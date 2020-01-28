@@ -1,0 +1,16 @@
+version: '3.7'
+services:
+  gateway:
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    image: relaynet-gw:development
+    init: true
+    entrypoint: ''
+    command: jest --config jest.config.functional.js
+    volumes:
+      - .:/opt/gw-dev
+      # Use `node_modules` from container; trailing slash is required.
+      - /opt/gw-dev/node_modules/
+    links:
+      - app

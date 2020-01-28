@@ -1,0 +1,13 @@
+version: '3.7'
+services:
+  app:
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    image: relaynet-gw:local-dev
+    init: true
+    command: src/bin/pohttp-server.ts
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - ./src:/opt/gw-dev/src:ro

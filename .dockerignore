@@ -1,0 +1,7 @@
+node_modules/
+build/
+docs/
+.*
+Dockerfile*
+src/functional_tests/
+docker-compose.yml

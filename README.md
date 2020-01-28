@@ -1,1 +1,1 @@
-# relaynet-relaying-gateway
+# Relaynet-Internet Gateway

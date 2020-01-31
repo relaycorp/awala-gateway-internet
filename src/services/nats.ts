@@ -11,3 +11,21 @@ export async function natsConnect(): Promise<Client> {
 
   return connect({ servers, token, payload: Payload.BINARY });
 }
+
+export async function publishMessage(subject: string, message: Buffer): Promise<void> {
+  const client = await natsConnect();
+
+  try {
+    await new Promise(async (resolve, reject) => {
+      client.on('error', reject);
+      client.on('permissionError', reject);
+
+      await client.publish(subject, message);
+
+      await client.flush();
+      resolve();
+    });
+  } finally {
+    await client.close();
+  }
+}

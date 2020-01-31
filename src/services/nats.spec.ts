@@ -1,11 +1,24 @@
+import { EventEmitter } from 'events';
 import * as nats from 'ts-nats';
 import { mockEnvVars, restoreEnvVars } from './_test_utils';
-import { natsConnect } from './nats';
+import { natsConnect, publishMessage } from './nats';
 import { EnvVarError } from 'env-var';
 
-const stubNatsClient = { foo: 'bar' };
+class StubNatsClient extends EventEmitter {
+  public readonly publish = jest.fn();
+  public readonly flush = jest.fn();
+  public readonly close = jest.fn();
+
+  constructor() {
+    super();
+  }
+}
+
+let stubNatsClient: StubNatsClient;
 const mockNatsConnect = jest.spyOn(nats, 'connect');
 beforeEach(() => {
+  stubNatsClient = new StubNatsClient();
+
   mockNatsConnect.mockReset();
   // @ts-ignore
   mockNatsConnect.mockResolvedValueOnce(stubNatsClient);
@@ -16,13 +29,15 @@ afterAll(() => {
   restoreEnvVars();
 });
 
+const stubSubject = 'the.topic.looks.like.this';
+const stubPayload = Buffer.from('the payload');
+
+const stubNatsServerUrl = 'nats://example.com:4222';
+beforeEach(() => {
+  mockEnvVars({ NATS_SERVERS: stubNatsServerUrl });
+});
+
 describe('natsConnect', () => {
-  const stubNatsServerUrl = 'nats://example.com:4222';
-
-  beforeEach(() => {
-    mockEnvVars({ NATS_SERVERS: stubNatsServerUrl });
-  });
-
   test('Env var NATS_SERVERS must be set', async () => {
     mockEnvVars({});
 
@@ -72,5 +87,44 @@ describe('natsConnect', () => {
     await natsConnect();
 
     expect(mockNatsConnect.mock.calls[0][0]).toHaveProperty('payload', nats.Payload.BINARY);
+  });
+});
+
+describe('publishMessage', () => {
+  test('Message should be published to the specified subject', async () => {
+    await publishMessage(stubSubject, stubPayload);
+
+    expect(stubNatsClient.publish).toBeCalledTimes(1);
+    expect(stubNatsClient.publish).toBeCalledWith(stubSubject, stubPayload);
+
+    expect(stubNatsClient.flush).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toHaveBeenCalledAfter(stubNatsClient.flush);
+  });
+
+  test('"error" event should be thrown', async () => {
+    const error = new Error('Could not connect');
+    stubNatsClient.publish.mockImplementation(() => {
+      stubNatsClient.emit('error', error);
+    });
+
+    await expect(publishMessage(stubSubject, stubPayload)).rejects.toEqual(error);
+
+    expect(stubNatsClient.flush).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toHaveBeenCalledAfter(stubNatsClient.flush);
+  });
+
+  test('"permissionError" event should be thrown', async () => {
+    const error = new Error('Denied');
+    stubNatsClient.publish.mockImplementation(() => {
+      stubNatsClient.emit('permissionError', error);
+    });
+
+    await expect(publishMessage(stubSubject, stubPayload)).rejects.toEqual(error);
+
+    expect(stubNatsClient.flush).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toBeCalledTimes(1);
+    expect(stubNatsClient.close).toHaveBeenCalledAfter(stubNatsClient.flush);
   });
 });

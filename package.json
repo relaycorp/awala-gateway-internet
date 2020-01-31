@@ -61,7 +61,7 @@
   },
   "homepage": "https://docs.relaycorp.tech/relaynet-internet-gateway/",
   "dependencies": {
-    "@relaycorp/relaynet-core": "^1.6.1",
+    "@relaycorp/relaynet-core": "^1.8.0",
     "@relaycorp/relaynet-pohttp": "^1.1.2",
     "axios": "^0.19.1",
     "buffer-to-arraybuffer": "0.0.5",

@@ -1,5 +1,5 @@
 import { get as getEnvVar } from 'env-var';
-import { Client, connect } from 'ts-nats';
+import { Client, connect, Payload } from 'ts-nats';
 
 export async function natsConnect(): Promise<Client> {
   const natsServersString = getEnvVar('NATS_SERVERS')
@@ -9,5 +9,5 @@ export async function natsConnect(): Promise<Client> {
 
   const token = getEnvVar('NATS_TOKEN').asString();
 
-  return connect({ servers, token });
+  return connect({ servers, token, payload: Payload.BINARY });
 }

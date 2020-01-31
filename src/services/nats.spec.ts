@@ -67,4 +67,10 @@ describe('natsConnect', () => {
 
     expect(mockNatsConnect.mock.calls[0][0]).toHaveProperty('token', natsToken);
   });
+
+  test('Payloads should be binary', async () => {
+    await natsConnect();
+
+    expect(mockNatsConnect.mock.calls[0][0]).toHaveProperty('payload', nats.Payload.BINARY);
+  });
 });

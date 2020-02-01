@@ -1,8 +1,11 @@
+/* tslint:disable:no-let */
+
+import { EnvVarError } from 'env-var';
 import { EventEmitter } from 'events';
 import * as nats from 'ts-nats';
+
 import { mockEnvVars, restoreEnvVars } from './_test_utils';
 import { natsConnect, publishMessage } from './nats';
-import { EnvVarError } from 'env-var';
 
 class StubNatsClient extends EventEmitter {
   public readonly publish = jest.fn();

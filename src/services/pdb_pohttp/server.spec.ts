@@ -1,7 +1,8 @@
-import { getMockContext } from '../_test_utils';
-import * as server from './server';
-
+import { EnvVarError } from 'env-var';
 import fastify = require('fastify');
+
+import { configureMockEnvVars, getMockContext } from '../_test_utils';
+import * as server from './server';
 
 const mockFastify = {
   addContentTypeParser: jest.fn(),
@@ -14,6 +15,9 @@ jest.mock('fastify', () => jest.fn().mockImplementation(() => mockFastify));
 afterAll(() => {
   jest.restoreAllMocks();
 });
+
+const stubMongoUri = 'mongodb://mongodb/test_db';
+const mockEnvVars = configureMockEnvVars({ MONGO_URI: stubMongoUri });
 
 describe('makeServer', () => {
   test('Logger should be enabled', () => {
@@ -32,8 +36,7 @@ describe('makeServer', () => {
 
   test('Custom request id header can be set via REQUEST_ID_HEADER variable', () => {
     const requestIdHeader = 'X-Id';
-    // tslint:disable-next-line:no-object-mutation
-    process.env.REQUEST_ID_HEADER = requestIdHeader;
+    mockEnvVars({ MONGO_URI: stubMongoUri, REQUEST_ID_HEADER: requestIdHeader });
 
     server.makeServer();
 
@@ -41,8 +44,8 @@ describe('makeServer', () => {
     expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader);
   });
 
-  test('Content-Type application/vnd.relaynet.parcel should be supported', () => {
-    server.makeServer();
+  test('Content-Type application/vnd.relaynet.parcel should be supported', async () => {
+    await server.makeServer();
 
     expect(mockFastify.addContentTypeParser).toBeCalledTimes(1);
     const addContentTypeParserCallArgs = getMockContext(mockFastify.addContentTypeParser).calls[0];
@@ -59,6 +62,20 @@ describe('makeServer', () => {
     server.makeServer();
 
     expect(mockFastify.register).toBeCalledWith(require('./routes').default);
+  });
+
+  test('The env var MONGO_URI should be set', async () => {
+    mockEnvVars({ MONGO_URI: undefined });
+
+    await expect(server.makeServer()).rejects.toBeInstanceOf(EnvVarError);
+  });
+
+  test('The fastify-mongoose plugin should be configured', async () => {
+    await server.makeServer();
+
+    expect(mockFastify.register).toBeCalledWith(require('fastify-mongoose'), {
+      uri: stubMongoUri,
+    });
   });
 
   test('It should wait for the Fastify server to be ready', async () => {

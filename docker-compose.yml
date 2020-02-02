@@ -11,6 +11,12 @@ services:
       - '127.0.0.1:8080:8080'
     volumes:
       - ./src:/opt/gw-dev/src:ro
+    links:
+      - mongodb
+      - nats
+
+  mongodb:
+    image: mongo:4.0
 
   nats:
     image: nats-streaming:0.16.2

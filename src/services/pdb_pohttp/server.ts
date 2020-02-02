@@ -24,6 +24,11 @@ export async function makeServer(): Promise<FastifyInstance> {
 
   server.register(routes);
 
+  const mongoUri = getEnvVar('MONGO_URI')
+    .required()
+    .asString();
+  await server.register(require('fastify-mongoose'), { uri: mongoUri });
+
   server.addContentTypeParser(
     'application/vnd.relaynet.parcel',
     { parseAs: 'buffer' },

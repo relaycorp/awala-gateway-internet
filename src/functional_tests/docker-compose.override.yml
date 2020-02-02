@@ -12,5 +12,3 @@ services:
       - .:/opt/gw-dev
       # Use `node_modules` from container; trailing slash is required.
       - /opt/gw-dev/node_modules/
-    links:
-      - services

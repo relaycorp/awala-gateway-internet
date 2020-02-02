@@ -59,7 +59,6 @@ export default async function registerRoutes(
             parcel.senderCaCertificateChain.map(c => c.calculateSubjectPrivateAddress()),
           ),
           certPath: await Promise.all(
-            // @ts-ignore
             (await parcel.getSenderCertificationPath(trustedCertificates)).map(c =>
               c.calculateSubjectPrivateAddress(),
             ),
@@ -74,7 +73,6 @@ export default async function registerRoutes(
         // return reply.code(400).send({ message: 'Parcel sender is not authorized' });
       }
 
-      // @ts-ignore
       const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
       const localGateway = certificatePath[0];
       const localGatewayAddress = await localGateway.calculateSubjectPrivateAddress();

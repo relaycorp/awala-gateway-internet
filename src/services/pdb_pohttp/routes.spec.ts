@@ -3,7 +3,6 @@
 import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { Connection } from 'mongoose';
 
 import {
   configureMockEnvVars,
@@ -18,11 +17,10 @@ import { makeServer } from './server';
 
 configureMockEnvVars({ MONGO_URI: 'uri' });
 
-// @ts-ignore
-const mockMongooseConnection: Connection = {};
+const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' }, ObjectId: {} };
 jest.mock('fastify-mongoose', () => {
   function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
-    fastify.decorate('mongo', mockMongooseConnection);
+    fastify.decorate('mongo', mockFastifyMongooseObject);
     next();
   }
 
@@ -51,7 +49,7 @@ beforeAll(async () => {
   const payload = await generateStubParcel({
     recipientAddress: await stubPdaChain.peerEndpoint.calculateSubjectPrivateAddress(),
     senderCertificate: stubPdaChain.pda,
-    senderCertificateChain: [stubPdaChain.localGateway],
+    senderCertificateChain: [stubPdaChain.peerEndpoint, stubPdaChain.localGateway],
     senderPrivateKey: stubPdaChain.pdaGranteePrivateKey,
   });
   // tslint:disable-next-line:no-object-mutation
@@ -62,15 +60,17 @@ beforeAll(async () => {
   ] = payload.byteLength.toString();
 });
 
-const mockPublishMessage = jest.spyOn(nats, 'publishMessage').mockResolvedValueOnce();
-beforeEach(() => mockPublishMessage.mockClear());
+const mockPublishMessage = jest.spyOn(nats, 'publishMessage');
+beforeEach(() => {
+  mockPublishMessage.mockReset();
+  mockPublishMessage.mockResolvedValueOnce();
+});
 afterAll(() => mockPublishMessage.mockRestore());
 
-const mockRetrieveOwnCertificates = jest
-  .spyOn(certs, 'retrieveOwnCertificates')
-  .mockImplementation(async () => [stubPdaChain.relayingGateway]);
+const mockRetrieveOwnCertificates = jest.spyOn(certs, 'retrieveOwnCertificates');
 beforeEach(() => {
-  mockRetrieveOwnCertificates.mockClear();
+  mockRetrieveOwnCertificates.mockReset();
+  mockRetrieveOwnCertificates.mockImplementation(async () => [stubPdaChain.relayingGateway]);
 });
 afterAll(() => mockRetrieveOwnCertificates.mockRestore());
 
@@ -149,13 +149,13 @@ describe('receiveParcel', () => {
     });
 
     expect(response).toHaveProperty('statusCode', 400);
-    expect(JSON.parse(response.payload)).toHaveProperty('message', 'Invalid parcel recipient');
+    expect(JSON.parse(response.payload)).toHaveProperty(
+      'message',
+      'Parcel sender is not authorized',
+    );
 
     expect(mockRetrieveOwnCertificates).toBeCalledTimes(1);
-    expect(mockRetrieveOwnCertificates).toBeCalledWith(
-      // @ts-ignore
-      ((serverInstance.mongo as unknown) as Connection).db,
-    );
+    expect(mockRetrieveOwnCertificates).toBeCalledWith(mockFastifyMongooseObject.db);
 
     expect(mockPublishMessage).not.toBeCalled();
   });
@@ -180,6 +180,7 @@ describe('receiveParcel', () => {
 
     test('Failing to queue the ping message should result in a 500 response', async () => {
       const error = new Error('Oops');
+      mockPublishMessage.mockReset();
       mockPublishMessage.mockRejectedValueOnce(error);
 
       const response = await serverInstance.inject(validRequestOptions);

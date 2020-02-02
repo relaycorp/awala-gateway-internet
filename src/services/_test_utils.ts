@@ -55,35 +55,43 @@ export interface PdaChain {
 
 export async function generateStubPdaChain(): Promise<PdaChain> {
   const relayingGatewayKeyPair = await generateRSAKeyPair();
-  const relayingGatewayCert = await issueGatewayCertificate({
-    issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-    subjectPublicKey: relayingGatewayKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  const relayingGatewayCert = reSerializeCertificate(
+    await issueGatewayCertificate({
+      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
+      subjectPublicKey: relayingGatewayKeyPair.publicKey,
+      validityEndDate: TOMORROW,
+    }),
+  );
 
   const localGatewayKeyPair = await generateRSAKeyPair();
-  const localGatewayCert = await issueGatewayCertificate({
-    issuerCertificate: relayingGatewayCert,
-    issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-    subjectPublicKey: localGatewayKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  const localGatewayCert = reSerializeCertificate(
+    await issueGatewayCertificate({
+      issuerCertificate: relayingGatewayCert,
+      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
+      subjectPublicKey: localGatewayKeyPair.publicKey,
+      validityEndDate: TOMORROW,
+    }),
+  );
 
   const peerEndpointKeyPair = await generateRSAKeyPair();
-  const peerEndpointCert = await issueEndpointCertificate({
-    issuerCertificate: localGatewayCert,
-    issuerPrivateKey: localGatewayKeyPair.privateKey,
-    subjectPublicKey: peerEndpointKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  const peerEndpointCert = reSerializeCertificate(
+    await issueEndpointCertificate({
+      issuerCertificate: localGatewayCert,
+      issuerPrivateKey: localGatewayKeyPair.privateKey,
+      subjectPublicKey: peerEndpointKeyPair.publicKey,
+      validityEndDate: TOMORROW,
+    }),
+  );
 
   const endpointKeyPair = await generateRSAKeyPair();
-  const endpointPdaCert = await issueDeliveryAuthorization({
-    issuerCertificate: peerEndpointCert,
-    issuerPrivateKey: peerEndpointKeyPair.privateKey,
-    subjectPublicKey: endpointKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  const endpointPdaCert = reSerializeCertificate(
+    await issueDeliveryAuthorization({
+      issuerCertificate: peerEndpointCert,
+      issuerPrivateKey: peerEndpointKeyPair.privateKey,
+      subjectPublicKey: endpointKeyPair.publicKey,
+      validityEndDate: TOMORROW,
+    }),
+  );
 
   return {
     localGateway: localGatewayCert,
@@ -136,4 +144,13 @@ export function expectBuffersToEqual(
     const actualBuffer2 = Buffer.from(buffer2);
     expect(actualBuffer1.equals(actualBuffer2)).toBeTrue();
   }
+}
+
+export function reSerializeCertificate(cert: Certificate): Certificate {
+  // TODO: Raise bug in PKI.js project
+  // PKI.js sometimes tries to use attributes that are only set *after* the certificate has been
+  // deserialized, so you'd get a TypeError if you use a certificate you just created in memory.
+  // For example, `extension.parsedValue` would be `undefined` in
+  // https://github.com/PeculiarVentures/PKI.js/blob/9a39551aa9f1445406f96680318014c8d714e8e3/src/CertificateChainValidationEngine.js#L155
+  return Certificate.deserialize(cert.serialize());
 }

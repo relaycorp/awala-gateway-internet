@@ -4,7 +4,7 @@ import { EnvVarError } from 'env-var';
 import { EventEmitter } from 'events';
 import * as nats from 'ts-nats';
 
-import { mockEnvVars, restoreEnvVars } from './_test_utils';
+import { configureMockEnvVars } from './_test_utils';
 import { natsConnect, publishMessage } from './nats';
 
 class StubNatsClient extends EventEmitter {
@@ -29,16 +29,13 @@ beforeEach(() => {
 
 afterAll(() => {
   mockNatsConnect.mockRestore();
-  restoreEnvVars();
 });
 
 const stubSubject = 'the.topic.looks.like.this';
 const stubPayload = Buffer.from('the payload');
 
 const stubNatsServerUrl = 'nats://example.com:4222';
-beforeEach(() => {
-  mockEnvVars({ NATS_SERVERS: stubNatsServerUrl });
-});
+const mockEnvVars = configureMockEnvVars({ NATS_SERVERS: stubNatsServerUrl });
 
 describe('natsConnect', () => {
   test('Env var NATS_SERVERS must be set', async () => {
@@ -95,7 +92,7 @@ describe('natsConnect', () => {
 
 describe('publishMessage', () => {
   test('Message should be published to the specified subject', async () => {
-    await publishMessage(stubSubject, stubPayload);
+    await publishMessage(stubPayload, stubSubject);
 
     expect(stubNatsClient.publish).toBeCalledTimes(1);
     expect(stubNatsClient.publish).toBeCalledWith(stubSubject, stubPayload);
@@ -111,7 +108,7 @@ describe('publishMessage', () => {
       stubNatsClient.emit('error', error);
     });
 
-    await expect(publishMessage(stubSubject, stubPayload)).rejects.toEqual(error);
+    await expect(publishMessage(stubPayload, stubSubject)).rejects.toEqual(error);
 
     expect(stubNatsClient.flush).toBeCalledTimes(1);
     expect(stubNatsClient.close).toBeCalledTimes(1);
@@ -124,7 +121,7 @@ describe('publishMessage', () => {
       stubNatsClient.emit('permissionError', error);
     });
 
-    await expect(publishMessage(stubSubject, stubPayload)).rejects.toEqual(error);
+    await expect(publishMessage(stubPayload, stubSubject)).rejects.toEqual(error);
 
     expect(stubNatsClient.flush).toBeCalledTimes(1);
     expect(stubNatsClient.close).toBeCalledTimes(1);

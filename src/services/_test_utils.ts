@@ -1,3 +1,5 @@
+/* tslint:disable:no-let */
+
 import {
   Certificate,
   generateRSAKeyPair,
@@ -16,18 +18,30 @@ export function getMockContext(mockedObject: any): jest.MockContext<any, any> {
   return mockInstance.mock;
 }
 
-export function mockEnvVars(envVars: { readonly [key: string]: string | undefined }): void {
-  jest.spyOn(envVar, 'get').mockImplementation((...args: readonly any[]) => {
-    const originalEnvVar = jest.requireActual('env-var');
-    const env = originalEnvVar.from(envVars);
-
-    return env.get(...args);
-  });
+interface EnvVarSet {
+  readonly [key: string]: string | undefined;
 }
 
-export function restoreEnvVars(): void {
-  // @ts-ignore
-  envVar.get.mockRestore();
+export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarSet) => void {
+  const mockEnvVarGet = jest.spyOn(envVar, 'get');
+
+  function setEnvVars(newEnvVars: EnvVarSet): void {
+    mockEnvVarGet.mockReset();
+    mockEnvVarGet.mockImplementation((...args: readonly any[]) => {
+      const originalEnvVar = jest.requireActual('env-var');
+      const env = originalEnvVar.from(newEnvVars);
+
+      return env.get(...args);
+    });
+  }
+
+  beforeEach(() => setEnvVars(envVars));
+
+  afterAll(() => {
+    mockEnvVarGet.mockRestore();
+  });
+
+  return (newEnvVars: EnvVarSet) => setEnvVars(newEnvVars);
 }
 
 export interface PdaChain {
@@ -79,8 +93,9 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   };
 }
 
-export async function generateStubEndpointCertificate(): Promise<Certificate> {
-  const keyPair = await generateRSAKeyPair();
+export async function generateStubEndpointCertificate(
+  keyPair: CryptoKeyPair,
+): Promise<Certificate> {
   return issueEndpointCertificate({
     issuerPrivateKey: keyPair.privateKey,
     subjectPublicKey: keyPair.publicKey,

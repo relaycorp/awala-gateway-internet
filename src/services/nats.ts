@@ -12,7 +12,7 @@ export async function natsConnect(): Promise<Client> {
   return connect({ servers, token, payload: Payload.BINARY });
 }
 
-export async function publishMessage(subject: string, message: Buffer): Promise<void> {
+export async function publishMessage(message: Buffer, subject: string): Promise<void> {
   const client = await natsConnect();
 
   try {

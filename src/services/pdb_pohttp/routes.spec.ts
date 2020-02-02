@@ -2,7 +2,7 @@
 
 import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
-import fastifyPlugin from 'fastify-plugin';
+import mockFastifyPlugin from 'fastify-plugin';
 
 import {
   configureMockEnvVars,
@@ -24,7 +24,7 @@ jest.mock('fastify-mongoose', () => {
     next();
   }
 
-  return fastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
+  return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
 });
 
 let serverInstance: FastifyInstance;

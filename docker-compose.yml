@@ -7,7 +7,21 @@ services:
     image: relaynet-gw:local-dev
     init: true
     command: src/bin/pohttp-server.ts
+    environment:
+      MONGO_URI: mongodb://mongodb/test_db
     ports:
       - '127.0.0.1:8080:8080'
     volumes:
       - ./src:/opt/gw-dev/src:ro
+    links:
+      - mongodb
+      - nats
+
+  mongodb:
+    image: mongo:4.0
+
+  nats:
+    image: nats-streaming:0.16.2
+    command: ['-DV']
+    ports:
+    - "127.0.0.1:4222:4222"

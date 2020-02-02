@@ -19,12 +19,10 @@ import { makeServer } from './server';
 configureMockEnvVars({ MONGO_URI: 'uri' });
 
 // @ts-ignore
-const stubMongooseConnection: Connection = {};
+const mockMongooseConnection: Connection = {};
 jest.mock('fastify-mongoose', () => {
   function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
-    // tslint:disable-next-line:no-console
-    console.log({ fastify });
-    fastify.decorate('mongo', stubMongooseConnection);
+    fastify.decorate('mongo', mockMongooseConnection);
     next();
   }
 

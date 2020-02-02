@@ -1,4 +1,4 @@
-/* tslint:disable:no-let */
+/* tslint:disable:no-let no-object-mutation */
 
 import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';

@@ -61,13 +61,16 @@
   },
   "homepage": "https://docs.relaycorp.tech/relaynet-internet-gateway/",
   "dependencies": {
-    "@relaycorp/relaynet-core": "^1.8.0",
+    "@relaycorp/relaynet-core": "^1.9.0",
     "@relaycorp/relaynet-pohttp": "^1.1.2",
+    "@typegoose/typegoose": "^6.2.2",
     "axios": "^0.19.1",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^5.2.0",
     "fastify": "^2.11.0",
+    "fastify-mongoose": "^0.3.0",
     "make-promises-safe": "^5.1.0",
+    "mongoose": "^5.8.11",
     "pino": "^5.16.0",
     "ts-nats": "^1.2.4"
   }

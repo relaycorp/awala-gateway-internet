@@ -53,32 +53,31 @@ export default async function registerRoutes(
       try {
         await parcel.validate(trustedCertificates);
       } catch (error) {
-        // // tslint:disable-next-line:no-console
-        // console.log({
-        //   attachedChain: [
-        //     await parcel.senderCaCertificateChain[0].calculateSubjectPrivateAddress(),
-        //     await parcel.senderCaCertificateChain[1].calculateSubjectPrivateAddress(),
-        //     await parcel.senderCaCertificateChain[2].calculateSubjectPrivateAddress(),
-        //   ],
-        //   attachedChainCount: parcel.senderCaCertificateChain.length,
-        //   err: error.message,
-        //   recipient: parcel.recipientAddress,
-        //   sender: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-        //   trusted: await trustedCertificates[0].calculateSubjectPrivateAddress(),
-        //   trustedCount: trustedCertificates.length,
-        // });
-        //
-        // // @ts-ignore
-        // const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-        // // tslint:disable-next-line:prefer-for-of no-let
-        // for (let i = 0; i < certificatePath.length; i++) {
-        //   // tslint:disable-next-line:no-console
-        //   console.log({
-        //     addr: await certificatePath[i].calculateSubjectPrivateAddress(),
-        //     i,
-        //     total: certificatePath.length,
-        //   });
-        // }
+        // tslint:disable-next-line:no-console
+        console.log({
+          attachedChain: [
+            await parcel.senderCaCertificateChain[0].calculateSubjectPrivateAddress(),
+            await parcel.senderCaCertificateChain[1].calculateSubjectPrivateAddress(),
+          ],
+          attachedChainCount: parcel.senderCaCertificateChain.length,
+          err: error.message,
+          recipient: parcel.recipientAddress,
+          sender: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+          trusted: await trustedCertificates[0].calculateSubjectPrivateAddress(),
+          trustedCount: trustedCertificates.length,
+        });
+
+        // @ts-ignore
+        const certPath = await parcel.getSenderCertificationPath(trustedCertificates);
+        // tslint:disable-next-line:prefer-for-of no-let
+        for (let i = 0; i < certPath.length; i++) {
+          // tslint:disable-next-line:no-console
+          console.log({
+            addr: await certPath[i].calculateSubjectPrivateAddress(),
+            i,
+            total: certPath.length,
+          });
+        }
         // return reply.code(400).send({ message: 'Parcel sender is not authorized' });
       }
 

@@ -35,6 +35,7 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
     });
   }
 
+  beforeAll(() => setEnvVars(envVars));
   beforeEach(() => setEnvVars(envVars));
 
   afterAll(() => {

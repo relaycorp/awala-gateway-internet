@@ -7,6 +7,8 @@ services:
     image: relaynet-gw:local-dev
     init: true
     command: src/bin/pohttp-server.ts
+    environment:
+      MONGO_URI: mongodb://mongodb/test_db
     ports:
       - '127.0.0.1:8080:8080'
     volumes:

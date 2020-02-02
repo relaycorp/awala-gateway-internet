@@ -2,7 +2,7 @@
 
 import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
-import mockFastifyPlugin from 'fastify-plugin';
+import fastifyPlugin from 'fastify-plugin';
 
 import {
   configureMockEnvVars,
@@ -17,6 +17,7 @@ import { makeServer } from './server';
 
 configureMockEnvVars({ MONGO_URI: 'uri' });
 
+const mockFastifyPlugin = fastifyPlugin;
 const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' }, ObjectId: {} };
 jest.mock('fastify-mongoose', () => {
   function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {

@@ -19,6 +19,8 @@ jobs:
             sudo mv ~/docker-compose /usr/local/bin/docker-compose
 
       # Install dependencies just so we can transpile the TS files to JS; then remove the deps.
+      - run: nvm install 12
+      - run: nvm use 12
       - run: npm install
       - run: npm run build
       - run: rm -rf node_modules

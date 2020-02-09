@@ -23,8 +23,8 @@ jobs:
           name: Transpile project to JavaScript
           command: |
             docker run --rm -v "$(pwd):/tmp/gw" -w "/tmp/gw" node:12.15 bash -c "npm install && npm run build"
-            sudo chown -R . "${USER}"
-            rm -rf node_modules
+            sudo chown -R build "${USER}"
+            sudo rm -rf node_modules
 
       - run: ./src/functional_tests/run.sh
 

@@ -20,7 +20,7 @@ jobs:
 
       # Install dependencies just so we can transpile the TS files to JS; then remove the deps.
       - run:
-          name: Transpile the TypeScript to JavaScript
+          name: Transpile project to JavaScript
           command: |
             docker run --rm -v "$(pwd):/tmp/gw" -w "/tmp/gw" node:12.15 bash -c "npm install && npm run build"
             sudo chown -R . "${USER}"

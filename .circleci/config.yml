@@ -19,11 +19,12 @@ jobs:
             sudo mv ~/docker-compose /usr/local/bin/docker-compose
 
       # Install dependencies just so we can transpile the TS files to JS; then remove the deps.
-      - name: Transpile the TypeScript to JavaScript
-        run: |
-          docker run --rm -v "$(pwd):/tmp/gw" -w "/tmp/gw" node:12.15 bash -c "npm install && npm run build"
-          sudo chown -R . "${USER}"
-          rm -rf node_modules
+      - run:
+          name: Transpile the TypeScript to JavaScript
+          command: |
+            docker run --rm -v "$(pwd):/tmp/gw" -w "/tmp/gw" node:12.15 bash -c "npm install && npm run build"
+            sudo chown -R . "${USER}"
+            rm -rf node_modules
 
       - run: ./src/functional_tests/run.sh
 

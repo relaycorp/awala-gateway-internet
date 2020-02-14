@@ -77,7 +77,7 @@ export default async function registerRoutes(
       const localGateway = certificatePath[0];
       const localGatewayAddress = await localGateway.calculateSubjectPrivateAddress();
       try {
-        await publishMessage(request.body, `crc-parcel.${localGatewayAddress}`);
+        await publishMessage(request.body, `pdc-parcel.${localGatewayAddress}`);
       } catch (error) {
         request.log.error({ err: error }, 'Failed to queue ping message');
         return reply

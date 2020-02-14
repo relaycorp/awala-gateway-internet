@@ -175,7 +175,7 @@ describe('receiveParcel', () => {
       expect(mockPublishMessage).toBeCalledTimes(1);
       expect(mockPublishMessage).toBeCalledWith(
         validRequestOptions.payload,
-        `crc-parcel.${await stubPdaChain.localGateway.calculateSubjectPrivateAddress()}`,
+        `pdc-parcel.${await stubPdaChain.localGateway.calculateSubjectPrivateAddress()}`,
       );
     });
 

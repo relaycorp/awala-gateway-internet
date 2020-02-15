@@ -50,7 +50,7 @@ beforeAll(async () => {
   const payload = await generateStubParcel({
     recipientAddress: await stubPdaChain.peerEndpoint.calculateSubjectPrivateAddress(),
     senderCertificate: stubPdaChain.pda,
-    senderCertificateChain: [stubPdaChain.peerEndpoint, stubPdaChain.localGateway],
+    senderCertificateChain: [stubPdaChain.peerEndpoint, stubPdaChain.privateGateway],
     senderPrivateKey: stubPdaChain.pdaGranteePrivateKey,
   });
   // tslint:disable-next-line:no-object-mutation
@@ -71,7 +71,7 @@ afterAll(() => mockPublishMessage.mockRestore());
 const mockRetrieveOwnCertificates = jest.spyOn(certs, 'retrieveOwnCertificates');
 beforeEach(() => {
   mockRetrieveOwnCertificates.mockReset();
-  mockRetrieveOwnCertificates.mockImplementation(async () => [stubPdaChain.relayingGateway]);
+  mockRetrieveOwnCertificates.mockImplementation(async () => [stubPdaChain.publicGateway]);
 });
 afterAll(() => mockRetrieveOwnCertificates.mockRestore());
 
@@ -140,7 +140,7 @@ describe('receiveParcel', () => {
     const payload = await generateStubParcel({
       recipientAddress: await stubPdaChain.peerEndpoint.calculateSubjectPrivateAddress(),
       senderCertificate: unauthorizedCert,
-      senderCertificateChain: [stubPdaChain.localGateway],
+      senderCertificateChain: [stubPdaChain.privateGateway],
       senderPrivateKey: unauthorizedSenderKeyPair.privateKey,
     });
     const response = await serverInstance.inject({
@@ -175,7 +175,7 @@ describe('receiveParcel', () => {
       expect(mockPublishMessage).toBeCalledTimes(1);
       expect(mockPublishMessage).toBeCalledWith(
         validRequestOptions.payload,
-        `pdc-parcel.${await stubPdaChain.localGateway.calculateSubjectPrivateAddress()}`,
+        `pdc-parcel.${await stubPdaChain.privateGateway.calculateSubjectPrivateAddress()}`,
       );
     });
 

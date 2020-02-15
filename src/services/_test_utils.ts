@@ -67,29 +67,29 @@ export function mockSpy<T, Y extends any[]>(
 }
 
 export interface PdaChain {
-  readonly relayingGateway: Certificate;
-  readonly localGateway: Certificate;
+  readonly publicGateway: Certificate;
+  readonly privateGateway: Certificate;
   readonly peerEndpoint: Certificate;
   readonly pda: Certificate;
   readonly pdaGranteePrivateKey: CryptoKey;
 }
 
 export async function generateStubPdaChain(): Promise<PdaChain> {
-  const relayingGatewayKeyPair = await generateRSAKeyPair();
-  const relayingGatewayCert = reSerializeCertificate(
+  const publicGatewayKeyPair = await generateRSAKeyPair();
+  const publicGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-      subjectPublicKey: relayingGatewayKeyPair.publicKey,
+      issuerPrivateKey: publicGatewayKeyPair.privateKey,
+      subjectPublicKey: publicGatewayKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
   );
 
-  const localGatewayKeyPair = await generateRSAKeyPair();
-  const localGatewayCert = reSerializeCertificate(
+  const privateGatewayKeyPair = await generateRSAKeyPair();
+  const privateGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerCertificate: relayingGatewayCert,
-      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-      subjectPublicKey: localGatewayKeyPair.publicKey,
+      issuerCertificate: publicGatewayCert,
+      issuerPrivateKey: publicGatewayKeyPair.privateKey,
+      subjectPublicKey: privateGatewayKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
   );
@@ -97,8 +97,8 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   const peerEndpointKeyPair = await generateRSAKeyPair();
   const peerEndpointCert = reSerializeCertificate(
     await issueEndpointCertificate({
-      issuerCertificate: localGatewayCert,
-      issuerPrivateKey: localGatewayKeyPair.privateKey,
+      issuerCertificate: privateGatewayCert,
+      issuerPrivateKey: privateGatewayKeyPair.privateKey,
       subjectPublicKey: peerEndpointKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
@@ -115,11 +115,11 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   );
 
   return {
-    localGateway: localGatewayCert,
     pda: endpointPdaCert,
     pdaGranteePrivateKey: endpointKeyPair.privateKey,
     peerEndpoint: peerEndpointCert,
-    relayingGateway: relayingGatewayCert,
+    privateGateway: privateGatewayCert,
+    publicGateway: publicGatewayCert,
   };
 }
 

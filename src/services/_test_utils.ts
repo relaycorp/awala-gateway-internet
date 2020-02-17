@@ -9,7 +9,7 @@ import {
   Parcel,
 } from '@relaycorp/relaynet-core';
 import envVar from 'env-var';
-import * as pkijs from "pkijs";
+import * as pkijs from 'pkijs';
 import MockInstance = jest.MockInstance;
 
 const TOMORROW = new Date();

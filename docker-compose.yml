@@ -33,7 +33,7 @@ services:
     image: mongo:4.0
 
   nats:
-    image: nats-streaming:0.16.2
+    image: nats-streaming:0.17.0
     command: ['-DV']
     ports:
     - "127.0.0.1:4222:4222"

@@ -13,7 +13,7 @@ import {
   PdaChain,
 } from '../_test_utils';
 import * as certs from '../certs';
-import * as nats from '../nats';
+import * as natsStreaming from '../natsStreaming';
 import { makeServer } from './server';
 
 const mockFastifyPlugin = fastifyPlugin;
@@ -55,7 +55,18 @@ beforeAll(async () => {
   ] = payload.byteLength.toString();
 });
 
-const mockPublishMessage = mockSpy(jest.spyOn(nats, 'publishMessage'), () => undefined);
+const STUB_NATS_SERVER_URL = 'nats://example.com';
+const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
+let mockNatsClient: natsStreaming.NatsStreamingClient;
+beforeEach(() => {
+  mockNatsClient = ({
+    publishMessage: jest.fn(),
+  } as unknown) as natsStreaming.NatsStreamingClient;
+});
+const mockNatsClientClass = mockSpy(
+  jest.spyOn(natsStreaming, 'NatsStreamingClient'),
+  () => mockNatsClient,
+);
 
 const mockRetrieveOwnCertificates = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
@@ -63,7 +74,11 @@ const mockRetrieveOwnCertificates = mockSpy(
 );
 
 describe('receiveParcel', () => {
-  configureMockEnvVars({ MONGO_URI: 'uri' });
+  configureMockEnvVars({
+    MONGO_URI: 'uri',
+    NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
+    NATS_SERVER_URL: STUB_NATS_SERVER_URL,
+  });
 
   let serverInstance: FastifyInstance;
   beforeAll(async () => {
@@ -152,7 +167,7 @@ describe('receiveParcel', () => {
     expect(mockRetrieveOwnCertificates).toBeCalledTimes(1);
     expect(mockRetrieveOwnCertificates).toBeCalledWith(mockFastifyMongooseObject.db);
 
-    expect(mockPublishMessage).not.toBeCalled();
+    expect(mockNatsClient.publishMessage).not.toBeCalled();
   });
 
   describe('Valid parcel delivery', () => {
@@ -166,8 +181,15 @@ describe('receiveParcel', () => {
     test('Parcel should be published to right topic', async () => {
       await serverInstance.inject(validRequestOptions);
 
-      expect(mockPublishMessage).toBeCalledTimes(1);
-      expect(mockPublishMessage).toBeCalledWith(
+      expect(mockNatsClientClass).toBeCalledTimes(1);
+      expect(mockNatsClientClass).toBeCalledWith(
+        STUB_NATS_SERVER_URL,
+        STUB_NATS_CLUSTER_ID,
+        expect.stringMatching(/^pohttp-req-\d+$/),
+      );
+
+      expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
+      expect(mockNatsClient.publishMessage).toBeCalledWith(
         validRequestOptions.payload,
         `pdc-parcel.${await stubPdaChain.privateGateway.calculateSubjectPrivateAddress()}`,
       );
@@ -175,8 +197,8 @@ describe('receiveParcel', () => {
 
     test('Failing to queue the ping message should result in a 500 response', async () => {
       const error = new Error('Oops');
-      mockPublishMessage.mockReset();
-      mockPublishMessage.mockRejectedValueOnce(error);
+      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
+      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
 
       const response = await serverInstance.inject(validRequestOptions);
 

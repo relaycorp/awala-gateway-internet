@@ -160,6 +160,22 @@ describe('makeNatsPublisher', () => {
 
       expect(mockConnection.close).toBeCalled();
     });
+
+    test('Consumer should be called multiple times', async () => {
+      const publisher = makeNatsPublisher(STUB_CLUSTER_ID, STUB_CLIENT_ID, STUB_CHANNEL);
+
+      setImmediate(() => mockConnection.emit('connect'));
+      await publisher(generateMessages([STUB_MESSAGE]));
+
+      // @ts-ignore
+      mockConnection.on.mockClear();
+
+      await expect(publisher(generateMessages([]))).rejects.toMatchObject<Partial<Error>>({
+        message: 'Publisher cannot be reused as the connection was already closed',
+      });
+
+      expect(mockConnection.on).not.toBeCalled();
+    });
   });
 });
 

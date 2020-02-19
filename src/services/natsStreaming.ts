@@ -9,7 +9,15 @@ export function makeNatsPublisher(
   const connection = connect(clusterId, clientId);
   const publishPromisified = promisify(connection.publish).bind(connection);
 
+  // tslint:disable-next-line:no-let
+  let didPublishingStart = false;
+
   return async messages => {
+    if (didPublishingStart) {
+      throw new Error('Publisher cannot be reused as the connection was already closed');
+    }
+    didPublishingStart = true;
+
     return new Promise<void>((resolve, reject) => {
       connection.on('connect', async () => {
         try {

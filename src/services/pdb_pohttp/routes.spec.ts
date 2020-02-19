@@ -9,13 +9,12 @@ import {
   generateStubEndpointCertificate,
   generateStubParcel,
   generateStubPdaChain,
+  mockSpy,
   PdaChain,
 } from '../_test_utils';
 import * as certs from '../certs';
 import * as nats from '../nats';
 import { makeServer } from './server';
-
-configureMockEnvVars({ MONGO_URI: 'uri' });
 
 const mockFastifyPlugin = fastifyPlugin;
 const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' }, ObjectId: {} };
@@ -26,11 +25,6 @@ jest.mock('fastify-mongoose', () => {
   }
 
   return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
-});
-
-let serverInstance: FastifyInstance;
-beforeAll(async () => {
-  serverInstance = await makeServer();
 });
 
 const gatewayAddress = 'gw.relaycorp.tech:8000';
@@ -61,21 +55,21 @@ beforeAll(async () => {
   ] = payload.byteLength.toString();
 });
 
-const mockPublishMessage = jest.spyOn(nats, 'publishMessage');
-beforeEach(() => {
-  mockPublishMessage.mockReset();
-  mockPublishMessage.mockResolvedValueOnce();
-});
-afterAll(() => mockPublishMessage.mockRestore());
+const mockPublishMessage = mockSpy(jest.spyOn(nats, 'publishMessage'), () => undefined);
 
-const mockRetrieveOwnCertificates = jest.spyOn(certs, 'retrieveOwnCertificates');
-beforeEach(() => {
-  mockRetrieveOwnCertificates.mockReset();
-  mockRetrieveOwnCertificates.mockImplementation(async () => [stubPdaChain.publicGateway]);
-});
-afterAll(() => mockRetrieveOwnCertificates.mockRestore());
+const mockRetrieveOwnCertificates = mockSpy(
+  jest.spyOn(certs, 'retrieveOwnCertificates'),
+  async () => [stubPdaChain.publicGateway],
+);
 
 describe('receiveParcel', () => {
+  configureMockEnvVars({ MONGO_URI: 'uri' });
+
+  let serverInstance: FastifyInstance;
+  beforeAll(async () => {
+    serverInstance = await makeServer();
+  });
+
   test.each(['PUT', 'PATCH', 'DELETE'] as readonly HTTPMethod[])(
     '%s requests should be refused',
     async method => {

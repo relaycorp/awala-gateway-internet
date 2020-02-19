@@ -5,7 +5,7 @@ export function makeNatsPublisher(
   clusterId: string,
   clientId: string,
   channel: string,
-): (messages: IterableIterator<Buffer>) => Promise<void> {
+): (messages: IterableIterator<Buffer> | readonly Buffer[]) => Promise<void> {
   const connection = connect(clusterId, clientId);
   const publishPromisified = promisify(connection.publish).bind(connection);
 

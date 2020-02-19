@@ -50,7 +50,7 @@ describe('makeNatsPublisher', () => {
     expect(mockNatsConnect).toBeCalledWith(expect.anything(), STUB_CLIENT_ID);
   });
 
-  describe('Iterable consumer', () => {
+  describe('Consumer', () => {
     test('Publishing should only be done once the connection has been established', async done => {
       const publisher = makeNatsPublisher(STUB_CLUSTER_ID, STUB_CLIENT_ID, STUB_CHANNEL);
 
@@ -98,7 +98,27 @@ describe('makeNatsPublisher', () => {
       expect(mockConnection.publish).toBeCalledTimes(1);
     });
 
-    test('Publishing multiple messages should be supported', async () => {
+    test('Publishing multiple messages from an array should be supported', async () => {
+      const publisher = makeNatsPublisher(STUB_CLUSTER_ID, STUB_CLIENT_ID, STUB_CHANNEL);
+      const additionalStubMessage = Buffer.from('additional message here');
+
+      setImmediate(() => mockConnection.emit('connect'));
+      await publisher([STUB_MESSAGE, additionalStubMessage]);
+
+      expect(mockConnection.publish).toBeCalledTimes(2);
+      expect(mockConnection.publish).toBeCalledWith(
+        expect.anything(),
+        STUB_MESSAGE,
+        expect.anything(),
+      );
+      expect(mockConnection.publish).toBeCalledWith(
+        expect.anything(),
+        additionalStubMessage,
+        expect.anything(),
+      );
+    });
+
+    test('Publishing multiple messages from an iterator should be supported', async () => {
       const publisher = makeNatsPublisher(STUB_CLUSTER_ID, STUB_CLIENT_ID, STUB_CHANNEL);
       const additionalStubMessage = Buffer.from('additional message here');
 

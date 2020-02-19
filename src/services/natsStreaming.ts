@@ -33,6 +33,11 @@ export class NatsStreamingClient {
     };
   }
 
+  public async publishMessage(message: Buffer, channel: string): Promise<void> {
+    const publisher = this.makePublisher(channel);
+    return publisher([message]);
+  }
+
   protected async connect(): Promise<Stan> {
     return new Promise<Stan>((resolve, _reject) => {
       const connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });

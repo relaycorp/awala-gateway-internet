@@ -37,11 +37,11 @@ const STUB_CHANNEL = 'the-channel';
 const STUB_MESSAGE = Buffer.from('the-message');
 
 describe('NatsStreamingClient', () => {
-  const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+  const stubClient = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
 
   describe('makePublisher', () => {
     test('Server URL should be the specified one', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher([]);
@@ -55,7 +55,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Cluster id should be the specified one', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher([]);
@@ -65,7 +65,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Client id should be the specified one', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher([]);
@@ -75,7 +75,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Publishing should only be done once the connection has been established', async done => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => {
         // "connect" event was never emitted, so no message should've been published
         expect(mockConnection.on).toBeCalledTimes(1);
@@ -90,7 +90,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Messages should be published to the specified channel', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher(generateMessages([STUB_MESSAGE]));
@@ -104,7 +104,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Iteration should be aborted if a message fails to be published', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       const error = new Error('Whoops');
@@ -121,7 +121,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Publishing multiple messages from an array should be supported', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       const additionalStubMessage = Buffer.from('additional message here');
       setImmediate(() => mockConnection.emit('connect'));
 
@@ -141,7 +141,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Publishing multiple messages from an iterator should be supported', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       const additionalStubMessage = Buffer.from('additional message here');
       setImmediate(() => mockConnection.emit('connect'));
 
@@ -161,7 +161,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Connection should be closed upon failure', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
 
       const error = new Error('Whoops');
       mockConnection.publish.mockImplementation(
@@ -175,7 +175,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Connection should be closed upon successful completion', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher(generateMessages([STUB_MESSAGE]));
@@ -184,7 +184,7 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Consumer should be called multiple times', async () => {
-      const publisher = client.makePublisher(STUB_CHANNEL);
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
       await publisher(generateMessages([STUB_MESSAGE]));
@@ -198,6 +198,17 @@ describe('NatsStreamingClient', () => {
 
       expect(mockConnection.on).not.toBeCalled();
     });
+  });
+
+  test('publishMessage() should send a single message via a dedicated connection', async () => {
+    const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+    const mockPublisher = jest.fn();
+    jest.spyOn(client, 'makePublisher').mockReturnValueOnce(mockPublisher);
+
+    await client.publishMessage(STUB_MESSAGE, STUB_CHANNEL);
+
+    expect(client.makePublisher).toBeCalledWith(STUB_CHANNEL);
+    expect(mockPublisher).toBeCalledWith([STUB_MESSAGE]);
   });
 });
 

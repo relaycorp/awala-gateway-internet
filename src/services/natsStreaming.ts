@@ -1,38 +1,44 @@
 import { connect } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-export function makeNatsPublisher(
-  clusterId: string,
-  clientId: string,
-  channel: string,
-): (messages: IterableIterator<Buffer> | readonly Buffer[]) => Promise<void> {
-  const connection = connect(clusterId, clientId);
-  const publishPromisified = promisify(connection.publish).bind(connection);
+export class NatsStreamingClient {
+  constructor(
+    protected readonly serverUrl: string,
+    protected readonly clusterId: string,
+    protected readonly clientId: string,
+  ) {}
 
-  // tslint:disable-next-line:no-let
-  let didPublishingStart = false;
+  public makePublisher(
+    channel: string,
+  ): (messages: IterableIterator<Buffer> | readonly Buffer[]) => Promise<void> {
+    const connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
+    const publishPromisified = promisify(connection.publish).bind(connection);
 
-  return async messages => {
-    if (didPublishingStart) {
-      throw new Error('Publisher cannot be reused as the connection was already closed');
-    }
-    didPublishingStart = true;
+    // tslint:disable-next-line:no-let
+    let didPublishingStart = false;
 
-    return new Promise<void>((resolve, reject) => {
-      connection.on('connect', async () => {
-        try {
-          for (const message of messages) {
-            try {
-              await publishPromisified(channel, message);
-            } catch (error) {
-              return reject(error);
+    return async messages => {
+      if (didPublishingStart) {
+        throw new Error('Publisher cannot be reused as the connection was already closed');
+      }
+      didPublishingStart = true;
+
+      return new Promise<void>((resolve, reject) => {
+        connection.on('connect', async () => {
+          try {
+            for (const message of messages) {
+              try {
+                await publishPromisified(channel, message);
+              } catch (error) {
+                return reject(error);
+              }
             }
+            resolve();
+          } finally {
+            connection.close();
           }
-          resolve();
-        } finally {
-          connection.close();
-        }
+        });
       });
-    });
-  };
+    };
+  }
 }

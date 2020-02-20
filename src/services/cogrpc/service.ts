@@ -8,12 +8,15 @@ import * as grpc from 'grpc';
 import pipe from 'it-pipe';
 import { createConnection } from 'mongoose';
 import * as streamToIt from 'stream-to-it';
+import uuid from 'uuid-random';
 
 import { retrieveOwnCertificates } from '../certs';
-import { publishMessage } from '../nats';
+import { NatsStreamingClient, PublisherMessage } from '../natsStreaming';
 
 interface ServiceImplementationOptions {
   readonly mongoUri: string;
+  readonly natsServerUrl: string;
+  readonly natsClusterId: string;
 }
 
 export function makeServiceImplementation(
@@ -31,7 +34,16 @@ export function makeServiceImplementation(
         call.end();
       });
 
-      async function queueCargo(source: AsyncIterable<CargoDelivery>): Promise<void> {
+      const natsClient = new NatsStreamingClient(
+        options.natsServerUrl,
+        options.natsClusterId,
+        `cogrpc-${uuid()}`,
+      );
+      const natsPublisher = natsClient.makePublisher('crc-cargo');
+
+      async function* validateDelivery(
+        source: AsyncIterable<CargoDelivery>,
+      ): AsyncIterable<PublisherMessage> {
         for await (const delivery of source) {
           // tslint:disable-next-line:no-let
           let cargo: Cargo;
@@ -44,17 +56,17 @@ export function makeServiceImplementation(
             call.write({ id: delivery.id });
             continue;
           }
-
-          try {
-            await publishMessage(delivery.cargo, 'crc-cargo');
-          } catch (error) {
-            return;
-          }
-          call.write({ id: delivery.id });
+          yield { id: delivery.id, data: delivery.cargo };
         }
       }
 
-      await pipe(streamToIt.source(call), queueCargo);
+      async function ackDelivery(source: AsyncIterable<string>): Promise<void> {
+        for await (const deliveryId of source) {
+          call.write({ id: deliveryId });
+        }
+      }
+
+      await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
     },
     collectCargo,
   };

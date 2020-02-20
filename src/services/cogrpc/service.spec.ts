@@ -8,7 +8,7 @@ import { Duplex } from 'stream';
 
 import { getMockContext, makeEmptyCertificate, mockSpy } from '../_test_utils';
 import * as certs from '../certs';
-import * as nats from '../nats';
+import * as natsStreaming from '../natsStreaming';
 import { collectCargo, makeServiceImplementation } from './service';
 
 const STUB_DELIVERY_ID = 'the-id';
@@ -19,6 +19,30 @@ const STUB_CARGO = new Cargo('0123', makeEmptyCertificate(), Buffer.from('payloa
 const STUB_TRUSTED_CERTIFICATE = makeEmptyCertificate();
 
 const STUB_MONGO_URI = 'mongo://example.com';
+
+const STUB_NATS_SERVER_URL = 'nats://example.com';
+const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
+let mockNatsClient: natsStreaming.NatsStreamingClient;
+// tslint:disable-next-line:readonly-array
+let natsPublishedMessages: Buffer[];
+beforeEach(() => {
+  natsPublishedMessages = [];
+  async function* mockNatsPublisher(
+    messages: IterableIterator<natsStreaming.PublisherMessage>,
+  ): AsyncIterable<string> {
+    for await (const message of messages) {
+      natsPublishedMessages.push(message.data);
+      yield message.id;
+    }
+  }
+  mockNatsClient = ({
+    makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
+  } as unknown) as natsStreaming.NatsStreamingClient;
+});
+const mockNatsClientClass = mockSpy(
+  jest.spyOn(natsStreaming, 'NatsStreamingClient'),
+  () => mockNatsClient,
+);
 
 describe('service', () => {
   let mockMongooseConnection: mongoose.Connection;
@@ -40,8 +64,13 @@ describe('service', () => {
     jest.spyOn(mockDuplexStream, 'write');
   });
 
+  const { deliverCargo } = makeServiceImplementation({
+    mongoUri: STUB_MONGO_URI,
+    natsClusterId: STUB_NATS_CLUSTER_ID,
+    natsServerUrl: STUB_NATS_SERVER_URL,
+  });
+
   describe('deliverCargo', () => {
-    const { deliverCargo } = makeServiceImplementation({ mongoUri: STUB_MONGO_URI });
     const retrieveOwnCertificatesSpy = mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), () => [
       STUB_TRUSTED_CERTIFICATE,
     ]);
@@ -56,8 +85,22 @@ describe('service', () => {
       expect(mockMongooseConnection.close).toBeCalledTimes(1);
     });
 
+    test('NATS Streaming publisher should be initialized upfront', async () => {
+      expect(mockNatsClientClass).not.toBeCalled();
+
+      await deliverCargo(mockDuplexStream.convertToGrpcStream());
+
+      expect(mockNatsClientClass).toBeCalledTimes(1);
+      expect(mockNatsClientClass).toBeCalledWith(
+        STUB_NATS_SERVER_URL,
+        STUB_NATS_CLUSTER_ID,
+        expect.stringMatching(/^cogrpc-([a-f0-9]+-){4}[a-f0-9]+$/),
+      );
+      expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
+      expect(mockNatsClient.makePublisher).toBeCalledWith('crc-cargo');
+    });
+
     describe('Cargo processing', () => {
-      const natsPublishMessageSpy = mockSpy(jest.spyOn(nats, 'publishMessage'), () => undefined);
       const cargoDeserializeSpy = mockSpy(jest.spyOn(Cargo, 'deserialize'), () => STUB_CARGO);
       const cargoValidateSpy = mockSpy(jest.spyOn(STUB_CARGO, 'validate'));
 
@@ -81,8 +124,7 @@ describe('service', () => {
         expect(mockDuplexStream.write).toBeCalledWith({ id: invalidDeliveryId });
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
-        expect(natsPublishMessageSpy).toBeCalledTimes(1);
-        expect(natsPublishMessageSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
+        expect(natsPublishedMessages).toEqual([STUB_CARGO_SERIALIZATION]);
       });
 
       test('Well-formed yet invalid message should be ACKd but discarded', async () => {
@@ -105,8 +147,7 @@ describe('service', () => {
         expect(mockDuplexStream.write).toBeCalledWith({ id: invalidDeliveryId });
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
-        expect(natsPublishMessageSpy).toBeCalledTimes(1);
-        expect(natsPublishMessageSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
+        expect(natsPublishedMessages).toEqual([STUB_CARGO_SERIALIZATION]);
       });
 
       test('Valid message should be ACKd and added to queue', async () => {
@@ -117,24 +158,49 @@ describe('service', () => {
 
         await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
-        expect(nats.publishMessage).toBeCalledTimes(1);
-        expect(nats.publishMessage).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
+        expect(natsPublishedMessages).toEqual([STUB_CARGO_SERIALIZATION]);
 
         expect(mockDuplexStream.write).toBeCalledTimes(1);
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
       });
 
       test('No ACK should be sent if a valid cargo cannot be queued', async () => {
+        // Receive two deliveries. The first succeeds but the second fails.
+
         const error = new Error('Denied');
-        natsPublishMessageSpy.mockRejectedValueOnce(error);
-        mockDuplexStream.output.push({
-          cargo: STUB_CARGO_SERIALIZATION,
-          id: STUB_DELIVERY_ID,
-        });
+        async function* publishFirstMessageThenFail(
+          messages: IterableIterator<natsStreaming.PublisherMessage>,
+        ): AsyncIterable<string> {
+          let firstMessageYielded = false;
+          for await (const message of messages) {
+            if (!firstMessageYielded) {
+              yield message.id;
+              firstMessageYielded = true;
+              continue;
+            }
+            throw error;
+          }
+        }
+        ((mockNatsClient.makePublisher as unknown) as jest.MockInstance<
+          any,
+          any
+        >).mockImplementation(() => publishFirstMessageThenFail);
+        const undeliveredMessageId = 'undelivered';
+        mockDuplexStream.output.push(
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: STUB_DELIVERY_ID,
+          },
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: undeliveredMessageId,
+          },
+        );
 
-        await deliverCargo(mockDuplexStream.convertToGrpcStream());
+        await expect(deliverCargo(mockDuplexStream.convertToGrpcStream())).rejects.toEqual(error);
 
-        expect(mockDuplexStream.write).not.toBeCalled();
+        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
         // TODO: Log error message
       });

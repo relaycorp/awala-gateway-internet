@@ -3,8 +3,8 @@
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/relaynet-cogrpc';
 import { Cargo } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
-import { EventEmitter } from 'events';
 import { ServerDuplexStream } from 'grpc';
+import { Duplex } from 'stream';
 
 import { getMockContext, makeEmptyCertificate, mockSpy } from '../_test_utils';
 import * as certs from '../certs';
@@ -32,21 +32,12 @@ describe('service', () => {
     () => mockMongooseConnection,
   );
 
-  let mockServerDuplexStream: ServerDuplexStream<any, any>;
+  let mockDuplexStream: RecordingStream<CargoDeliveryAck, CargoDelivery>;
   beforeEach(() => {
-    const eventEmitter = new EventEmitter();
-    mockServerDuplexStream = ({
-      emit: jest
-        .fn()
-        .mockImplementation((event: string, ...args: readonly any[]) =>
-          eventEmitter.emit(event, ...args),
-        ),
-      end: jest.fn(),
-      on: jest
-        .fn()
-        .mockImplementation((event: string, cb: (data: any) => void) => eventEmitter.on(event, cb)),
-      write: jest.fn(),
-    } as unknown) as ServerDuplexStream<any, any>;
+    mockDuplexStream = new RecordingStream();
+    jest.spyOn(mockDuplexStream, 'on');
+    jest.spyOn(mockDuplexStream, 'end');
+    jest.spyOn(mockDuplexStream, 'write');
   });
 
   describe('deliverCargo', () => {
@@ -58,7 +49,7 @@ describe('service', () => {
     test('Mongoose connection should be initialized and closed upfront', async () => {
       expect(mockMongooseCreateConnection).not.toBeCalled();
 
-      await deliverCargo(mockServerDuplexStream);
+      await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
       expect(mockMongooseCreateConnection).toBeCalledTimes(1);
       expect(mockMongooseCreateConnection).toBeCalledWith(STUB_MONGO_URI);
@@ -66,32 +57,25 @@ describe('service', () => {
     });
 
     describe('Cargo processing', () => {
-      const natsPublishMessageSpy = mockSpy(jest.spyOn(nats, 'publishMessage'));
+      const natsPublishMessageSpy = mockSpy(jest.spyOn(nats, 'publishMessage'), () => undefined);
       const cargoDeserializeSpy = mockSpy(jest.spyOn(Cargo, 'deserialize'), () => STUB_CARGO);
       const cargoValidateSpy = mockSpy(jest.spyOn(STUB_CARGO, 'validate'));
-
-      let dataCallback: (delivery: CargoDelivery) => void;
-      beforeEach(async () => {
-        await deliverCargo(mockServerDuplexStream);
-
-        const onDataCalls = getMockContext(mockServerDuplexStream.on).calls.filter(
-          c => c[0] === 'data',
-        );
-        expect(onDataCalls).toHaveLength(1);
-        dataCallback = onDataCalls[0][1];
-      });
 
       test('Malformed message should be ACKd but discarded', async () => {
         const error = new Error('Denied');
         cargoDeserializeSpy.mockRejectedValueOnce(error);
 
-        await dataCallback({ id: STUB_DELIVERY_ID, cargo: STUB_CARGO_SERIALIZATION });
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
         expect(cargoDeserializeSpy).toBeCalledTimes(1);
         expect(cargoDeserializeSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION);
 
-        expect(mockServerDuplexStream.write).toBeCalledTimes(1);
-        expect(mockServerDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
+        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
         expect(natsPublishMessageSpy).not.toBeCalled();
       });
@@ -100,54 +84,78 @@ describe('service', () => {
         const error = new Error('Denied');
         cargoValidateSpy.mockRejectedValueOnce(error);
 
-        await dataCallback({ id: STUB_DELIVERY_ID, cargo: STUB_CARGO_SERIALIZATION });
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
+
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
         expect(cargoValidateSpy).toBeCalledTimes(1);
         expect(cargoValidateSpy).toBeCalledWith([STUB_TRUSTED_CERTIFICATE]);
 
-        expect(mockServerDuplexStream.write).toBeCalledTimes(1);
-        expect(mockServerDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
+        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
         expect(natsPublishMessageSpy).not.toBeCalled();
       });
 
       test('Valid message should be ACKd and added to queue', async () => {
-        await dataCallback({ id: STUB_DELIVERY_ID, cargo: STUB_CARGO_SERIALIZATION });
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
 
-        expect(natsPublishMessageSpy).toBeCalledTimes(1);
-        expect(natsPublishMessageSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
-        expect(mockServerDuplexStream.write).toBeCalledTimes(1);
-        expect(mockServerDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
+        expect(nats.publishMessage).toBeCalledTimes(1);
+        expect(nats.publishMessage).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
+
+        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
       });
 
       test('No ACK should be sent if a valid cargo cannot be queued', async () => {
         const error = new Error('Denied');
         natsPublishMessageSpy.mockRejectedValueOnce(error);
-        await dataCallback({ id: STUB_DELIVERY_ID, cargo: STUB_CARGO_SERIALIZATION });
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
 
-        expect(mockServerDuplexStream.write).not.toBeCalled();
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
+
+        expect(mockDuplexStream.write).not.toBeCalled();
 
         // TODO: Log error message
       });
 
       test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {
         // Even if multiple cargoes are received
-        await dataCallback({ id: `${STUB_DELIVERY_ID}-1`, cargo: STUB_CARGO_SERIALIZATION });
-        await dataCallback({ id: `${STUB_DELIVERY_ID}-2`, cargo: STUB_CARGO_SERIALIZATION });
+        mockDuplexStream.output.push(
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: `${STUB_DELIVERY_ID}-1`,
+          },
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: `${STUB_DELIVERY_ID}-2`,
+          },
+        );
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
         expect(retrieveOwnCertificatesSpy).toBeCalledTimes(1);
       });
     });
 
     test('Call should end when client attempts to end connection', async () => {
-      await deliverCargo(mockServerDuplexStream);
-      expect(mockServerDuplexStream.on).toBeCalledWith('end', expect.anything());
-      expect(mockServerDuplexStream.end).not.toBeCalled();
+      await deliverCargo(mockDuplexStream.convertToGrpcStream());
+      expect(mockDuplexStream.on).toBeCalledWith('end', expect.any(Function));
+      const endCallback = getMockContext(mockDuplexStream.on).calls[0][1];
 
-      mockServerDuplexStream.emit('end');
-
-      expect(mockServerDuplexStream.end).toBeCalledTimes(1);
+      expect(mockDuplexStream.end).toBeCalledTimes(1);
+      endCallback();
+      expect(mockDuplexStream.end).toBeCalledTimes(2);
     });
   });
 
@@ -159,3 +167,36 @@ describe('service', () => {
     });
   });
 });
+
+class RecordingStream<Input, Output> extends Duplex {
+  // tslint:disable-next-line:readonly-array readonly-keyword
+  public input: Input[] = [];
+  // tslint:disable-next-line:readonly-array readonly-keyword
+  public output: Output[] = [];
+
+  constructor() {
+    super({ objectMode: true });
+  }
+
+  public _read(_size: number): void {
+    while (this.output.length) {
+      const canPushAgain = this.push(this.output.shift());
+      if (!canPushAgain) {
+        return;
+      }
+    }
+
+    this.push(null);
+  }
+
+  public _write(value: Input, _encoding: string, callback: (error?: Error) => void): void {
+    this.input.push(value);
+    callback();
+  }
+
+  public convertToGrpcStream(): ServerDuplexStream<Input, Output> {
+    // Unfortunately, ServerDuplexStream's constructor is private so we have to ressort to this
+    // ugly hack
+    return (this as unknown) as ServerDuplexStream<Input, Output>;
+  }
+}

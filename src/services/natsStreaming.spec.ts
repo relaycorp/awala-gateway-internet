@@ -28,13 +28,20 @@ jest.mock('node-nats-streaming', () => {
   };
 });
 
-import { NatsStreamingClient } from './natsStreaming';
+import { NatsStreamingClient, PublisherMessage } from './natsStreaming';
 
 const STUB_SERVER_URL = 'nats://example.com';
 const STUB_CLUSTER_ID = 'cluster-id';
 const STUB_CLIENT_ID = 'client-id';
 const STUB_CHANNEL = 'the-channel';
-const STUB_MESSAGE = Buffer.from('the-message');
+const STUB_MESSAGE_1: PublisherMessage = {
+  data: Buffer.from('the-message'),
+  id: 'stub-message-id',
+};
+const STUB_MESSAGE_2: PublisherMessage = {
+  data: Buffer.from('additional message here'),
+  id: 'additional-id',
+};
 
 describe('NatsStreamingClient', () => {
   const stubClient = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
@@ -86,19 +93,19 @@ describe('NatsStreamingClient', () => {
         done();
       });
 
-      await publisher(generateMessages([STUB_MESSAGE]));
+      await publisher([STUB_MESSAGE_1]);
     });
 
     test('Messages should be published to the specified channel', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await publisher(generateMessages([STUB_MESSAGE]));
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
 
       expect(mockConnection.publish).toBeCalledTimes(1);
       expect(mockConnection.publish).toBeCalledWith(
         STUB_CHANNEL,
-        STUB_MESSAGE,
+        STUB_MESSAGE_1.data,
         expect.any(Function),
       );
     });
@@ -112,9 +119,9 @@ describe('NatsStreamingClient', () => {
         (_channel: any, _data: any, cb: AckHandlerCallback) => cb(error, ''),
       );
 
-      await expect(publisher(generateMessages([STUB_MESSAGE, STUB_MESSAGE]))).rejects.toEqual(
-        error,
-      );
+      await expect(
+        asyncIterableToArray(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2])),
+      ).rejects.toEqual(error);
 
       // Two messages were passed, but publishing should've stopped with the first failure
       expect(mockConnection.publish).toBeCalledTimes(1);
@@ -122,40 +129,50 @@ describe('NatsStreamingClient', () => {
 
     test('Publishing multiple messages from an array should be supported', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
-      const additionalStubMessage = Buffer.from('additional message here');
       setImmediate(() => mockConnection.emit('connect'));
 
-      await publisher([STUB_MESSAGE, additionalStubMessage]);
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]));
 
       expect(mockConnection.publish).toBeCalledTimes(2);
       expect(mockConnection.publish).toBeCalledWith(
         expect.anything(),
-        STUB_MESSAGE,
+        STUB_MESSAGE_1.data,
         expect.anything(),
       );
       expect(mockConnection.publish).toBeCalledWith(
         expect.anything(),
-        additionalStubMessage,
+        STUB_MESSAGE_2.data,
         expect.anything(),
       );
     });
 
-    test('Publishing multiple messages from an iterator should be supported', async () => {
+    test('Ids of published message should be yielded', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
-      const additionalStubMessage = Buffer.from('additional message here');
       setImmediate(() => mockConnection.emit('connect'));
 
-      await publisher(generateMessages([STUB_MESSAGE, additionalStubMessage]));
+      const publishedIds = await publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]);
+
+      await expect(asyncIterableToArray(publishedIds)).resolves.toEqual([
+        STUB_MESSAGE_1.id,
+        STUB_MESSAGE_2.id,
+      ]);
+    });
+
+    test('Publishing multiple messages from an iterator should be supported', async () => {
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
+      setImmediate(() => mockConnection.emit('connect'));
+
+      await asyncIterableToArray(publisher(arrayToIterator([STUB_MESSAGE_1, STUB_MESSAGE_2])));
 
       expect(mockConnection.publish).toBeCalledTimes(2);
       expect(mockConnection.publish).toBeCalledWith(
         expect.anything(),
-        STUB_MESSAGE,
+        STUB_MESSAGE_1.data,
         expect.anything(),
       );
       expect(mockConnection.publish).toBeCalledWith(
         expect.anything(),
-        additionalStubMessage,
+        STUB_MESSAGE_2.data,
         expect.anything(),
       );
     });
@@ -169,7 +186,7 @@ describe('NatsStreamingClient', () => {
       );
       setImmediate(() => mockConnection.emit('connect'));
 
-      await expect(publisher(generateMessages([STUB_MESSAGE]))).toReject();
+      await expect(asyncIterableToArray(publisher([STUB_MESSAGE_1]))).toReject();
 
       expect(mockConnection.close).toBeCalled();
     });
@@ -178,21 +195,21 @@ describe('NatsStreamingClient', () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await publisher(generateMessages([STUB_MESSAGE]));
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
 
       expect(mockConnection.close).toBeCalled();
     });
 
-    test('Consumer should be called multiple times', async () => {
+    test('Consumer should not be called multiple times', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await publisher(generateMessages([STUB_MESSAGE]));
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
 
       // @ts-ignore
       mockConnection.on.mockClear();
 
-      await expect(publisher(generateMessages([]))).rejects.toMatchObject<Partial<Error>>({
+      await expect(asyncIterableToArray(publisher([]))).rejects.toMatchObject<Partial<Error>>({
         message: 'Publisher cannot be reused as the connection was already closed',
       });
 
@@ -202,18 +219,31 @@ describe('NatsStreamingClient', () => {
 
   test('publishMessage() should send a single message via a dedicated connection', async () => {
     const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
-    const mockPublisher = jest.fn();
-    jest.spyOn(client, 'makePublisher').mockReturnValueOnce(mockPublisher);
+    jest.spyOn(client, 'makePublisher');
+    setImmediate(() => mockConnection.emit('connect'));
 
-    await client.publishMessage(STUB_MESSAGE, STUB_CHANNEL);
+    await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
 
     expect(client.makePublisher).toBeCalledWith(STUB_CHANNEL);
-    expect(mockPublisher).toBeCalledWith([STUB_MESSAGE]);
+    expect(mockConnection.publish).toBeCalledWith(
+      STUB_CHANNEL,
+      STUB_MESSAGE_1.data,
+      expect.any(Function),
+    );
   });
 });
 
-function* generateMessages(messages: readonly Buffer[]): IterableIterator<Buffer> {
-  for (const message of messages) {
-    yield message;
+function* arrayToIterator<T>(array: readonly T[]): IterableIterator<T> {
+  for (const item of array) {
+    yield item;
   }
+}
+
+async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promise<readonly T[]> {
+  // tslint:disable-next-line:readonly-array
+  const values = [];
+  for await (const item of iterable) {
+    values.push(item);
+  }
+  return values;
 }

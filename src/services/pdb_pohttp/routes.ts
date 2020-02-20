@@ -1,14 +1,22 @@
 import { Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
+import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { retrieveOwnCertificates } from '../certs';
-import { publishMessage } from '../nats';
+import { NatsStreamingClient } from '../natsStreaming';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: any,
 ): Promise<void> {
+  const natsServerUrl = getEnvVar('NATS_SERVER_URL')
+    .required()
+    .asString();
+  const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
+    .required()
+    .asString();
+
   fastify.route({
     method: ['PUT', 'DELETE', 'PATCH'],
     url: '/',
@@ -76,8 +84,13 @@ export default async function registerRoutes(
       const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
       const localGateway = certificatePath[0];
       const localGatewayAddress = await localGateway.calculateSubjectPrivateAddress();
+      const natsClient = new NatsStreamingClient(
+        natsServerUrl,
+        natsClusterId,
+        `pohttp-req-${request.id}`,
+      );
       try {
-        await publishMessage(request.body, `crc-parcel.${localGatewayAddress}`);
+        await natsClient.publishMessage(request.body, `pdc-parcel.${localGatewayAddress}`);
       } catch (error) {
         request.log.error({ err: error }, 'Failed to queue ping message');
         return reply

@@ -9,6 +9,8 @@ import {
   Parcel,
 } from '@relaycorp/relaynet-core';
 import envVar from 'env-var';
+import * as pkijs from 'pkijs';
+import MockInstance = jest.MockInstance;
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
@@ -45,30 +47,49 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
   return (newEnvVars: EnvVarSet) => setEnvVars(newEnvVars);
 }
 
+// tslint:disable-next-line:readonly-array
+export function mockSpy<T, Y extends any[]>(
+  spy: MockInstance<T, Y>,
+  mockImplementation?: () => any,
+): MockInstance<T, Y> {
+  beforeEach(() => {
+    spy.mockReset();
+    if (mockImplementation) {
+      spy.mockImplementation(mockImplementation);
+    }
+  });
+
+  afterAll(() => {
+    spy.mockRestore();
+  });
+
+  return spy;
+}
+
 export interface PdaChain {
-  readonly relayingGateway: Certificate;
-  readonly localGateway: Certificate;
+  readonly publicGateway: Certificate;
+  readonly privateGateway: Certificate;
   readonly peerEndpoint: Certificate;
   readonly pda: Certificate;
   readonly pdaGranteePrivateKey: CryptoKey;
 }
 
 export async function generateStubPdaChain(): Promise<PdaChain> {
-  const relayingGatewayKeyPair = await generateRSAKeyPair();
-  const relayingGatewayCert = reSerializeCertificate(
+  const publicGatewayKeyPair = await generateRSAKeyPair();
+  const publicGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-      subjectPublicKey: relayingGatewayKeyPair.publicKey,
+      issuerPrivateKey: publicGatewayKeyPair.privateKey,
+      subjectPublicKey: publicGatewayKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
   );
 
-  const localGatewayKeyPair = await generateRSAKeyPair();
-  const localGatewayCert = reSerializeCertificate(
+  const privateGatewayKeyPair = await generateRSAKeyPair();
+  const privateGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerCertificate: relayingGatewayCert,
-      issuerPrivateKey: relayingGatewayKeyPair.privateKey,
-      subjectPublicKey: localGatewayKeyPair.publicKey,
+      issuerCertificate: publicGatewayCert,
+      issuerPrivateKey: publicGatewayKeyPair.privateKey,
+      subjectPublicKey: privateGatewayKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
   );
@@ -76,8 +97,8 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   const peerEndpointKeyPair = await generateRSAKeyPair();
   const peerEndpointCert = reSerializeCertificate(
     await issueEndpointCertificate({
-      issuerCertificate: localGatewayCert,
-      issuerPrivateKey: localGatewayKeyPair.privateKey,
+      issuerCertificate: privateGatewayCert,
+      issuerPrivateKey: privateGatewayKeyPair.privateKey,
       subjectPublicKey: peerEndpointKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
@@ -94,11 +115,11 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   );
 
   return {
-    localGateway: localGatewayCert,
     pda: endpointPdaCert,
     pdaGranteePrivateKey: endpointKeyPair.privateKey,
     peerEndpoint: peerEndpointCert,
-    relayingGateway: relayingGatewayCert,
+    privateGateway: privateGatewayCert,
+    publicGateway: publicGatewayCert,
   };
 }
 
@@ -110,6 +131,10 @@ export async function generateStubEndpointCertificate(
     subjectPublicKey: keyPair.publicKey,
     validityEndDate: TOMORROW,
   });
+}
+
+export function makeEmptyCertificate(): Certificate {
+  return new Certificate(new pkijs.Certificate());
 }
 
 export interface StubParcelOptions {

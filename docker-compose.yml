@@ -1,6 +1,6 @@
 version: '3.7'
 services:
-  app:
+  pohttp:
     build:
       dockerfile: Dockerfile.dev
       context: .
@@ -17,11 +17,23 @@ services:
       - mongodb
       - nats
 
+  cogrpc:
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    image: relaynet-gw:local-dev
+    init: true
+    command: src/bin/cogrpc-server.ts
+    ports:
+      - '127.0.0.1:8081:8080'
+    volumes:
+      - ./src:/opt/gw-dev/src:ro
+
   mongodb:
     image: mongo:4.0
 
   nats:
-    image: nats-streaming:0.16.2
+    image: nats-streaming:0.17.0
     command: ['-DV']
     ports:
     - "127.0.0.1:4222:4222"

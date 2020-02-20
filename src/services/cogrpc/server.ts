@@ -10,9 +10,19 @@ export function runServer(): void {
   const mongoUri = getEnvVar('MONGO_URI')
     .required()
     .asString();
+  const natsServerUrl = getEnvVar('NATS_SERVER_URL')
+    .required()
+    .asString();
+  const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
+    .required()
+    .asString();
 
   const server = new Server();
-  const serviceImplementation = makeServiceImplementation({ mongoUri });
+  const serviceImplementation = makeServiceImplementation({
+    mongoUri,
+    natsClusterId,
+    natsServerUrl,
+  });
   server.addService(CargoRelayService, serviceImplementation);
   const bindResult = server.bind(NETLOC, ServerCredentials.createInsecure());
   if (bindResult < 0) {

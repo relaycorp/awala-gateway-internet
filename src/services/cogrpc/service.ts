@@ -42,7 +42,7 @@ export function makeServiceImplementation(
             // Acknowledge that we got it, not that it was accepted and stored. See:
             // https://github.com/relaynet/specs/issues/38
             call.write({ id: delivery.id });
-            return;
+            continue;
           }
 
           try {

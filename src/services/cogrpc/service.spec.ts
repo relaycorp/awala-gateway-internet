@@ -62,42 +62,51 @@ describe('service', () => {
       const cargoValidateSpy = mockSpy(jest.spyOn(STUB_CARGO, 'validate'));
 
       test('Malformed message should be ACKd but discarded', async () => {
-        const error = new Error('Denied');
-        cargoDeserializeSpy.mockRejectedValueOnce(error);
+        // The invalid message is followed by a valid one to check that processing continues
+        cargoDeserializeSpy.mockReset();
+        cargoDeserializeSpy.mockRejectedValueOnce(new Error('Denied'));
+        cargoDeserializeSpy.mockResolvedValueOnce(STUB_CARGO);
 
-        mockDuplexStream.output.push({
-          cargo: STUB_CARGO_SERIALIZATION,
-          id: STUB_DELIVERY_ID,
-        });
+        const invalidDeliveryId = 'invalid';
+        mockDuplexStream.output.push(
+          { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: STUB_DELIVERY_ID,
+          },
+        );
         await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
-        expect(cargoDeserializeSpy).toBeCalledTimes(1);
-        expect(cargoDeserializeSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION);
-
-        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledTimes(2);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: invalidDeliveryId });
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
-        expect(natsPublishMessageSpy).not.toBeCalled();
+        expect(natsPublishMessageSpy).toBeCalledTimes(1);
+        expect(natsPublishMessageSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
       });
 
       test('Well-formed yet invalid message should be ACKd but discarded', async () => {
-        const error = new Error('Denied');
-        cargoValidateSpy.mockRejectedValueOnce(error);
-
-        mockDuplexStream.output.push({
-          cargo: STUB_CARGO_SERIALIZATION,
-          id: STUB_DELIVERY_ID,
-        });
+        // The invalid message is followed by a valid one to check that processing continues
+        cargoValidateSpy.mockReset();
+        cargoValidateSpy.mockRejectedValueOnce(new Error('Denied'));
+        cargoValidateSpy.mockResolvedValueOnce(undefined);
+        const invalidDeliveryId = 'invalid';
+        mockDuplexStream.output.push(
+          { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
+          {
+            cargo: STUB_CARGO_SERIALIZATION,
+            id: STUB_DELIVERY_ID,
+          },
+        );
 
         await deliverCargo(mockDuplexStream.convertToGrpcStream());
 
-        expect(cargoValidateSpy).toBeCalledTimes(1);
-        expect(cargoValidateSpy).toBeCalledWith([STUB_TRUSTED_CERTIFICATE]);
-
-        expect(mockDuplexStream.write).toBeCalledTimes(1);
+        expect(mockDuplexStream.write).toBeCalledTimes(2);
+        expect(mockDuplexStream.write).toBeCalledWith({ id: invalidDeliveryId });
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
-        expect(natsPublishMessageSpy).not.toBeCalled();
+        expect(natsPublishMessageSpy).toBeCalledTimes(1);
+        expect(natsPublishMessageSpy).toBeCalledWith(STUB_CARGO_SERIALIZATION, 'crc-cargo');
       });
 
       test('Valid message should be ACKd and added to queue', async () => {

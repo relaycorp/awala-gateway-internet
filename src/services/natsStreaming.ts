@@ -1,4 +1,4 @@
-import { connect, Stan } from 'node-nats-streaming';
+import { connect, Message, Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
 export interface PublisherMessage {
@@ -45,6 +45,14 @@ export class NatsStreamingClient {
   public async publishMessage(messageData: Buffer, channel: string): Promise<void> {
     const publisher = this.makePublisher(channel);
     await consumeAsyncIterable(publisher([{ id: 'single-message', data: messageData }]));
+  }
+
+  public async *makeQueueConsumer(
+    _channel: string,
+    _queue: string,
+    _durableName: string,
+  ): AsyncIterable<Message> {
+    return;
   }
 
   protected async connect(): Promise<Stan> {

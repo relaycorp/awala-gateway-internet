@@ -231,6 +231,34 @@ describe('NatsStreamingClient', () => {
       expect.any(Function),
     );
   });
+
+  describe('makeQueueConsumer', () => {
+    describe('Connection', () => {
+      test.todo('Server URL should be the specified one');
+
+      test.todo('Cluster id should be the specified one');
+
+      test.todo('Client id should be the specified one');
+    });
+
+    describe('Subscription', () => {
+      test.todo('Subscription should start once the connection has been established');
+
+      test.todo('Queue should be the specified one');
+
+      test.todo('Durable name should be the specified one');
+
+      test.todo('All available messages should be delivered');
+
+      test.todo('Manual acknowledgment should be used');
+
+      test.todo('Acknowledgment timeout should be 5 seconds');
+
+      test.todo('Maximum in-flight messages should be 1');
+    });
+
+    test.todo('Incoming messages should be yielded');
+  });
 });
 
 function* arrayToIterator<T>(array: readonly T[]): IterableIterator<T> {

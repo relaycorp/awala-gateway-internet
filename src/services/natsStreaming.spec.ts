@@ -1,7 +1,11 @@
-/* tslint:disable:no-let */
+/* tslint:disable:no-let max-classes-per-file */
 
 import { EventEmitter } from 'events';
-import { AckHandlerCallback } from 'node-nats-streaming';
+import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
+
+class MockNatsSubscription extends EventEmitter {
+  public readonly unsubscribe = jest.fn();
+}
 
 class MockNatsConnection extends EventEmitter {
   public readonly close = jest.fn();
@@ -11,6 +15,10 @@ class MockNatsConnection extends EventEmitter {
     .mockImplementation((_channel: string, _data: Buffer, cb: AckHandlerCallback) =>
       cb(undefined, 'stub-guid'),
     );
+
+  public readonly subscribe = jest.fn();
+
+  public readonly subscriptionOptions = jest.fn();
 }
 
 let mockConnection: MockNatsConnection;
@@ -233,31 +241,190 @@ describe('NatsStreamingClient', () => {
   });
 
   describe('makeQueueConsumer', () => {
+    const STUB_QUEUE = 'queue-name';
+    const STUB_DURABLE_NAME = 'durable-name';
+
+    let mockSubscription: MockNatsSubscription;
+    let mockSubscriptionOptions: Partial<SubscriptionOptions>;
+    beforeEach(() => {
+      mockSubscriptionOptions = {
+        setAckWait: jest.fn().mockReturnThis(),
+        setDeliverAllAvailable: jest.fn().mockReturnThis(),
+        setDurableName: jest.fn().mockReturnThis(),
+        setManualAckMode: jest.fn().mockReturnThis(),
+        setMaxInFlight: jest.fn().mockReturnThis(),
+      };
+
+      mockSubscription = new MockNatsSubscription();
+      mockConnection.subscribe.mockImplementation(() => mockSubscription);
+      mockConnection.subscriptionOptions.mockReturnValue(mockSubscriptionOptions);
+    });
+
     describe('Connection', () => {
-      test.todo('Server URL should be the specified one');
+      test('Server URL should be the specified one', async () => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenUnsubscribe();
 
-      test.todo('Cluster id should be the specified one');
+        await asyncIterableToArray(consumer);
 
-      test.todo('Client id should be the specified one');
+        expect(mockNatsConnect).toBeCalledTimes(1);
+        expect(mockNatsConnect).toBeCalledWith(
+          expect.anything(),
+          expect.anything(),
+          expect.objectContaining({ url: STUB_SERVER_URL }),
+        );
+      });
+
+      test('Cluster id should be the specified one', async () => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenUnsubscribe();
+
+        await asyncIterableToArray(consumer);
+
+        expect(mockNatsConnect).toBeCalledTimes(1);
+        expect(mockNatsConnect).toBeCalledWith(
+          STUB_CLUSTER_ID,
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
+      test('Client id should be the specified one', async () => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenUnsubscribe();
+
+        await asyncIterableToArray(consumer);
+
+        expect(mockNatsConnect).toBeCalledTimes(1);
+        expect(mockNatsConnect).toBeCalledWith(
+          expect.anything(),
+          STUB_CLIENT_ID,
+          expect.anything(),
+        );
+      });
     });
 
     describe('Subscription', () => {
-      test.todo('Subscription should start once the connection has been established');
+      test('Subscription should start once the connection has been established', async done => {
+        const publisher = stubClient.makePublisher(STUB_CHANNEL);
+        setImmediate(() => {
+          // "connect" event was never emitted, so no message should've been published
+          expect(mockConnection.on).toBeCalledTimes(1);
+          expect(mockConnection.on).toBeCalledWith('connect', expect.any(Function));
 
-      test.todo('Queue should be the specified one');
+          expect(mockConnection.subscribe).not.toBeCalled();
 
-      test.todo('Durable name should be the specified one');
+          done();
+        });
 
-      test.todo('All available messages should be delivered');
+        await publisher([STUB_MESSAGE_1]);
+      });
 
-      test.todo('Manual acknowledgment should be used');
+      test('Channel should be the specified one', async () => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenUnsubscribe();
 
-      test.todo('Acknowledgment timeout should be 5 seconds');
+        await asyncIterableToArray(consumer);
 
-      test.todo('Maximum in-flight messages should be 1');
+        expect(mockConnection.subscribe).toBeCalledTimes(1);
+        expect(mockConnection.subscribe).toBeCalledWith(
+          STUB_CHANNEL,
+          expect.anything(),
+          expect.anything(),
+        );
+      });
+
+      test('Queue should be the specified one', async () => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenUnsubscribe();
+
+        await asyncIterableToArray(consumer);
+
+        expect(mockConnection.subscribe).toBeCalledTimes(1);
+        expect(mockConnection.subscribe).toBeCalledWith(
+          expect.anything(),
+          STUB_QUEUE,
+          expect.anything(),
+        );
+      });
+
+      test.each([
+        ['setDurableName', [STUB_DURABLE_NAME]],
+        ['setDeliverAllAvailable', []],
+        ['setManualAckMode', [true]],
+        ['setAckWait', [5_000]],
+        ['setMaxInFlight', [1]],
+      ] as ReadonlyArray<readonly [keyof SubscriptionOptions, readonly any[]]>)(
+        'Option %s should be %s',
+        async (optKey, optArgs) => {
+          const consumer = stubClient.makeQueueConsumer(
+            STUB_CHANNEL,
+            STUB_QUEUE,
+            STUB_DURABLE_NAME,
+          );
+          fakeConnectionThenUnsubscribe();
+
+          await asyncIterableToArray(consumer);
+
+          expect(mockConnection.subscribe).toBeCalledTimes(1);
+          expect(mockConnection.subscribe).toBeCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockSubscriptionOptions,
+          );
+          expect(mockSubscriptionOptions[optKey]).toBeCalledWith(...optArgs);
+        },
+      );
     });
 
-    test.todo('Incoming messages should be yielded');
+    test('Incoming messages should be yielded until subscription ends', async () => {
+      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+      const stubMessage1 = { number: 1 };
+      const stubMessage2 = { number: 2 };
+      setImmediate(() => {
+        mockConnection.emit('connect');
+      });
+      setImmediate(() => {
+        mockSubscription.emit('message', stubMessage1);
+        mockSubscription.emit('message', stubMessage2);
+      });
+      setImmediate(() => {
+        mockSubscription.emit('unsubscribed');
+      });
+
+      await expect(asyncIterableToArray(consumer)).resolves.toEqual([stubMessage1, stubMessage2]);
+    });
+
+    test('Connection and subscription should be closed after a subscription error', async () => {
+      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+      const error = new Error('Whoops, my bad');
+      setImmediate(() => {
+        mockConnection.emit('connect');
+      });
+      setImmediate(() => {
+        mockSubscription.emit('error', error);
+      });
+
+      await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
+
+      expect(mockSubscription.unsubscribe).toBeCalledTimes(1);
+      expect(mockConnection.close).toBeCalledTimes(1);
+    });
+
+    test('Connection and subscription should be closed after consuming messages', async () => {
+      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+      fakeConnectionThenUnsubscribe();
+
+      await asyncIterableToArray(consumer);
+
+      expect(mockSubscription.unsubscribe).toBeCalledTimes(1);
+      expect(mockConnection.close).toBeCalledTimes(1);
+    });
+
+    function fakeConnectionThenUnsubscribe(): void {
+      setImmediate(() => mockConnection.emit('connect'));
+      setImmediate(() => mockSubscription.emit('unsubscribed'));
+    }
   });
 });
 

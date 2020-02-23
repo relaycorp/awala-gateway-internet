@@ -1,4 +1,6 @@
 import { connect, Message, Stan } from 'node-nats-streaming';
+import { PassThrough } from 'stream';
+import * as streamToIt from 'stream-to-it';
 import { promisify } from 'util';
 
 export interface PublisherMessage {
@@ -48,11 +50,31 @@ export class NatsStreamingClient {
   }
 
   public async *makeQueueConsumer(
-    _channel: string,
-    _queue: string,
-    _durableName: string,
+    channel: string,
+    queue: string,
+    durableName: string,
   ): AsyncIterable<Message> {
-    return;
+    const connection = await this.connect();
+    const subscriptionOptions = connection
+      .subscriptionOptions()
+      .setDurableName(durableName)
+      .setDeliverAllAvailable()
+      .setManualAckMode(true)
+      .setAckWait(5_000)
+      .setMaxInFlight(1);
+    const sourceStream = new PassThrough({ objectMode: true });
+    const subscription = connection.subscribe(channel, queue, subscriptionOptions);
+    try {
+      subscription.on('error', error => sourceStream.destroy(error));
+      subscription.on('unsubscribed', () => sourceStream.destroy());
+      subscription.on('message', msg => sourceStream.write(msg));
+      for await (const msg of streamToIt.source(sourceStream)) {
+        yield msg;
+      }
+    } finally {
+      subscription.unsubscribe();
+      connection.close();
+    }
   }
 
   protected async connect(): Promise<Stan> {

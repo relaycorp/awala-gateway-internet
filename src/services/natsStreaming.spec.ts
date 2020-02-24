@@ -3,6 +3,8 @@
 import { EventEmitter } from 'events';
 import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
 
+import { mockSpy } from './_test_utils';
+
 class MockNatsSubscription extends EventEmitter {
   public readonly unsubscribe = jest.fn();
 }
@@ -35,7 +37,6 @@ jest.mock('node-nats-streaming', () => {
     connect: mockNatsConnect,
   };
 });
-
 import { NatsStreamingClient, PublisherMessage } from './natsStreaming';
 
 const STUB_SERVER_URL = 'nats://example.com';
@@ -260,10 +261,12 @@ describe('NatsStreamingClient', () => {
       mockConnection.subscriptionOptions.mockReturnValue(mockSubscriptionOptions);
     });
 
+    const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'), () => undefined);
+
     describe('Connection', () => {
       test('Server URL should be the specified one', async () => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenUnsubscribe();
+        fakeConnectionThenInterrupt();
 
         await asyncIterableToArray(consumer);
 
@@ -277,7 +280,7 @@ describe('NatsStreamingClient', () => {
 
       test('Cluster id should be the specified one', async () => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenUnsubscribe();
+        fakeConnectionThenInterrupt();
 
         await asyncIterableToArray(consumer);
 
@@ -291,7 +294,7 @@ describe('NatsStreamingClient', () => {
 
       test('Client id should be the specified one', async () => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenUnsubscribe();
+        fakeConnectionThenInterrupt();
 
         await asyncIterableToArray(consumer);
 
@@ -306,7 +309,7 @@ describe('NatsStreamingClient', () => {
 
     describe('Subscription', () => {
       test('Subscription should start once the connection has been established', async done => {
-        const publisher = stubClient.makePublisher(STUB_CHANNEL);
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
         setImmediate(() => {
           // "connect" event was never emitted, so no message should've been published
           expect(mockConnection.on).toBeCalledTimes(1);
@@ -317,12 +320,12 @@ describe('NatsStreamingClient', () => {
           done();
         });
 
-        await publisher([STUB_MESSAGE_1]);
+        await asyncIterableToArray(consumer);
       });
 
       test('Channel should be the specified one', async () => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenUnsubscribe();
+        fakeConnectionThenInterrupt();
 
         await asyncIterableToArray(consumer);
 
@@ -336,7 +339,7 @@ describe('NatsStreamingClient', () => {
 
       test('Queue should be the specified one', async () => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenUnsubscribe();
+        fakeConnectionThenInterrupt();
 
         await asyncIterableToArray(consumer);
 
@@ -362,7 +365,7 @@ describe('NatsStreamingClient', () => {
             STUB_QUEUE,
             STUB_DURABLE_NAME,
           );
-          fakeConnectionThenUnsubscribe();
+          fakeConnectionThenInterrupt();
 
           await asyncIterableToArray(consumer);
 
@@ -388,14 +391,12 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage1);
         mockSubscription.emit('message', stubMessage2);
       });
-      setImmediate(() => {
-        mockSubscription.emit('unsubscribed');
-      });
+      setImmediate(interruptCurrentProcess);
 
       await expect(asyncIterableToArray(consumer)).resolves.toEqual([stubMessage1, stubMessage2]);
     });
 
-    test('Connection and subscription should be closed after a subscription error', async () => {
+    test('Connection should be closed after a subscription error', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const error = new Error('Whoops, my bad');
       setImmediate(() => {
@@ -407,31 +408,45 @@ describe('NatsStreamingClient', () => {
 
       await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
 
-      expect(mockSubscription.unsubscribe).toBeCalledTimes(1);
       expect(mockConnection.close).toBeCalledTimes(1);
     });
 
-    test('Connection should be closed after consuming messages', async () => {
-      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-      fakeConnectionThenUnsubscribe();
+    test.each(['SIGINT', 'SIGTERM'])(
+      '%s should close the connection and end the process',
+      async signal => {
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        setImmediate(() => mockConnection.emit('connect'));
+        setImmediate(() => {
+          // @ts-ignore
+          process.emit(signal);
+        });
 
-      await asyncIterableToArray(consumer);
+        await asyncIterableToArray(consumer);
 
-      expect(mockConnection.close).toBeCalledTimes(1);
-    });
+        expect(mockConnection.close).toBeCalledTimes(1);
+
+        expect(mockProcessExit).toBeCalledTimes(1);
+        expect(mockProcessExit).toBeCalledWith(0);
+      },
+    );
 
     test('Consumer should never unsubscribe', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-      fakeConnectionThenUnsubscribe();
+      fakeConnectionThenInterrupt();
 
       await asyncIterableToArray(consumer);
 
       expect(mockSubscription.unsubscribe).not.toBeCalled();
     });
 
-    function fakeConnectionThenUnsubscribe(): void {
+    function fakeConnectionThenInterrupt(): void {
       setImmediate(() => mockConnection.emit('connect'));
-      setImmediate(() => mockSubscription.emit('unsubscribed'));
+      setImmediate(interruptCurrentProcess);
+    }
+
+    function interruptCurrentProcess(): void {
+      // @ts-ignore
+      process.emit('SIGINT');
     }
   });
 });

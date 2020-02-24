@@ -63,20 +63,29 @@ export class NatsStreamingClient {
       .setAckWait(5_000)
       .setMaxInFlight(1);
     const sourceStream = new PassThrough({ objectMode: true });
-    const subscription = connection.subscribe(channel, queue, subscriptionOptions);
+
+    function gracefullyEndWorker(): void {
+      sourceStream.destroy();
+      process.exit(0);
+    }
+    process.on('SIGINT', gracefullyEndWorker);
+    process.on('SIGTERM', gracefullyEndWorker);
+
     try {
+      const subscription = connection.subscribe(channel, queue, subscriptionOptions);
       subscription.on('error', error => sourceStream.destroy(error));
-      subscription.on('unsubscribed', () => sourceStream.destroy());
       subscription.on('message', msg => sourceStream.write(msg));
       for await (const msg of streamToIt.source(sourceStream)) {
         yield msg;
       }
     } finally {
       connection.close();
+      process.removeListener('SIGINT', gracefullyEndWorker);
+      process.removeListener('SIGTERM', gracefullyEndWorker);
     }
   }
 
-  protected async connect(): Promise<Stan> {
+  public async connect(): Promise<Stan> {
     return new Promise<Stan>((resolve, _reject) => {
       const connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
       connection.on('connect', () => {

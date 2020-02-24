@@ -171,11 +171,11 @@ describe('NatsStreamingClient', () => {
       ]);
     });
 
-    test('Publishing multiple messages from an iterator should be supported', async () => {
+    test('Publishing multiple messages from an async iterable should be supported', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await asyncIterableToArray(publisher(arrayToIterator([STUB_MESSAGE_1, STUB_MESSAGE_2])));
+      await asyncIterableToArray(publisher(arrayToAsyncIterable([STUB_MESSAGE_1, STUB_MESSAGE_2])));
 
       expect(mockConnection.publish).toBeCalledTimes(2);
       expect(mockConnection.publish).toBeCalledWith(
@@ -449,7 +449,7 @@ describe('NatsStreamingClient', () => {
   });
 });
 
-function* arrayToIterator<T>(array: readonly T[]): IterableIterator<T> {
+async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
   for (const item of array) {
     yield item;
   }

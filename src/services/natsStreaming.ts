@@ -21,14 +21,14 @@ export class NatsStreamingClient {
   public makePublisher(
     channel: string,
   ): (
-    messages: IterableIterator<PublisherMessage> | readonly PublisherMessage[],
+    messages: AsyncIterable<PublisherMessage> | readonly PublisherMessage[],
   ) => AsyncIterable<string> {
     const promisedConnection = this.connect();
     return async function*(messages): AsyncIterable<string> {
       const connection = await promisedConnection;
       const publishPromisified = promisify(connection.publish).bind(connection);
 
-      for (const message of messages) {
+      for await (const message of messages) {
         await publishPromisified(channel, message.data);
         yield message.id;
       }

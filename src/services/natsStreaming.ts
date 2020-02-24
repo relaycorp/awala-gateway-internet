@@ -72,7 +72,6 @@ export class NatsStreamingClient {
         yield msg;
       }
     } finally {
-      subscription.unsubscribe();
       connection.close();
     }
   }

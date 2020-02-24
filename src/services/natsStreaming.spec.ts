@@ -411,14 +411,22 @@ describe('NatsStreamingClient', () => {
       expect(mockConnection.close).toBeCalledTimes(1);
     });
 
-    test('Connection and subscription should be closed after consuming messages', async () => {
+    test('Connection should be closed after consuming messages', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       fakeConnectionThenUnsubscribe();
 
       await asyncIterableToArray(consumer);
 
-      expect(mockSubscription.unsubscribe).toBeCalledTimes(1);
       expect(mockConnection.close).toBeCalledTimes(1);
+    });
+
+    test('Consumer should never unsubscribe', async () => {
+      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+      fakeConnectionThenUnsubscribe();
+
+      await asyncIterableToArray(consumer);
+
+      expect(mockSubscription.unsubscribe).not.toBeCalled();
     });
 
     function fakeConnectionThenUnsubscribe(): void {

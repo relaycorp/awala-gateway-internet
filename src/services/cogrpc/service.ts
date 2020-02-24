@@ -66,7 +66,11 @@ export function makeServiceImplementation(
         }
       }
 
-      await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+      try {
+        await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+      } finally {
+        natsClient.disconnect();
+      }
     },
     collectCargo,
   };

@@ -36,6 +36,7 @@ beforeEach(() => {
     }
   }
   mockNatsClient = ({
+    disconnect: jest.fn(),
     makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
   } as unknown) as natsStreaming.NatsStreamingClient;
 });
@@ -181,10 +182,9 @@ describe('service', () => {
             throw error;
           }
         }
-        ((mockNatsClient.makePublisher as unknown) as jest.MockInstance<
-          any,
-          any
-        >).mockImplementation(() => publishFirstMessageThenFail);
+        ((mockNatsClient.makePublisher as unknown) as jest.MockInstance<any, any>).mockReturnValue(
+          publishFirstMessageThenFail,
+        );
         const undeliveredMessageId = 'undelivered';
         mockDuplexStream.output.push(
           {
@@ -203,6 +203,39 @@ describe('service', () => {
         expect(mockDuplexStream.write).toBeCalledWith({ id: STUB_DELIVERY_ID });
 
         // TODO: Log error message
+      });
+
+      test('NATS Streaming connection should be closed upon completion', async () => {
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
+
+        await deliverCargo(mockDuplexStream.convertToGrpcStream());
+
+        expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+      });
+
+      test('NATS Streaming connection should be closed upon error', async () => {
+        async function* throwError(
+          messages: AsyncIterable<natsStreaming.PublisherMessage>,
+        ): AsyncIterable<string> {
+          for await (const message of messages) {
+            yield message.id;
+          }
+          throw new Error('Denied');
+        }
+        ((mockNatsClient.makePublisher as unknown) as jest.MockInstance<any, any>).mockReturnValue(
+          throwError,
+        );
+        mockDuplexStream.output.push({
+          cargo: STUB_CARGO_SERIALIZATION,
+          id: STUB_DELIVERY_ID,
+        });
+
+        await expect(deliverCargo(mockDuplexStream.convertToGrpcStream())).toReject();
+
+        expect(mockNatsClient.disconnect).toBeCalledTimes(1);
       });
 
       test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {

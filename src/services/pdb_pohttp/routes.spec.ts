@@ -60,6 +60,7 @@ const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
 let mockNatsClient: natsStreaming.NatsStreamingClient;
 beforeEach(() => {
   mockNatsClient = ({
+    disconnect: jest.fn(),
     publishMessage: jest.fn(),
   } as unknown) as natsStreaming.NatsStreamingClient;
 });
@@ -209,6 +210,22 @@ describe('receiveParcel', () => {
 
       // TODO: Find a way to spy on the error logger
       // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
+    });
+
+    test('NATS connection should be closed upon successful completion', async () => {
+      await serverInstance.inject(validRequestOptions);
+
+      expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+    });
+
+    test('NATS connection should be closed upon failure', async () => {
+      const error = new Error('Oops');
+      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
+      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
+
+      await serverInstance.inject(validRequestOptions);
+
+      expect(mockNatsClient.disconnect).toBeCalledTimes(1);
     });
   });
 });

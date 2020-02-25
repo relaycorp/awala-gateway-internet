@@ -88,11 +88,13 @@ export class NatsStreamingClient {
         return resolve(this.connection);
       }
 
+      // tslint:disable-next-line:no-object-mutation
       this.connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
       this.connection.on('connect', () => {
         resolve(this.connection);
       });
       this.connection.on('close', () => {
+        // tslint:disable-next-line:no-object-mutation
         this.connection = undefined;
       });
     });

@@ -96,6 +96,8 @@ export default async function registerRoutes(
         return reply
           .code(500)
           .send({ message: 'Parcel could not be stored; please try again later' });
+      } finally {
+        natsClient.disconnect();
       }
       return reply.code(202).send({});
     },

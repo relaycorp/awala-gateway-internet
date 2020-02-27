@@ -36,13 +36,18 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         }
         yield { data: Buffer.from(parcelSerialized), id: 'ignored-id' };
       }
+      message.ack();
     }
   }
 
   const parcelPublisher = natsStreamingClient.makePublisher('crc-parcels');
 
   const queueConsumer = natsStreamingClient.makeQueueConsumer('crc-cargo', 'worker', 'worker');
-  await pipe(queueConsumer, unwrapCargoPayload, parcelPublisher, consumeAsyncIterator);
+  try {
+    await pipe(queueConsumer, unwrapCargoPayload, parcelPublisher, consumeAsyncIterator);
+  } finally {
+    natsStreamingClient.disconnect();
+  }
 }
 
 async function consumeAsyncIterator<T>(iterator: AsyncIterable<T>): Promise<void> {

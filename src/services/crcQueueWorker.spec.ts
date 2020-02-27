@@ -265,9 +265,42 @@ describe('processIncomingCrcCargo', () => {
     );
   });
 
-  test.todo('Cargo message should be acknowledged after messages have been processed');
+  test('Cargo message should be acknowledged after messages have been processed', async () => {
+    const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+    const stubParcelSerialized = Buffer.from(
+      await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
+    );
+    const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
+    const stanMessage = mockStanMessage(await generateCargo(stubCargoMessageSet));
+    mockQueueMessages = [stanMessage];
 
-  test.todo('NATS connection should be closed upon completion');
+    mockCargoUnwrapPayload.mockResolvedValueOnce({ payload: stubCargoMessageSet });
+
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(stanMessage.ack).toBeCalledTimes(1);
+    expect(stanMessage.ack).toBeCalledWith();
+  });
+
+  test('NATS connection should be closed upon successful completion', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+    expect(mockNatsClient.disconnect).toBeCalledWith();
+  });
+
+  test('NATS connection should be closed upon error', async () => {
+    const error = new Error('Not on my watch');
+    // @ts-ignore
+    mockNatsClient.makePublisher.mockReturnValue(() => {
+      throw error;
+    });
+
+    await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
+
+    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+    expect(mockNatsClient.disconnect).toBeCalledWith();
+  });
 
   async function generateCargo(cargoMessageSet: CargoMessageSet): Promise<ArrayBuffer> {
     const stubCargo = new Cargo(
@@ -281,7 +314,7 @@ describe('processIncomingCrcCargo', () => {
 
 function mockStanMessage(messageData: Buffer | ArrayBuffer): stan.Message {
   return castMock<stan.Message>({
-    ack: jest.fn,
+    ack: jest.fn(),
     getRawData: () => Buffer.from(messageData),
   });
 }

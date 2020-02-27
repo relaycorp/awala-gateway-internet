@@ -284,7 +284,7 @@ describe('NatsStreamingClient', () => {
       });
     });
 
-    describe('Subscription', () => {
+    describe('Subscription creation', () => {
       test('Subscription should start once the connection has been established', async done => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
         setImmediate(() => {
@@ -354,6 +354,17 @@ describe('NatsStreamingClient', () => {
           expect(mockSubscriptionOptions[optKey]).toBeCalledWith(...optArgs);
         },
       );
+
+      test('Errors thrown while establishing subscription should be propagated', async () => {
+        const error = new Error('Nope');
+        mockConnection.subscribe.mockImplementationOnce(() => {
+          throw error;
+        });
+        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+        fakeConnectionThenInterrupt();
+
+        await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
+      });
     });
 
     test('Incoming messages should be yielded until subscription ends', async () => {

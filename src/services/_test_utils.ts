@@ -66,11 +66,16 @@ export function mockSpy<T, Y extends any[]>(
   return spy;
 }
 
+export function castMock<T>(partialMock: Partial<T>): T {
+  return (partialMock as unknown) as T;
+}
+
 export interface PdaChain {
-  readonly publicGateway: Certificate;
-  readonly privateGateway: Certificate;
-  readonly peerEndpoint: Certificate;
-  readonly pda: Certificate;
+  readonly publicGatewayCert: Certificate;
+  readonly privateGatewayCert: Certificate;
+  readonly privateGatewayPrivateKey: CryptoKey;
+  readonly peerEndpointCert: Certificate;
+  readonly pdaCert: Certificate;
   readonly pdaGranteePrivateKey: CryptoKey;
 }
 
@@ -115,11 +120,12 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
   );
 
   return {
-    pda: endpointPdaCert,
+    pdaCert: endpointPdaCert,
     pdaGranteePrivateKey: endpointKeyPair.privateKey,
-    peerEndpoint: peerEndpointCert,
-    privateGateway: privateGatewayCert,
-    publicGateway: publicGatewayCert,
+    peerEndpointCert,
+    privateGatewayCert,
+    privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
+    publicGatewayCert,
   };
 }
 

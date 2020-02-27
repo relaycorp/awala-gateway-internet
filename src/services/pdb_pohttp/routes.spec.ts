@@ -42,9 +42,9 @@ beforeAll(async () => {
   stubPdaChain = await generateStubPdaChain();
 
   const payload = await generateStubParcel({
-    recipientAddress: await stubPdaChain.peerEndpoint.calculateSubjectPrivateAddress(),
-    senderCertificate: stubPdaChain.pda,
-    senderCertificateChain: [stubPdaChain.peerEndpoint, stubPdaChain.privateGateway],
+    recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    senderCertificate: stubPdaChain.pdaCert,
+    senderCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
     senderPrivateKey: stubPdaChain.pdaGranteePrivateKey,
   });
   // tslint:disable-next-line:no-object-mutation
@@ -71,7 +71,7 @@ const mockNatsClientClass = mockSpy(
 
 const mockRetrieveOwnCertificates = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
-  async () => [stubPdaChain.publicGateway],
+  async () => [stubPdaChain.publicGatewayCert],
 );
 
 describe('receiveParcel', () => {
@@ -148,9 +148,9 @@ describe('receiveParcel', () => {
     const unauthorizedSenderKeyPair = await generateRSAKeyPair();
     const unauthorizedCert = await generateStubEndpointCertificate(unauthorizedSenderKeyPair);
     const payload = await generateStubParcel({
-      recipientAddress: await stubPdaChain.peerEndpoint.calculateSubjectPrivateAddress(),
+      recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       senderCertificate: unauthorizedCert,
-      senderCertificateChain: [stubPdaChain.privateGateway],
+      senderCertificateChain: [stubPdaChain.privateGatewayCert],
       senderPrivateKey: unauthorizedSenderKeyPair.privateKey,
     });
     const response = await serverInstance.inject({
@@ -192,7 +192,7 @@ describe('receiveParcel', () => {
       expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
       expect(mockNatsClient.publishMessage).toBeCalledWith(
         validRequestOptions.payload,
-        `pdc-parcel.${await stubPdaChain.privateGateway.calculateSubjectPrivateAddress()}`,
+        `pdc-parcel.${await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
       );
     });
 

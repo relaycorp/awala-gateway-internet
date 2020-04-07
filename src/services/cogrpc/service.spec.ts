@@ -31,7 +31,7 @@ beforeEach(() => {
     messages: IterableIterator<natsStreaming.PublisherMessage>,
   ): AsyncIterable<string> {
     for await (const message of messages) {
-      natsPublishedMessages.push(message.data);
+      natsPublishedMessages.push(message.data as Buffer);
       yield message.id;
     }
   }

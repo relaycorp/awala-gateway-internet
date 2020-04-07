@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
+import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStore, StoreObject } from '../../backingServices/objectStorage';
 import {
   configureMockEnvVars,
@@ -15,7 +16,6 @@ import {
   PdaChain,
 } from '../_test_utils';
 import * as certs from '../certs';
-import * as natsStreaming from '../natsStreaming';
 import { makeServer } from './server';
 
 const mockFastifyPlugin = fastifyPlugin;

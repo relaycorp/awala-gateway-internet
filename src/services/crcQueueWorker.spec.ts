@@ -4,6 +4,7 @@ import * as vaultKeystore from '@relaycorp/keystore-vault';
 import { Cargo, CargoMessageSet, Parcel, RAMFSyntaxError } from '@relaycorp/relaynet-core';
 import * as stan from 'node-nats-streaming';
 
+import * as natsStreaming from '../backingServices/natsStreaming';
 import {
   castMock,
   configureMockEnvVars,
@@ -11,7 +12,6 @@ import {
   mockSpy,
   PdaChain,
 } from './_test_utils';
-import * as natsStreaming from './natsStreaming';
 
 const mockPino = { info: jest.fn() };
 jest.mock('pino', () => jest.fn().mockImplementation(() => mockPino));

@@ -10,8 +10,8 @@ import { createConnection } from 'mongoose';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
+import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { retrieveOwnCertificates } from '../certs';
-import { NatsStreamingClient, PublisherMessage } from '../natsStreaming';
 
 interface ServiceImplementationOptions {
   readonly mongoUri: string;

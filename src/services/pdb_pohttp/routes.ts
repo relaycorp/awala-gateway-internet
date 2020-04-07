@@ -4,9 +4,9 @@ import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
+import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStore } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
-import { NatsStreamingClient } from '../natsStreaming';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 

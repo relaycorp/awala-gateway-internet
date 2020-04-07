@@ -1,4 +1,5 @@
 import { S3 } from 'aws-sdk';
+import { get as getEnvVar } from 'env-var';
 import * as http from 'http';
 import * as https from 'https';
 
@@ -15,6 +16,20 @@ export interface StoreObject {
  * it a little easier to support other authentication mechanisms, like service accounts.
  */
 export class ObjectStore {
+  public static initFromEnv(): ObjectStore {
+    const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
+      .required()
+      .asString();
+    const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID')
+      .required()
+      .asString();
+    const secretKey = getEnvVar('OBJECT_STORE_SECRET_KEY')
+      .required()
+      .asString();
+    const tlsEnabled = getEnvVar('OBJECT_STORE_TLS_ENABLED').asBool();
+    return new ObjectStore(endpoint, accessKeyId, secretKey, tlsEnabled);
+  }
+
   protected readonly client: S3;
 
   constructor(endpoint: string, accessKeyId: string, secretAccessKey: string, tlsEnabled = true) {

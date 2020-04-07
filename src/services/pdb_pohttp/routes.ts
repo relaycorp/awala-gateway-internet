@@ -1,10 +1,14 @@
-import { Parcel } from '@relaycorp/relaynet-core';
+import { Certificate, Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
+import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
+import { ObjectStore } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
 import { NatsStreamingClient } from '../natsStreaming';
+
+const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -14,6 +18,11 @@ export default async function registerRoutes(
     .required()
     .asString();
   const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
+    .required()
+    .asString();
+
+  const objectStoreClient = ObjectStore.initFromEnv();
+  const objectStoreBucket = getEnvVar('OBJECT_STORAGE_BUCKET')
     .required()
     .asString();
 
@@ -47,6 +56,8 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
+      //region Validate the parcel
+
       // tslint:disable-next-line:no-let
       let parcel;
       try {
@@ -61,6 +72,7 @@ export default async function registerRoutes(
       try {
         await parcel.validate(trustedCertificates);
       } catch (error) {
+        // See: https://github.com/relaycorp/relaynet-internet-gateway/issues/15
         // tslint:disable-next-line:no-console
         console.log({
           attachedChain: await Promise.all(
@@ -81,16 +93,41 @@ export default async function registerRoutes(
         // return reply.code(400).send({ message: 'Parcel sender is not authorized' });
       }
 
+      //endregion
+
       const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-      const localGateway = certificatePath[0];
-      const localGatewayAddress = await localGateway.calculateSubjectPrivateAddress();
+      const localGatewayCert = certificatePath[0];
+      const localGatewayAddress = await localGatewayCert.calculateSubjectPrivateAddress();
+
+      //region Save to object storage
+      const parcelObjectKey = await calculateParcelObjectKey(
+        parcel.id,
+        localGatewayAddress,
+        parcel.senderCertificate,
+      );
+      const parcelObject = {
+        body: request.body,
+        metadata: { 'parcel-expiry': convertDateToTimestamp(parcel.expiryDate).toString() },
+      };
+      try {
+        await objectStoreClient.putObject(parcelObject, parcelObjectKey, objectStoreBucket);
+      } catch (error) {
+        request.log.error({ err: error }, 'Failed to save parcel in object storage');
+        return reply
+          .code(500)
+          .send({ message: 'Parcel could not be stored; please try again later' });
+      }
+      //region
+
+      //region Notify subscribers
+      // TODO: Try to reuse the NATS client within the process, if the client is concurrency-safe
       const natsClient = new NatsStreamingClient(
         natsServerUrl,
         natsClusterId,
         `pohttp-req-${request.id}`,
       );
       try {
-        await natsClient.publishMessage(request.body, `pdc-parcel.${localGatewayAddress}`);
+        await natsClient.publishMessage(parcelObjectKey, `pdc-parcel.${localGatewayAddress}`);
       } catch (error) {
         request.log.error({ err: error }, 'Failed to queue ping message');
         return reply
@@ -99,7 +136,33 @@ export default async function registerRoutes(
       } finally {
         natsClient.disconnect();
       }
+      //endregion
+
       return reply.code(202).send({});
     },
   });
+}
+
+async function calculateParcelObjectKey(
+  parcelId: string,
+  localGatewayAddress: string,
+  senderCertificate: Certificate,
+): Promise<string> {
+  const senderPrivateAddress = await senderCertificate.calculateSubjectPrivateAddress();
+  return [
+    GATEWAY_BOUND_OBJECT_KEY_PREFIX,
+    localGatewayAddress,
+    senderPrivateAddress,
+    sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
+  ].join('/');
+}
+
+function convertDateToTimestamp(expiryDate: Date): number {
+  return Math.floor(expiryDate.getTime() / 1_000);
+}
+
+function sha256Hex(plaintext: string): string {
+  return createHash('sha256')
+    .update(plaintext)
+    .digest('hex');
 }

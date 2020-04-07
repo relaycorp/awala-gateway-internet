@@ -11,6 +11,10 @@ services:
       MONGO_URI: ${MONGO_URI}
       NATS_SERVER_URL: ${NATS_SERVER_URL}
       NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}
+      OBJECT_STORE_ENDPOINT: ${OBJECT_STORE_ENDPOINT}
+      OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
+      OBJECT_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      OBJECT_STORE_TLS_ENABLED: ${OBJECT_STORE_TLS_ENABLED}
     ports:
       - '127.0.0.1:8080:8080'
     volumes:
@@ -78,7 +82,7 @@ services:
     init: true
     command: ["server", "/data"]
     environment:
-      MINIO_ACCESS_KEY: ACCESS_KEY
-      MINIO_SECRET_KEY: letmeinpls
+      MINIO_ACCESS_KEY: ${OBJECT_STORE_ACCESS_KEY_ID}
+      MINIO_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
     ports:
       - '127.0.0.1:9000:9000'

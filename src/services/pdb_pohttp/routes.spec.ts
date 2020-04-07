@@ -1,9 +1,11 @@
 /* tslint:disable:no-let */
 
-import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
+import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
+import { createHash } from 'crypto';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
+import { ObjectStore, StoreObject } from '../../backingServices/objectStorage';
 import {
   configureMockEnvVars,
   generateStubEndpointCertificate,
@@ -38,15 +40,16 @@ const validRequestOptions: HTTPInjectOptions = {
 };
 let stubPdaChain: PdaChain;
 
+let PARCEL: Parcel;
 beforeAll(async () => {
   stubPdaChain = await generateStubPdaChain();
 
-  const payload = await generateStubParcel({
+  PARCEL = await generateStubParcel({
     recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
     senderCertificate: stubPdaChain.pdaCert,
     senderCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
-    senderPrivateKey: stubPdaChain.pdaGranteePrivateKey,
   });
+  const payload = Buffer.from(await PARCEL.serialize(stubPdaChain.pdaGranteePrivateKey));
   // tslint:disable-next-line:no-object-mutation
   validRequestOptions.payload = payload;
   // tslint:disable-next-line:readonly-keyword no-object-mutation
@@ -74,11 +77,21 @@ const mockRetrieveOwnCertificates = mockSpy(
   async () => [stubPdaChain.publicGatewayCert],
 );
 
+const mockObjectStoreClient = {
+  putObject: mockSpy(jest.fn()),
+};
+jest.spyOn(ObjectStore, 'initFromEnv').mockReturnValue(
+  // @ts-ignore
+  mockObjectStoreClient,
+);
+const OBJECT_STORAGE_BUCKET = 'the-bucket';
+
 describe('receiveParcel', () => {
   configureMockEnvVars({
     MONGO_URI: 'uri',
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
+    OBJECT_STORAGE_BUCKET,
   });
 
   let serverInstance: FastifyInstance;
@@ -147,12 +160,12 @@ describe('receiveParcel', () => {
   test.skip('Parcel should be refused if sender certification path is not trusted', async () => {
     const unauthorizedSenderKeyPair = await generateRSAKeyPair();
     const unauthorizedCert = await generateStubEndpointCertificate(unauthorizedSenderKeyPair);
-    const payload = await generateStubParcel({
+    const parcel = await generateStubParcel({
       recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       senderCertificate: unauthorizedCert,
       senderCertificateChain: [stubPdaChain.privateGatewayCert],
-      senderPrivateKey: unauthorizedSenderKeyPair.privateKey,
     });
+    const payload = await parcel.serialize(unauthorizedSenderKeyPair.privateKey);
     const response = await serverInstance.inject({
       ...validRequestOptions,
       headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
@@ -172,6 +185,17 @@ describe('receiveParcel', () => {
   });
 
   describe('Valid parcel delivery', () => {
+    let expectedObjectKey: string;
+    beforeAll(async () => {
+      expectedObjectKey = [
+        'parcels',
+        'gateway-bound',
+        await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        await stubPdaChain.pdaCert.calculateSubjectPrivateAddress(),
+        sha256Hex(PARCEL.id),
+      ].join('/');
+    });
+
     test('202 response should be returned', async () => {
       const response = await serverInstance.inject(validRequestOptions);
 
@@ -179,7 +203,40 @@ describe('receiveParcel', () => {
       expect(JSON.parse(response.payload)).toEqual({});
     });
 
-    test('Parcel should be published to right topic', async () => {
+    test('Parcel should be put in the right object store location', async () => {
+      await serverInstance.inject(validRequestOptions);
+
+      expect(mockObjectStoreClient.putObject).toBeCalledTimes(1);
+      const expectedParcelExpiry = Math.floor(PARCEL.expiryDate.getTime() / 1_000).toString();
+      const expectedStoreObject: StoreObject = {
+        body: validRequestOptions.payload as Buffer,
+        metadata: { 'parcel-expiry': expectedParcelExpiry },
+      };
+      expect(mockObjectStoreClient.putObject).toBeCalledWith(
+        expectedStoreObject,
+        expectedObjectKey,
+        OBJECT_STORAGE_BUCKET,
+      );
+    });
+
+    test('Failing to save parcel in object store should result in a 500 response', async () => {
+      const error = new Error('Oops');
+      mockObjectStoreClient.putObject.mockReset();
+      mockObjectStoreClient.putObject.mockRejectedValueOnce(error);
+
+      const response = await serverInstance.inject(validRequestOptions);
+
+      expect(response).toHaveProperty('statusCode', 500);
+      expect(JSON.parse(response.payload)).toEqual({
+        message: 'Parcel could not be stored; please try again later',
+      });
+      expect(mockNatsClient.publishMessage).not.toBeCalled();
+
+      // TODO: Find a way to spy on the error logger
+      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
+    });
+
+    test('Parcel object key should be published to right NATS Streaming channel', async () => {
       await serverInstance.inject(validRequestOptions);
 
       expect(mockNatsClientClass).toBeCalledTimes(1);
@@ -191,7 +248,7 @@ describe('receiveParcel', () => {
 
       expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
       expect(mockNatsClient.publishMessage).toBeCalledWith(
-        validRequestOptions.payload,
+        expectedObjectKey,
         `pdc-parcel.${await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
       );
     });
@@ -229,3 +286,9 @@ describe('receiveParcel', () => {
     });
   });
 });
+
+function sha256Hex(plaintext: string): string {
+  return createHash('sha256')
+    .update(plaintext)
+    .digest('hex');
+}

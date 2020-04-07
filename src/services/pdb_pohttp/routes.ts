@@ -5,7 +5,7 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { ObjectStore } from '../../backingServices/objectStorage';
+import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
@@ -21,7 +21,7 @@ export default async function registerRoutes(
     .required()
     .asString();
 
-  const objectStoreClient = ObjectStore.initFromEnv();
+  const objectStoreClient = ObjectStoreClient.initFromEnv();
   const objectStoreBucket = getEnvVar('OBJECT_STORAGE_BUCKET')
     .required()
     .asString();

@@ -6,7 +6,7 @@ import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import { ObjectStore, StoreObject } from '../../backingServices/objectStorage';
+import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
   configureMockEnvVars,
   generateStubEndpointCertificate,
@@ -80,7 +80,7 @@ const mockRetrieveOwnCertificates = mockSpy(
 const mockObjectStoreClient = {
   putObject: mockSpy(jest.fn()),
 };
-jest.spyOn(ObjectStore, 'initFromEnv').mockReturnValue(
+jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(
   // @ts-ignore
   mockObjectStoreClient,
 );

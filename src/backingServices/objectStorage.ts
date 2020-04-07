@@ -15,8 +15,8 @@ export interface StoreObject {
  * use something like https://github.com/ItalyPaleAle/SMCloudStore. This approach should also make
  * it a little easier to support other authentication mechanisms, like service accounts.
  */
-export class ObjectStore {
-  public static initFromEnv(): ObjectStore {
+export class ObjectStoreClient {
+  public static initFromEnv(): ObjectStoreClient {
     const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
       .required()
       .asString();
@@ -27,7 +27,7 @@ export class ObjectStore {
       .required()
       .asString();
     const tlsEnabled = getEnvVar('OBJECT_STORE_TLS_ENABLED').asBool();
-    return new ObjectStore(endpoint, accessKeyId, secretKey, tlsEnabled);
+    return new ObjectStoreClient(endpoint, accessKeyId, secretKey, tlsEnabled);
   }
 
   protected readonly client: S3;

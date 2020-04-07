@@ -11,7 +11,7 @@ jest.mock('aws-sdk', () => ({
   S3: jest.fn().mockReturnValue(mockS3Client),
 }));
 import * as AWS from 'aws-sdk';
-import { ObjectStore, StoreObject } from './objectStorage';
+import { ObjectStoreClient, StoreObject } from './objectStorage';
 
 const SECRET_ACCESS_KEY = 'secret-access-key';
 const ACCESS_KEY = 'the-access-key';
@@ -26,7 +26,7 @@ describe('ObjectStore', () => {
     describe('Client', () => {
       test('Specified endpoint should be used', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -36,7 +36,7 @@ describe('ObjectStore', () => {
 
       test('Specified credentials should be used', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -47,7 +47,7 @@ describe('ObjectStore', () => {
 
       test('Signature should use version 4', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -57,7 +57,7 @@ describe('ObjectStore', () => {
 
       test('s3ForcePathStyle should be enabled', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -67,7 +67,7 @@ describe('ObjectStore', () => {
 
       test('TSL should be enabled by default', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -77,7 +77,7 @@ describe('ObjectStore', () => {
 
       test('TSL may be disabled', () => {
         // tslint:disable-next-line:no-unused-expression
-        new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, false);
+        new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, false);
 
         expect(AWS.S3).toBeCalledTimes(1);
 
@@ -88,7 +88,7 @@ describe('ObjectStore', () => {
       describe('HTTP(S) agent', () => {
         test('HTTP agent with Keep-Alive should be used when TSL is disabled', () => {
           // tslint:disable-next-line:no-unused-expression
-          new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, false);
+          new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, false);
 
           expect(AWS.S3).toBeCalledTimes(1);
 
@@ -100,7 +100,7 @@ describe('ObjectStore', () => {
 
         test('HTTPS agent with Keep-Alive should be used when TSL is enabled', () => {
           // tslint:disable-next-line:no-unused-expression
-          new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, true);
+          new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY, true);
 
           expect(AWS.S3).toBeCalledTimes(1);
 
@@ -126,7 +126,7 @@ describe('ObjectStore', () => {
       (envVarKey: string) => {
         mockEnvVars({ ...baseEnvVars, [envVarKey]: undefined });
 
-        expect(() => ObjectStore.initFromEnv()).toThrowWithMessage(
+        expect(() => ObjectStoreClient.initFromEnv()).toThrowWithMessage(
           EnvVarError,
           new RegExp(envVarKey),
         );
@@ -136,7 +136,7 @@ describe('ObjectStore', () => {
     test('OBJECT_STORE_TLS_ENABLED should be honored if present', () => {
       mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: 'false' });
 
-      ObjectStore.initFromEnv();
+      ObjectStoreClient.initFromEnv();
 
       expect(AWS.S3).toBeCalledTimes(1);
       const s3CallArgs = getMockContext(AWS.S3).calls[0][0];
@@ -146,7 +146,7 @@ describe('ObjectStore', () => {
     test('TLS should be enabled if OBJECT_STORE_TLS_ENABLED is missing', () => {
       mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
-      ObjectStore.initFromEnv();
+      ObjectStoreClient.initFromEnv();
 
       expect(AWS.S3).toBeCalledTimes(1);
       const s3CallArgs = getMockContext(AWS.S3).calls[0][0];
@@ -156,7 +156,7 @@ describe('ObjectStore', () => {
     test('Environment variables should be passed to constructor', () => {
       mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
-      ObjectStore.initFromEnv();
+      ObjectStoreClient.initFromEnv();
 
       expect(AWS.S3).toBeCalledTimes(1);
       const s3CallArgs = getMockContext(AWS.S3).calls[0][0];
@@ -170,12 +170,12 @@ describe('ObjectStore', () => {
     test('Client should be returned', () => {
       mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
-      expect(ObjectStore.initFromEnv()).toBeInstanceOf(ObjectStore);
+      expect(ObjectStoreClient.initFromEnv()).toBeInstanceOf(ObjectStoreClient);
     });
   });
 
   describe('putObject', () => {
-    const client = new ObjectStore(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+    const client = new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
 
     test('Object should be created with specified parameters', async () => {
       await client.putObject(OBJECT, OBJECT_KEY, BUCKET);

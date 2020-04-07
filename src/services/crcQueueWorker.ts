@@ -6,7 +6,7 @@ import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
 import pino from 'pino';
 
-import { NatsStreamingClient, PublisherMessage } from './natsStreaming';
+import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
 
 const logger = pino();
 

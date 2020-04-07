@@ -3,7 +3,7 @@
 import { EventEmitter } from 'events';
 import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
 
-import { mockSpy } from './_test_utils';
+import { mockSpy } from '../services/_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
   public readonly close = jest.fn();

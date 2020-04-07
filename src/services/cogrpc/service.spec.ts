@@ -6,9 +6,9 @@ import { mongoose } from '@typegoose/typegoose';
 import { ServerDuplexStream } from 'grpc';
 import { Duplex } from 'stream';
 
+import * as natsStreaming from '../../backingServices/natsStreaming';
 import { getMockContext, makeEmptyCertificate, mockSpy } from '../_test_utils';
 import * as certs from '../certs';
-import * as natsStreaming from '../natsStreaming';
 import { collectCargo, makeServiceImplementation } from './service';
 
 const STUB_DELIVERY_ID = 'the-id';
@@ -31,7 +31,7 @@ beforeEach(() => {
     messages: IterableIterator<natsStreaming.PublisherMessage>,
   ): AsyncIterable<string> {
     for await (const message of messages) {
-      natsPublishedMessages.push(message.data);
+      natsPublishedMessages.push(message.data as Buffer);
       yield message.id;
     }
   }

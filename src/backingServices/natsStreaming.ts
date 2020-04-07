@@ -5,7 +5,7 @@ import { promisify } from 'util';
 
 export interface PublisherMessage {
   readonly id: string;
-  readonly data: Buffer;
+  readonly data: Buffer | string;
 }
 
 export class NatsStreamingClient {
@@ -35,7 +35,7 @@ export class NatsStreamingClient {
     };
   }
 
-  public async publishMessage(messageData: Buffer, channel: string): Promise<void> {
+  public async publishMessage(messageData: Buffer | string, channel: string): Promise<void> {
     const publisher = this.makePublisher(channel);
     await consumeAsyncIterable(publisher([{ id: 'single-message', data: messageData }]));
   }

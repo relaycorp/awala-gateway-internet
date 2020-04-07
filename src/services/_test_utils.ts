@@ -147,17 +147,15 @@ export interface StubParcelOptions {
   readonly recipientAddress: string;
   readonly senderCertificate: Certificate;
   readonly senderCertificateChain?: readonly Certificate[];
-  readonly senderPrivateKey: CryptoKey;
 }
 
-export async function generateStubParcel(options: StubParcelOptions): Promise<Buffer> {
-  const parcel = new Parcel(
+export async function generateStubParcel(options: StubParcelOptions): Promise<Parcel> {
+  return new Parcel(
     options.recipientAddress,
     options.senderCertificate,
     Buffer.from('the payload'),
     { senderCaCertificateChain: options.senderCertificateChain ?? [] },
   );
-  return Buffer.from(await parcel.serialize(options.senderPrivateKey));
 }
 
 export function expectBuffersToEqual(

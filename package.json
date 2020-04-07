@@ -66,10 +66,11 @@
   "dependencies": {
     "@relaycorp/keystore-vault": "^1.0.1",
     "@relaycorp/relaynet-cogrpc": "^1.0.4",
-    "@relaycorp/relaynet-core": "^1.19.1",
+    "@relaycorp/relaynet-core": "^1.20.0",
     "@relaycorp/relaynet-pohttp": "^1.1.2",
     "@typegoose/typegoose": "^6.2.2",
     "@types/pino": "^5.15.5",
+    "aws-sdk": "^2.654.0",
     "axios": "^0.19.1",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^5.2.0",

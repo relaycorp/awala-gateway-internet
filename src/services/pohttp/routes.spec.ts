@@ -184,6 +184,28 @@ describe('receiveParcel', () => {
     expect(mockNatsClient.publishMessage).not.toBeCalled();
   });
 
+  test('Parcel should be refused if recipient address is not private', async () => {
+    const parcel = await generateStubParcel({
+      recipientAddress: 'https://public.address/',
+      senderCertificate: stubPdaChain.pdaCert,
+    });
+    const payload = Buffer.from(await parcel.serialize(stubPdaChain.pdaGranteePrivateKey));
+    const response = await serverInstance.inject({
+      ...validRequestOptions,
+      headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
+      payload,
+    });
+
+    expect(response).toHaveProperty('statusCode', 400);
+    expect(JSON.parse(response.payload)).toHaveProperty(
+      'message',
+      'Parcel recipient should be specified as a private address',
+    );
+
+    expect(mockRetrieveOwnCertificates).not.toBeCalled();
+    expect(mockNatsClient.publishMessage).not.toBeCalled();
+  });
+
   describe('Valid parcel delivery', () => {
     let expectedObjectKey: string;
     beforeAll(async () => {

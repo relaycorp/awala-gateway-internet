@@ -66,6 +66,14 @@ export default async function registerRoutes(
         return reply.code(400).send({ message: 'Payload is not a valid RAMF-serialized parcel' });
       }
 
+      // The recipient's address should definitely be private, but we're only enforcing that so we
+      // can safely used it in the object key later.
+      if (!parcel.recipientAddress.match(/^[a-f0-9]+$/)) {
+        return reply
+          .code(400)
+          .send({ message: 'Parcel recipient should be specified as a private address' });
+      }
+
       // @ts-ignore
       const mongooseConnection = (fastify.mongo as unknown) as { readonly db: mongoose.Connection };
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection.db);

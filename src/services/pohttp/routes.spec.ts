@@ -191,6 +191,7 @@ describe('receiveParcel', () => {
         'parcels',
         'gateway-bound',
         await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
         await stubPdaChain.pdaCert.calculateSubjectPrivateAddress(),
         sha256Hex(PARCEL.id),
       ].join('/');

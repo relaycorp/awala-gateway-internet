@@ -1,4 +1,4 @@
-import { Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
 import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
@@ -96,15 +96,11 @@ export default async function registerRoutes(
       //endregion
 
       const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-      const localGatewayCert = certificatePath[0];
-      const localGatewayAddress = await localGatewayCert.calculateSubjectPrivateAddress();
+      const recipientGatewayCert = certificatePath[0];
+      const recipientGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
 
       //region Save to object storage
-      const parcelObjectKey = await calculateParcelObjectKey(
-        parcel.id,
-        localGatewayAddress,
-        parcel.senderCertificate,
-      );
+      const parcelObjectKey = await calculateParcelObjectKey(parcel, recipientGatewayAddress);
       const parcelObject = {
         body: request.body,
         metadata: { 'parcel-expiry': convertDateToTimestamp(parcel.expiryDate).toString() },
@@ -127,7 +123,7 @@ export default async function registerRoutes(
         `pohttp-req-${request.id}`,
       );
       try {
-        await natsClient.publishMessage(parcelObjectKey, `pdc-parcel.${localGatewayAddress}`);
+        await natsClient.publishMessage(parcelObjectKey, `pdc-parcel.${recipientGatewayAddress}`);
       } catch (error) {
         request.log.error({ err: error }, 'Failed to queue ping message');
         return reply
@@ -144,16 +140,16 @@ export default async function registerRoutes(
 }
 
 async function calculateParcelObjectKey(
-  parcelId: string,
-  localGatewayAddress: string,
-  senderCertificate: Certificate,
+  parcel: Parcel,
+  recipientGatewayAddress: string,
 ): Promise<string> {
-  const senderPrivateAddress = await senderCertificate.calculateSubjectPrivateAddress();
+  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
   return [
     GATEWAY_BOUND_OBJECT_KEY_PREFIX,
-    localGatewayAddress,
+    recipientGatewayAddress,
+    parcel.recipientAddress,
     senderPrivateAddress,
-    sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
+    sha256Hex(parcel.id), // Use the digest to avoid using potentially illegal characters
   ].join('/');
 }
 

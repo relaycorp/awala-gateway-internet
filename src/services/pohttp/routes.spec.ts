@@ -84,14 +84,14 @@ jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(
   // @ts-ignore
   mockObjectStoreClient,
 );
-const OBJECT_STORAGE_BUCKET = 'the-bucket';
+const OBJECT_STORE_BUCKET = 'the-bucket';
 
 describe('receiveParcel', () => {
   configureMockEnvVars({
     MONGO_URI: 'uri',
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
-    OBJECT_STORAGE_BUCKET,
+    OBJECT_STORE_BUCKET,
   });
 
   let serverInstance: FastifyInstance;
@@ -238,7 +238,7 @@ describe('receiveParcel', () => {
       expect(mockObjectStoreClient.putObject).toBeCalledWith(
         expectedStoreObject,
         expectedObjectKey,
-        OBJECT_STORAGE_BUCKET,
+        OBJECT_STORE_BUCKET,
       );
     });
 

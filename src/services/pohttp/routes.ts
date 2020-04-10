@@ -22,7 +22,7 @@ export default async function registerRoutes(
     .asString();
 
   const objectStoreClient = ObjectStoreClient.initFromEnv();
-  const objectStoreBucket = getEnvVar('OBJECT_STORAGE_BUCKET')
+  const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET')
     .required()
     .asString();
 

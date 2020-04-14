@@ -3,8 +3,10 @@ import * as http from 'http';
 import * as https from 'https';
 
 import { configureMockEnvVars, getMockContext, mockSpy } from '../services/_test_utils';
+import { asyncIterableToArray } from './_test_utils';
 
 const mockS3Client = {
+  listObjectsV2: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({ Contents: [] }) })),
   putObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
 };
 jest.mock('aws-sdk', () => ({
@@ -22,6 +24,8 @@ const OBJECT_KEY = 'the-object.txt';
 const OBJECT: StoreObject = { body: Buffer.from('the-body'), metadata: { foo: 'bar' } };
 
 describe('ObjectStore', () => {
+  const CLIENT = new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+
   describe('Constructor', () => {
     describe('Client', () => {
       test('Specified endpoint should be used', () => {
@@ -174,11 +178,70 @@ describe('ObjectStore', () => {
     });
   });
 
-  describe('putObject', () => {
-    const client = new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+  describe('listObjectKeys', () => {
+    const PREFIX = 'prefix/';
 
+    test('Filter criteria should be honored', async () => {
+      await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(mockS3Client.listObjectsV2).toBeCalledTimes(1);
+      expect(mockS3Client.listObjectsV2).toBeCalledWith({
+        Bucket: BUCKET,
+        Prefix: PREFIX,
+      });
+    });
+
+    test('Keys for objects matching criteria should be yielded', async () => {
+      const objectKeys: readonly string[] = [`${PREFIX}logo.png`, `${PREFIX}logo.gif`];
+      mockS3Client.listObjectsV2.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys.map(k => ({ Key: k })),
+            IsTruncated: false,
+          }),
+      });
+
+      const retrievedKeys = await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(retrievedKeys).toEqual(objectKeys);
+    });
+
+    test('Pagination should be handled seamlessly', async () => {
+      const objectKeys1: readonly string[] = [`${PREFIX}logo.png`, `${PREFIX}logo.gif`];
+      const continuationToken = 'continue==';
+      mockS3Client.listObjectsV2.mockReturnValueOnce({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys1.map(k => ({ Key: k })),
+            ContinuationToken: continuationToken,
+            IsTruncated: true,
+          }),
+      });
+      const objectKeys2: readonly string[] = [`${PREFIX}style.css`, `${PREFIX}mobile.css`];
+      mockS3Client.listObjectsV2.mockReturnValueOnce({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys2.map(k => ({ Key: k })),
+            IsTruncated: false,
+          }),
+      });
+
+      const retrievedKeys = await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(retrievedKeys).toEqual([...objectKeys1, ...objectKeys2]);
+
+      expect(mockS3Client.listObjectsV2).toBeCalledTimes(2);
+      expect(mockS3Client.listObjectsV2).toBeCalledWith({
+        Bucket: BUCKET,
+        ContinuationToken: continuationToken,
+        Prefix: PREFIX,
+      });
+    });
+  });
+
+  describe('putObject', () => {
     test('Object should be created with specified parameters', async () => {
-      await client.putObject(OBJECT, OBJECT_KEY, BUCKET);
+      await CLIENT.putObject(OBJECT, OBJECT_KEY, BUCKET);
 
       expect(mockS3Client.putObject).toBeCalledTimes(1);
       expect(mockS3Client.putObject).toBeCalledWith({

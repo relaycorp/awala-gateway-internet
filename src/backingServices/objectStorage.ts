@@ -51,6 +51,24 @@ export class ObjectStoreClient {
   //   return { body: data.Body as Buffer, metadata: data.Metadata || {} };
   // }
 
+  public async *listObjectKeys(prefix: string, bucket: string): AsyncIterable<string> {
+    // tslint:disable-next-line:no-let
+    let continuationToken: string | undefined;
+    do {
+      const request = this.client.listObjectsV2({
+        Bucket: bucket,
+        ContinuationToken: continuationToken,
+        Prefix: prefix,
+      });
+      const response = await request.promise();
+      for (const objectData of response.Contents as S3.ObjectList) {
+        yield objectData.Key as string;
+      }
+
+      continuationToken = response.ContinuationToken;
+    } while (continuationToken !== undefined);
+  }
+
   public async putObject(object: StoreObject, key: string, bucket: string): Promise<void> {
     const request = this.client.putObject({
       Body: object.body,

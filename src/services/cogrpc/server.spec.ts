@@ -13,15 +13,10 @@ const makeServiceImplementationSpy = mockSpy(
   jest.spyOn(cogrpcService, 'makeServiceImplementation'),
 );
 const mockServer = {
-  addService: jest.fn(),
-  bind: jest.fn(),
-  start: jest.fn(),
+  addService: mockSpy(jest.fn()),
+  bind: mockSpy(jest.fn(), () => 1),
+  start: mockSpy(jest.fn()),
 };
-beforeEach(() => {
-  mockServer.addService.mockReset();
-  mockServer.bind.mockReset();
-  mockServer.start.mockReset();
-});
 jest.mock('grpc', () => {
   const grpcOriginal = jest.requireActual('grpc');
   return {

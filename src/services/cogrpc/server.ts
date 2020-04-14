@@ -2,9 +2,14 @@ import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
 import { get as getEnvVar } from 'env-var';
 import { Server, ServerCredentials } from 'grpc';
 
+import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { makeServiceImplementation } from './service';
 
 const NETLOC = '0.0.0.0:8080';
+
+// Add some wiggle room to the maximum message size so we can include the overhead in serializing
+// Protocol Buffers messages.
+const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256;
 
 export function runServer(): void {
   const mongoUri = getEnvVar('MONGO_URI')
@@ -17,7 +22,7 @@ export function runServer(): void {
     .required()
     .asString();
 
-  const server = new Server();
+  const server = new Server({ 'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH });
   const serviceImplementation = makeServiceImplementation({
     mongoUri,
     natsClusterId,

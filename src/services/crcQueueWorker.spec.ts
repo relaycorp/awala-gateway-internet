@@ -4,19 +4,11 @@ import * as vaultKeystore from '@relaycorp/keystore-vault';
 import { Cargo, CargoMessageSet, Parcel, RAMFSyntaxError } from '@relaycorp/relaynet-core';
 import * as stan from 'node-nats-streaming';
 
+import { mockPino, mockSpy } from '../_test_utils';
 import * as natsStreaming from '../backingServices/natsStreaming';
-import {
-  castMock,
-  configureMockEnvVars,
-  generateStubPdaChain,
-  mockSpy,
-  PdaChain,
-} from './_test_utils';
+import { castMock, configureMockEnvVars, generateStubPdaChain, PdaChain } from './_test_utils';
 
-const mockPino = { info: jest.fn() };
-jest.mock('pino', () => jest.fn().mockImplementation(() => mockPino));
-beforeEach(() => mockPino.info.mockReset());
-
+const mockLogger = mockPino();
 import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
@@ -255,7 +247,7 @@ describe('processIncomingCrcCargo', () => {
     expect(mockPublishedMessages).toEqual([stubParcel1Serialized, stubParcel2Serialized]);
 
     const cargoSenderAddress = await stubCargo1.senderCertificate.calculateSubjectPrivateAddress();
-    expect(mockPino.info).toBeCalledWith(
+    expect(mockLogger.info).toBeCalledWith(
       {
         cargoId: stubCargo1.id,
         error: expect.any(RAMFSyntaxError),

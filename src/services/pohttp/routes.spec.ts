@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
+import { mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
@@ -12,7 +13,6 @@ import {
   generateStubEndpointCertificate,
   generateStubParcel,
   generateStubPdaChain,
-  mockSpy,
   PdaChain,
 } from '../_test_utils';
 import * as certs from '../certs';

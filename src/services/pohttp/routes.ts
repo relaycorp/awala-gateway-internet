@@ -7,8 +7,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
-
-const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
+import { EXPIRY_METADATA_KEY, GATEWAY_BOUND_OBJECT_KEY_PREFIX } from '../parcelStore';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -111,7 +110,7 @@ export default async function registerRoutes(
       const parcelObjectKey = await calculateParcelObjectKey(parcel, recipientGatewayAddress);
       const parcelObject = {
         body: request.body,
-        metadata: { 'parcel-expiry': convertDateToTimestamp(parcel.expiryDate).toString() },
+        metadata: { [EXPIRY_METADATA_KEY]: convertDateToTimestamp(parcel.expiryDate).toString() },
       };
       try {
         await objectStoreClient.putObject(parcelObject, parcelObjectKey, objectStoreBucket);

@@ -6,8 +6,9 @@ import { mongoose } from '@typegoose/typegoose';
 import { ServerDuplexStream } from 'grpc';
 import { Duplex } from 'stream';
 
+import { mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import { getMockContext, makeEmptyCertificate, mockSpy } from '../_test_utils';
+import { getMockContext, makeEmptyCertificate } from '../_test_utils';
 import * as certs from '../certs';
 import { collectCargo, makeServiceImplementation } from './service';
 

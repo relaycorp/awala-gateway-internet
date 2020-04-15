@@ -4,7 +4,8 @@ import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
 import { EnvVarError } from 'env-var';
 import * as grpc from 'grpc';
 
-import { configureMockEnvVars, mockSpy } from '../_test_utils';
+import { mockSpy } from '../../_test_utils';
+import { configureMockEnvVars } from '../_test_utils';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 

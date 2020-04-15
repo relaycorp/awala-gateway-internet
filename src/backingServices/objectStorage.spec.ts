@@ -2,8 +2,8 @@ import { EnvVarError } from 'env-var';
 import * as http from 'http';
 import * as https from 'https';
 
-import { configureMockEnvVars, getMockContext, mockSpy } from '../services/_test_utils';
-import { asyncIterableToArray } from './_test_utils';
+import { asyncIterableToArray, mockSpy } from '../_test_utils';
+import { configureMockEnvVars, getMockContext } from '../services/_test_utils';
 
 const mockS3Client = {
   deleteObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),

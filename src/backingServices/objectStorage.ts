@@ -51,6 +51,14 @@ export class ObjectStoreClient {
   //   return { body: data.Body as Buffer, metadata: data.Metadata || {} };
   // }
 
+  /**
+   * Retrieve the keys for all the objects in the specified bucket with the specified key prefix.
+   *
+   * This will handle pagination if the backend supports it (S3 does, Minio doesn't).
+   *
+   * @param prefix
+   * @param bucket
+   */
   public async *listObjectKeys(prefix: string, bucket: string): AsyncIterable<string> {
     // tslint:disable-next-line:no-let
     let continuationToken: string | undefined;

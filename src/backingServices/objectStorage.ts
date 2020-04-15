@@ -46,10 +46,10 @@ export class ObjectStoreClient {
     });
   }
 
-  // public async getObject(key: string, bucket: string): Promise<StoreObject> {
-  //   const data = await this.client.getObject({ Bucket: bucket, Key: key }).promise();
-  //   return { body: data.Body as Buffer, metadata: data.Metadata || {} };
-  // }
+  public async getObject(key: string, bucket: string): Promise<StoreObject> {
+    const data = await this.client.getObject({ Bucket: bucket, Key: key }).promise();
+    return { body: data.Body as Buffer, metadata: data.Metadata || {} };
+  }
 
   /**
    * Retrieve the keys for all the objects in the specified bucket with the specified key prefix.

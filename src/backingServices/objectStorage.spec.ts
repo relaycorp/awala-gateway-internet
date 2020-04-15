@@ -7,6 +7,7 @@ import { asyncIterableToArray } from './_test_utils';
 
 const mockS3Client = {
   deleteObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
+  getObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({}) })),
   listObjectsV2: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({ Contents: [] }) })),
   putObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
 };
@@ -240,6 +241,47 @@ describe('ObjectStore', () => {
     });
   });
 
+  describe('getObject', () => {
+    test('Object should be retrieved with the specified parameters', async () => {
+      await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(mockS3Client.getObject).toBeCalledTimes(1);
+      expect(mockS3Client.getObject).toBeCalledWith({
+        Bucket: BUCKET,
+        Key: OBJECT_KEY,
+      });
+    });
+
+    test('Body and metadata should be output', async () => {
+      mockS3Client.getObject.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Body: OBJECT.body,
+            Metadata: OBJECT.metadata,
+          }),
+      });
+
+      const object = await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(object).toHaveProperty('body', OBJECT.body);
+      expect(object).toHaveProperty('metadata', OBJECT.metadata);
+    });
+
+    test('Metadata should fall back to empty object when undefined', async () => {
+      mockS3Client.getObject.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Body: OBJECT.body,
+          }),
+      });
+
+      const object = await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(object).toHaveProperty('body', OBJECT.body);
+      expect(object).toHaveProperty('metadata', {});
+    });
+  });
+
   describe('putObject', () => {
     test('Object should be created with specified parameters', async () => {
       await CLIENT.putObject(OBJECT, OBJECT_KEY, BUCKET);
@@ -256,7 +298,7 @@ describe('ObjectStore', () => {
 
   describe('deleteObject', () => {
     test('Specified object should be deleted', async () => {
-      await CLIENT.deleteObject( OBJECT_KEY, BUCKET);
+      await CLIENT.deleteObject(OBJECT_KEY, BUCKET);
 
       expect(mockS3Client.deleteObject).toBeCalledTimes(1);
       expect(mockS3Client.deleteObject).toBeCalledWith({

@@ -87,7 +87,7 @@ export class ObjectStoreClient {
     await request.promise();
   }
 
-  // public async deleteObject(key: string, bucket: string): Promise<void> {
-  //   await this.client.deleteObject({ Key: key, Bucket: bucket }).promise();
-  // }
+  public async deleteObject(key: string, bucket: string): Promise<void> {
+    await this.client.deleteObject({ Key: key, Bucket: bucket }).promise();
+  }
 }

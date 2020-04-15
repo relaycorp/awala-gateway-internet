@@ -6,6 +6,7 @@ import { configureMockEnvVars, getMockContext, mockSpy } from '../services/_test
 import { asyncIterableToArray } from './_test_utils';
 
 const mockS3Client = {
+  deleteObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
   listObjectsV2: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({ Contents: [] }) })),
   putObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
 };
@@ -249,6 +250,18 @@ describe('ObjectStore', () => {
         Bucket: BUCKET,
         Key: OBJECT_KEY,
         Metadata: OBJECT.metadata,
+      });
+    });
+  });
+
+  describe('deleteObject', () => {
+    test('Specified object should be deleted', async () => {
+      await CLIENT.deleteObject( OBJECT_KEY, BUCKET);
+
+      expect(mockS3Client.deleteObject).toBeCalledTimes(1);
+      expect(mockS3Client.deleteObject).toBeCalledWith({
+        Bucket: BUCKET,
+        Key: OBJECT_KEY,
       });
     });
   });

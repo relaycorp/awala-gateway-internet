@@ -18,7 +18,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     messages: AsyncIterable<stan.Message>,
   ): AsyncIterable<PublisherMessage> {
     for await (const message of messages) {
-      const cargo = await Cargo.deserialize(message.getRawData());
+      const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
       const { payload } = await cargo.unwrapPayload(privateKeyStore);
       for (const parcelSerialized of payload.messages) {
         try {

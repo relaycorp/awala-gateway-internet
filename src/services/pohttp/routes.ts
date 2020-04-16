@@ -1,5 +1,6 @@
 import { Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
@@ -60,7 +61,7 @@ export default async function registerRoutes(
       // tslint:disable-next-line:no-let
       let parcel;
       try {
-        parcel = await Parcel.deserialize(request.body);
+        parcel = await Parcel.deserialize(bufferToArray(request.body));
       } catch (error) {
         return reply.code(400).send({ message: 'Payload is not a valid RAMF-serialized parcel' });
       }

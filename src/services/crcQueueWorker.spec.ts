@@ -2,6 +2,7 @@
 
 import * as vaultKeystore from '@relaycorp/keystore-vault';
 import { Cargo, CargoMessageSet, Parcel, RAMFSyntaxError } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy } from '../_test_utils';
@@ -194,9 +195,7 @@ describe('processIncomingCrcCargo', () => {
 
   test('Parcels contained in cargo should be published on channel "crc-parcels"', async () => {
     const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcelSerialized = Buffer.from(
-      await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcelSerialized = await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
     mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
 
@@ -209,7 +208,7 @@ describe('processIncomingCrcCargo', () => {
 
     expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
     expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
-    expect(mockPublishedMessages).toEqual([stubParcelSerialized]);
+    expect(mockPublishedMessages.map(bufferToArray)).toEqual([stubParcelSerialized]);
   });
 
   test('Cargo containing invalid messages should be ignored and logged', async () => {
@@ -217,13 +216,9 @@ describe('processIncomingCrcCargo', () => {
     // one message and it's valid.
 
     const stubParcel1 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel1Serialized = Buffer.from(
-      await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel2Serialized = Buffer.from(
-      await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubCargo1MessageSet = new CargoMessageSet(
       new Set([Buffer.from('Not a parcel'), stubParcel1Serialized]),
     );
@@ -244,7 +239,10 @@ describe('processIncomingCrcCargo', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockPublishedMessages).toEqual([stubParcel1Serialized, stubParcel2Serialized]);
+    expect(mockPublishedMessages.map(bufferToArray)).toEqual([
+      stubParcel1Serialized,
+      stubParcel2Serialized,
+    ]);
 
     const cargoSenderAddress = await stubCargo1.senderCertificate.calculateSubjectPrivateAddress();
     expect(mockLogger.info).toBeCalledWith(

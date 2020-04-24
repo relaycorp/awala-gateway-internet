@@ -64,7 +64,7 @@
   },
   "homepage": "https://docs.relaycorp.tech/relaynet-internet-gateway/",
   "dependencies": {
-    "@relaycorp/keystore-vault": "^1.1.0",
+    "@relaycorp/keystore-vault": "^1.1.1",
     "@relaycorp/relaynet-cogrpc": "^1.0.4",
     "@relaycorp/relaynet-core": "^1.24.0",
     "@relaycorp/relaynet-pohttp": "^1.1.2",

@@ -10,7 +10,7 @@ import { mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { getMockContext, makeEmptyCertificate } from '../_test_utils';
 import * as certs from '../certs';
-import { collectCargo, makeServiceImplementation } from './service';
+import { makeServiceImplementation } from './service';
 
 const STUB_DELIVERY_ID = 'the-id';
 const STUB_CARGO_SERIALIZATION = Buffer.from('Pretend this is a valid cargo');
@@ -269,11 +269,21 @@ describe('service', () => {
   });
 
   describe('collectCargo', () => {
-    test('Unimplemented', async () => {
-      await expect(
-        collectCargo((null as unknown) as ServerDuplexStream<CargoDeliveryAck, CargoDelivery>),
-      ).rejects.toEqual(new Error('Unimplemented'));
+    describe('CCA validation', () => {
+      test.todo('Error should be returned if CCA is invalid');
+
+      test.todo('Error should be returned if CCA is valid but not bound for current gateway');
+
+      test.todo('Error should be returned if CCA is valid but sender certificate is untrusted');
     });
+
+    test.todo('Call should end immediately if there is no cargo for specified gateway');
+
+    test.todo('One cargo should be returned if all messages fit in it');
+
+    test.todo('Multiple cargoes should be returned if necessary');
+
+    test.todo('Parcel collection acknowledgements should be included in payload');
   });
 });
 
@@ -304,7 +314,7 @@ class RecordingStream<Input, Output> extends Duplex {
   }
 
   public convertToGrpcStream(): ServerDuplexStream<Input, Output> {
-    // Unfortunately, ServerDuplexStream's constructor is private so we have to ressort to this
+    // Unfortunately, ServerDuplexStream's constructor is private so we have to resort to this
     // ugly hack
     return (this as unknown) as ServerDuplexStream<Input, Output>;
   }

@@ -33,6 +33,7 @@ services:
     init: true
     command: src/bin/cogrpc-server.ts
     environment:
+      COGRPC_ADDRESS: https://cogrpc.example.com/
       MONGO_URI: ${MONGO_URI}
       NATS_SERVER_URL: ${NATS_SERVER_URL}
       NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}

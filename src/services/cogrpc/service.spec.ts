@@ -1,9 +1,15 @@
 /* tslint:disable:no-let */
 
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/relaynet-cogrpc';
-import { Cargo } from '@relaycorp/relaynet-core';
+import {
+  Cargo,
+  CargoCollectionAuthorization,
+  Certificate,
+  generateRSAKeyPair,
+  issueGatewayCertificate,
+} from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
-import { ServerDuplexStream } from 'grpc';
+import * as grpc from 'grpc';
 import { Duplex } from 'stream';
 
 import { mockSpy } from '../../_test_utils';
@@ -11,6 +17,8 @@ import * as natsStreaming from '../../backingServices/natsStreaming';
 import { getMockContext, makeEmptyCertificate } from '../_test_utils';
 import * as certs from '../certs';
 import { makeServiceImplementation } from './service';
+
+const COGRPC_ADDRESS = 'https://cogrpc.example.com/';
 
 const STUB_DELIVERY_ID = 'the-id';
 const STUB_CARGO_SERIALIZATION = Buffer.from('Pretend this is a valid cargo');
@@ -58,21 +66,19 @@ describe('service', () => {
     () => mockMongooseConnection,
   );
 
-  let mockDuplexStream: RecordingStream<CargoDeliveryAck, CargoDelivery>;
-  beforeEach(() => {
-    mockDuplexStream = new RecordingStream();
-    jest.spyOn(mockDuplexStream, 'on');
-    jest.spyOn(mockDuplexStream, 'end');
-    jest.spyOn(mockDuplexStream, 'write');
-  });
-
-  const { deliverCargo } = makeServiceImplementation({
+  const { collectCargo, deliverCargo } = makeServiceImplementation({
+    cogrpcAddress: COGRPC_ADDRESS,
     mongoUri: STUB_MONGO_URI,
     natsClusterId: STUB_NATS_CLUSTER_ID,
     natsServerUrl: STUB_NATS_SERVER_URL,
   });
 
   describe('deliverCargo', () => {
+    let mockDuplexStream: RecordingStream<CargoDeliveryAck, CargoDelivery>;
+    beforeEach(() => {
+      mockDuplexStream = new RecordingStream();
+    });
+
     const retrieveOwnCertificatesSpy = mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), () => [
       STUB_TRUSTED_CERTIFICATE,
     ]);
@@ -269,21 +275,152 @@ describe('service', () => {
   });
 
   describe('collectCargo', () => {
-    describe('CCA validation', () => {
-      test.todo('Error should be returned if CCA is invalid');
-
-      test.todo('Error should be returned if CCA is valid but not bound for current gateway');
-
-      test.todo('Error should be returned if CCA is valid but sender certificate is untrusted');
+    let mockDuplexStream: RecordingStream<CargoDelivery, CargoDeliveryAck>;
+    beforeEach(() => {
+      mockDuplexStream = new RecordingStream();
     });
 
-    test.todo('Call should end immediately if there is no cargo for specified gateway');
+    let CCA_SENDER_PRIVATE_KEY: CryptoKey;
+    let CCA_SENDER_CERT: Certificate;
+    beforeAll(async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const keyPair = await generateRSAKeyPair();
+      CCA_SENDER_PRIVATE_KEY = keyPair.privateKey;
+      CCA_SENDER_CERT = await issueGatewayCertificate({
+        issuerPrivateKey: keyPair.privateKey,
+        subjectPublicKey: keyPair.publicKey,
+        validityEndDate: tomorrow,
+      });
+    });
+
+    describe('CCA validation', () => {
+      test('UNAUTHENTICATED should be returned if Authorization is missing', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'Authorization metadata should be specified exactly once',
+          });
+
+          cb();
+        });
+
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+
+      test('UNAUTHENTICATED should be returned if Authorization is duplicated', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'Authorization metadata should be specified exactly once',
+          });
+
+          cb();
+        });
+
+        mockDuplexStream.metadata.add('Authorization', 'Bearer s3cr3t');
+        mockDuplexStream.metadata.add('Authorization', 'Bearer s3cr3t');
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+
+      test('UNAUTHENTICATED should be returned if Authorization type is invalid', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'Authorization type should be Relaynet-CCA',
+          });
+
+          cb();
+        });
+
+        mockDuplexStream.metadata.add('Authorization', 'Bearer s3cr3t');
+
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+
+      test('UNAUTHENTICATED should be returned if Authorization value is missing', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'Authorization value should be set to the CCA',
+          });
+
+          cb();
+        });
+
+        mockDuplexStream.metadata.add('Authorization', 'Relaynet-CCA');
+
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+
+      test('UNAUTHENTICATED should be returned if CCA is malformed', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'CCA is malformed',
+          });
+
+          cb();
+        });
+
+        const ccaSerialized = Buffer.from('I am not really a RAMF message');
+        mockDuplexStream.metadata.add(
+          'Authorization',
+          `Relaynet-CCA ${ccaSerialized.toString('base64')}`,
+        );
+
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+
+      test('UNAUTHENTICATED should be returned if CCA is not bound for current gateway', async cb => {
+        mockDuplexStream.on('error', error => {
+          expect(error).toEqual({
+            code: grpc.status.UNAUTHENTICATED,
+            message: 'CCA recipient is a different gateway',
+          });
+
+          cb();
+        });
+
+        const cca = new CargoCollectionAuthorization(
+          `${COGRPC_ADDRESS}/path`,
+          CCA_SENDER_CERT,
+          Buffer.from([]),
+        );
+        const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
+        mockDuplexStream.metadata.add(
+          'Authorization',
+          `Relaynet-CCA ${ccaSerialized.toString('base64')}`,
+        );
+
+        await collectCargo(mockDuplexStream.convertToGrpcStream());
+      });
+    });
+
+    test('Call should end immediately if there is no cargo for specified gateway', async () => {
+      const cca = new CargoCollectionAuthorization(
+        COGRPC_ADDRESS,
+        CCA_SENDER_CERT,
+        Buffer.from([]),
+      );
+      const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
+      mockDuplexStream.metadata.add(
+        'Authorization',
+        `Relaynet-CCA ${ccaSerialized.toString('base64')}`,
+      );
+
+      await collectCargo(mockDuplexStream.convertToGrpcStream());
+
+      expect(mockDuplexStream.write).not.toBeCalled();
+    });
 
     test.todo('One cargo should be returned if all messages fit in it');
 
     test.todo('Multiple cargoes should be returned if necessary');
 
-    test.todo('Parcel collection acknowledgements should be included in payload');
+    test.todo('PCAs should be included in payload');
+
+    test.todo('No cargo should be returned if CCA was already used');
   });
 });
 
@@ -293,8 +430,12 @@ class RecordingStream<Input, Output> extends Duplex {
   // tslint:disable-next-line:readonly-array readonly-keyword
   public output: Output[] = [];
 
+  public readonly metadata: grpc.Metadata;
+
   constructor() {
     super({ objectMode: true });
+
+    this.metadata = new grpc.Metadata();
   }
 
   public _read(_size: number): void {
@@ -313,9 +454,13 @@ class RecordingStream<Input, Output> extends Duplex {
     callback();
   }
 
-  public convertToGrpcStream(): ServerDuplexStream<Input, Output> {
+  public convertToGrpcStream(): grpc.ServerDuplexStream<Input, Output> {
     // Unfortunately, ServerDuplexStream's constructor is private so we have to resort to this
     // ugly hack
-    return (this as unknown) as ServerDuplexStream<Input, Output>;
+    return (this as unknown) as grpc.ServerDuplexStream<Input, Output>;
   }
 }
+jest.spyOn(RecordingStream.prototype, 'emit');
+jest.spyOn(RecordingStream.prototype, 'on');
+jest.spyOn(RecordingStream.prototype, 'end');
+jest.spyOn(RecordingStream.prototype, 'write');

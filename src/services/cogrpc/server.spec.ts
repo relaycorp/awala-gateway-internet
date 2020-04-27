@@ -21,18 +21,16 @@ beforeEach(() => {
   startSpy.mockReset();
 });
 
-const stubMongoUri = 'mongo://example.com';
-const stubNatsServerUrl = 'nats://example.com';
-const stubNatsClusterId = 'nats-cluster-id';
 const BASE_ENV_VARS = {
-  MONGO_URI: stubMongoUri,
-  NATS_CLUSTER_ID: stubNatsClusterId,
-  NATS_SERVER_URL: stubNatsServerUrl,
+  COGRPC_ADDRESS: 'https://cogrpc.example.com/',
+  MONGO_URI: 'mongo://example.com',
+  NATS_CLUSTER_ID: 'nats-cluster-id',
+  NATS_SERVER_URL: 'nats://example.com',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 describe('runServer', () => {
-  test.each(['MONGO_URI', 'NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
+  test.each(['MONGO_URI', 'NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'COGRPC_ADDRESS'])(
     'Environment variable %s should be present',
     envVar => {
       mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
@@ -46,9 +44,10 @@ describe('runServer', () => {
 
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
     expect(makeServiceImplementationSpy).toBeCalledWith({
-      mongoUri: stubMongoUri,
-      natsClusterId: stubNatsClusterId,
-      natsServerUrl: stubNatsServerUrl,
+      cogrpcAddress: BASE_ENV_VARS.COGRPC_ADDRESS,
+      mongoUri: BASE_ENV_VARS.MONGO_URI,
+      natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
+      natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

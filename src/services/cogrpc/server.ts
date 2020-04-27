@@ -7,6 +7,9 @@ import { makeServiceImplementation } from './service';
 const NETLOC = '0.0.0.0:8080';
 
 export function runServer(): void {
+  const cogrpcAddress = getEnvVar('COGRPC_ADDRESS')
+    .required()
+    .asString();
   const mongoUri = getEnvVar('MONGO_URI')
     .required()
     .asString();
@@ -19,6 +22,7 @@ export function runServer(): void {
 
   const server = new Server();
   const serviceImplementation = makeServiceImplementation({
+    cogrpcAddress,
     mongoUri,
     natsClusterId,
     natsServerUrl,

@@ -1,3 +1,4 @@
+import { CargoMessageStream } from '@relaycorp/relaynet-core';
 import pino from 'pino';
 
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
@@ -8,9 +9,9 @@ export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
-  constructor(protected objectStoreClient: ObjectStoreClient, protected bucket: string) {}
+  constructor(protected objectStoreClient: ObjectStoreClient, public bucket: string) {}
 
-  public async *retrieveActiveParcelsForGateway(gatewayAddress: string): AsyncIterable<Buffer> {
+  public async *retrieveActiveParcelsForGateway(gatewayAddress: string): CargoMessageStream {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
     const objectKeys = this.objectStoreClient.listObjectKeys(prefix, this.bucket);
     for await (const parcelObjectKey of objectKeys) {
@@ -25,30 +26,30 @@ export class ParcelStore {
         );
         continue;
       }
-      if (!isParcelStillValid(parcelObject.metadata[EXPIRY_METADATA_KEY], parcelObjectKey)) {
+
+      const parcelExpiryDate = getDateFromTimestamp(parcelObject.metadata[EXPIRY_METADATA_KEY]);
+      if (parcelExpiryDate === null) {
+        LOGGER.error(
+          { parcelObjectKey },
+          'Parcel object does not have a valid expiry timestamp metadata',
+        );
+        continue;
+      } else if (parcelExpiryDate <= new Date()) {
         continue;
       }
-      yield parcelObject.body;
+      yield { expiryDate: parcelExpiryDate, message: parcelObject.body };
     }
   }
 }
 
-function isParcelStillValid(parcelExpiryTimestampString: string, parcelObjectKey: string): boolean {
-  if (!parcelExpiryTimestampString) {
-    LOGGER.error({ parcelObjectKey }, 'Parcel object does not have expiry timestamp metadata');
-    return false;
-  }
-  const parcelExpiryTimestamp = parseInt(parcelExpiryTimestampString, 10);
-  const parcelExpiryDate = new Date(parcelExpiryTimestamp * 1_000);
-  if (Number.isNaN(parcelExpiryDate.getTime())) {
-    LOGGER.error(
-      { parcelObjectKey },
-      'Parcel object does not have a valid expiry timestamp metadata',
-    );
-    return false;
+function getDateFromTimestamp(timestampString: string): Date | null {
+  if (!timestampString) {
+    return null;
   }
 
-  return new Date() < parcelExpiryDate;
+  const parcelExpiryTimestamp = parseInt(timestampString, 10);
+  const parcelExpiryDate = new Date(parcelExpiryTimestamp * 1_000);
+  return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
 }
 
 // TODO: Move here

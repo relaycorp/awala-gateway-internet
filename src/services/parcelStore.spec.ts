@@ -43,14 +43,17 @@ describe('retrieveActiveParcelsForGateway', () => {
   });
 
   test('Active parcels should be output', async () => {
+    const parcel1ExpiryDate = getDateRelativeToNow(1);
+    const parcel2ExpiryDate = getDateRelativeToNow(2);
+    const parcel2Body = Buffer.from('Another parcel');
     const objectsByKey: { readonly [key: string]: StoreObject } = {
       'prefix/1.parcel': {
         body: PARCEL_SERIALIZED,
-        metadata: { 'parcel-expiry': getTimestampRelativeToNow(1) },
+        metadata: { 'parcel-expiry': getTimestamp(parcel1ExpiryDate).toString() },
       },
       'prefix/2.parcel': {
-        body: Buffer.from('Another parcel'),
-        metadata: { 'parcel-expiry': getTimestampRelativeToNow(2) },
+        body: parcel2Body,
+        metadata: { 'parcel-expiry': getTimestamp(parcel2ExpiryDate).toString() },
       },
     };
     setMockParcelObjectStore(objectsByKey);
@@ -59,7 +62,10 @@ describe('retrieveActiveParcelsForGateway', () => {
       store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
     );
 
-    expect(activeParcels).toEqual(Object.values(objectsByKey).map(obj => obj.body));
+    expect(activeParcels).toEqual([
+      { expiryDate: parcel1ExpiryDate, message: PARCEL_SERIALIZED },
+      { expiryDate: parcel2ExpiryDate, message: parcel2Body },
+    ]);
   });
 
   test('Objects deleted since the listing should be gracefully skipped', async () => {
@@ -72,14 +78,14 @@ describe('retrieveActiveParcelsForGateway', () => {
       }
       return {
         body: PARCEL_SERIALIZED,
-        metadata: { 'parcel-expiry': getTimestampRelativeToNow(1) },
+        metadata: { 'parcel-expiry': getTimestampRelativeToNow(2) },
       };
     });
 
     const activeParcels = await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
     );
-    expect(activeParcels).toEqual([PARCEL_SERIALIZED]);
+    expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
     expect(mockLogger.warn).toBeCalledTimes(1);
     expect(mockLogger.warn).toBeCalledWith(
@@ -104,7 +110,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     const activeParcels = await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
     );
-    expect(activeParcels).toEqual([PARCEL_SERIALIZED]);
+    expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
   });
 
   test('Objects without expiry metadata should be skipped and reported in the logs', async () => {
@@ -124,12 +130,12 @@ describe('retrieveActiveParcelsForGateway', () => {
     const activeParcels = await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
     );
-    expect(activeParcels).toEqual([PARCEL_SERIALIZED]);
+    expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
     expect(mockLogger.error).toBeCalledTimes(1);
     expect(mockLogger.error).toBeCalledWith(
       { parcelObjectKey: invalidParcelKey },
-      'Parcel object does not have expiry timestamp metadata',
+      'Parcel object does not have a valid expiry timestamp metadata',
     );
   });
 
@@ -150,7 +156,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     const activeParcels = await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
     );
-    expect(activeParcels).toEqual([PARCEL_SERIALIZED]);
+    expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
     expect(mockLogger.error).toBeCalledTimes(1);
     expect(mockLogger.error).toBeCalledWith(
@@ -164,9 +170,18 @@ describe('retrieveActiveParcelsForGateway', () => {
     mockGetObject.mockImplementation(objectKey => objectsByKey[objectKey]);
   }
 
-  function getTimestampRelativeToNow(deltaSeconds: number): string {
+  function getDateRelativeToNow(deltaSeconds: number): Date {
     const date = new Date();
     date.setSeconds(date.getSeconds() + deltaSeconds, 0);
-    return (date.getTime() / 1_000).toString();
+    return date;
+  }
+
+  function getTimestamp(date: Date): number {
+    return date.getTime() / 1_000;
+  }
+
+  function getTimestampRelativeToNow(deltaSeconds: number): string {
+    const date = getDateRelativeToNow(deltaSeconds);
+    return getTimestamp(date).toString();
   }
 });

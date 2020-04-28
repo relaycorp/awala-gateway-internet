@@ -1,4 +1,3 @@
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import { Cargo, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -7,6 +6,7 @@ import * as stan from 'node-nats-streaming';
 import pino from 'pino';
 
 import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
+import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
 const logger = pino();
 
@@ -65,17 +65,4 @@ function initNatsStreamingClient(clientId: string): NatsStreamingClient {
     .required()
     .asString();
   return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
-}
-
-function initVaultKeyStore(): VaultPrivateKeyStore {
-  const vaultUrl = getEnvVar('VAULT_URL')
-    .required()
-    .asString();
-  const vaultToken = getEnvVar('VAULT_TOKEN')
-    .required()
-    .asString();
-  const vaultKvPath = getEnvVar('VAULT_KV_PREFIX')
-    .required()
-    .asString();
-  return new VaultPrivateKeyStore(vaultUrl, vaultToken, vaultKvPath);
 }

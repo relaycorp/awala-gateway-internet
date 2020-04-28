@@ -7,6 +7,7 @@ import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy } from '../_test_utils';
 import * as natsStreaming from '../backingServices/natsStreaming';
+import * as privateKeyStore from '../backingServices/privateKeyStore';
 import { castMock, configureMockEnvVars, generateStubPdaChain, PdaChain } from './_test_utils';
 
 const mockLogger = mockPino();
@@ -59,10 +60,7 @@ const STUB_VAULT_TOKEN = 'letmein';
 const STUB_VAULT_KV_PREFIX = 'keys/';
 
 const mockPrivateKeyStore = castMock<vaultKeystore.VaultPrivateKeyStore>({});
-const mockVaultKeyStoreClass = mockSpy(
-  jest.spyOn(vaultKeystore, 'VaultPrivateKeyStore'),
-  () => mockPrivateKeyStore,
-);
+mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
 //endregion
 
@@ -86,7 +84,7 @@ describe('processIncomingCrcCargo', () => {
     stubPdaChain = await generateStubPdaChain();
   });
 
-  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'VAULT_URL', 'VAULT_TOKEN', 'VAULT_KV_PREFIX'])(
+  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
     'Environment variable %s should be present',
     async envVar => {
       mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
@@ -125,38 +123,6 @@ describe('processIncomingCrcCargo', () => {
         expect.anything(),
         expect.anything(),
         STUB_WORKER_NAME,
-      );
-    });
-  });
-
-  describe('Vault keystore', () => {
-    test('Client should connect to the server in VAULT_URL', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        STUB_VAULT_URL,
-        expect.anything(),
-        expect.anything(),
-      );
-    });
-
-    test('Client should use token in VAULT_TOKEN', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        expect.anything(),
-        STUB_VAULT_TOKEN,
-        expect.anything(),
-      );
-    });
-
-    test('Client should use k/v prefix in VAULT_KV_PREFIX', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        expect.anything(),
-        expect.anything(),
-        STUB_VAULT_KV_PREFIX,
       );
     });
   });

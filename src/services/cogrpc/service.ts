@@ -113,7 +113,10 @@ export async function collectCargo(
     return;
   }
 
-  const publicKeyStore = new MongoPublicKeyStore(createConnection(mongoUri));
+  const mongooseConnection = createConnection(mongoUri);
+  call.on('end', () => mongooseConnection.close());
+
+  const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
   const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
 
   const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(cca.recipientAddress);

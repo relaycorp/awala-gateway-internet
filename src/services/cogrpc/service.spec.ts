@@ -16,9 +16,10 @@ import {
   issueGatewayCertificate,
   Parcel,
 } from '@relaycorp/relaynet-core';
-import { mongoose } from '@typegoose/typegoose';
+import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
+import mongoose from 'mongoose';
 
 import { arrayToAsyncIterable, mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
@@ -343,7 +344,7 @@ describe('collectCargo', () => {
     privateKey: OWN_PRIVATE_KEY,
   }));
 
-  mockSpy(jest.spyOn(mongoose, 'createConnection'));
+  mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
   mockSpy(jest.spyOn(MongoPublicKeyStore.prototype, 'fetchLastSessionKey'), async () => {
     throw new Error('Do not use session keys');
   });
@@ -546,6 +547,8 @@ describe('collectCargo', () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    CALL.emit('end');
 
     expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
   });

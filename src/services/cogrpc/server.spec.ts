@@ -23,6 +23,7 @@ beforeEach(() => {
 
 const BASE_ENV_VARS = {
   COGRPC_ADDRESS: 'https://cogrpc.example.com/',
+  GATEWAY_KEY_ID: 'base64-encoded key id',
   MONGO_URI: 'mongo://example.com',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
@@ -32,6 +33,7 @@ const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 describe('runServer', () => {
   test.each([
+    'GATEWAY_KEY_ID',
     'MONGO_URI',
     'NATS_SERVER_URL',
     'NATS_CLUSTER_ID',
@@ -49,6 +51,7 @@ describe('runServer', () => {
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
     expect(makeServiceImplementationSpy).toBeCalledWith({
       cogrpcAddress: BASE_ENV_VARS.COGRPC_ADDRESS,
+      gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
       mongoUri: BASE_ENV_VARS.MONGO_URI,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,

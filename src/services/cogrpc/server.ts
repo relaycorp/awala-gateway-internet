@@ -7,6 +7,9 @@ import { makeServiceImplementation } from './service';
 const NETLOC = '0.0.0.0:8080';
 
 export function runServer(): void {
+  const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID')
+    .required()
+    .asString();
   const cogrpcAddress = getEnvVar('COGRPC_ADDRESS')
     .required()
     .asString();
@@ -26,6 +29,7 @@ export function runServer(): void {
   const server = new Server();
   const serviceImplementation = makeServiceImplementation({
     cogrpcAddress,
+    gatewayKeyIdBase64,
     mongoUri,
     natsClusterId,
     natsServerUrl,

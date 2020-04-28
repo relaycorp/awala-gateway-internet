@@ -38,6 +38,7 @@ import { makeServiceImplementation } from './service';
 //region Fixtures
 
 const COGRPC_ADDRESS = 'https://cogrpc.example.com/';
+const GATEWAY_KEY_ID_BASE64 = 'MTM1Nzkk';
 const PARCEL_STORE_BUCKET = 'parcels-bucket';
 const MONGO_URI = 'mongo://example.com';
 const NATS_SERVER_URL = 'nats://example.com';
@@ -77,6 +78,7 @@ let SERVICE: CargoRelayServerMethodSet;
 beforeAll(() => {
   SERVICE = makeServiceImplementation({
     cogrpcAddress: COGRPC_ADDRESS,
+    gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
     mongoUri: MONGO_URI,
     natsClusterId: NATS_CLUSTER_ID,
     natsServerUrl: NATS_SERVER_URL,
@@ -339,10 +341,13 @@ describe('collectCargo', () => {
     async () => arrayToAsyncIterable([]),
   );
 
-  mockSpy(jest.spyOn(VaultPrivateKeyStore.prototype, 'fetchNodeKey'), async () => ({
-    certificate: OWN_CERTIFICATE,
-    privateKey: OWN_PRIVATE_KEY,
-  }));
+  const MOCK_FETCH_NODE_KEY = mockSpy(
+    jest.spyOn(VaultPrivateKeyStore.prototype, 'fetchNodeKey'),
+    async () => ({
+      certificate: OWN_CERTIFICATE,
+      privateKey: OWN_PRIVATE_KEY,
+    }),
+  );
 
   mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
   mockSpy(jest.spyOn(MongoPublicKeyStore.prototype, 'fetchLastSessionKey'), async () => {
@@ -522,26 +527,18 @@ describe('collectCargo', () => {
     await validateCargoDelivery(CALL.input[0]);
   });
 
-  test('Multiple cargoes should be returned if necessary', async () => {
-    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
-
-    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
-      arrayToAsyncIterable([
-        { expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED },
-        { expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED },
-      ]),
-    );
-
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
-
-    expect(CALL.input).toHaveLength(2);
-    await validateCargoDelivery(CALL.input[0]);
-    await validateCargoDelivery(CALL.input[1]);
-  });
+  test.todo('Multiple cargoes should be returned if necessary');
 
   test.todo('PCAs should be included in payload');
 
-  test.todo('Cargoes should be signed with current key');
+  test('Cargoes should be signed with current key', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    const gatewayKeyId = Buffer.from(GATEWAY_KEY_ID_BASE64, 'base64');
+    expect(MOCK_FETCH_NODE_KEY).toBeCalledWith(gatewayKeyId);
+  });
 
   test('Mongoose connection should be closed at the end of the call', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);

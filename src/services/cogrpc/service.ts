@@ -24,6 +24,7 @@ import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
 
 interface ServiceImplementationOptions {
+  readonly gatewayKeyIdBase64: string;
   readonly parcelStoreBucket: string;
   readonly mongoUri: string;
   readonly natsServerUrl: string;
@@ -36,6 +37,8 @@ export function makeServiceImplementation(
 ): CargoRelayServerMethodSet {
   const objectStoreClient = ObjectStoreClient.initFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
+
+  const currentKeyId = Buffer.from(options.gatewayKeyIdBase64, 'base64');
 
   return {
     async deliverCargo(
@@ -88,7 +91,7 @@ export function makeServiceImplementation(
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
-      await collectCargo(call, options.mongoUri, options.cogrpcAddress, parcelStore);
+      await collectCargo(call, options.mongoUri, options.cogrpcAddress, currentKeyId, parcelStore);
     },
   };
 }
@@ -97,6 +100,7 @@ export async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongoUri: string,
   ownCogrpcAddress: string,
+  currentKeyId: Buffer,
   parcelStore: ParcelStore,
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
@@ -122,7 +126,7 @@ export async function collectCargo(
   const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(cca.recipientAddress);
 
   async function* encapsulateMessages(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    yield* await gateway.generateCargoes(messages, cca.senderCertificate, Buffer.from([1, 2]));
+    yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {

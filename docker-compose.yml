@@ -33,6 +33,7 @@ services:
     init: true
     command: src/bin/cogrpc-server.ts
     environment:
+      GATEWAY_KEY_ID: ${GATEWAY_KEY_ID}
       COGRPC_ADDRESS: https://cogrpc.example.com/
       MONGO_URI: ${MONGO_URI}
       NATS_SERVER_URL: ${NATS_SERVER_URL}

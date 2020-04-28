@@ -11,12 +11,10 @@ import {
   CargoCollectionAuthorization,
   CargoMessageSet,
   Certificate,
-  EnvelopedData,
   generateRSAKeyPair,
   issueEndpointCertificate,
   issueGatewayCertificate,
   Parcel,
-  SessionlessEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -618,11 +616,8 @@ describe('service', () => {
 
     async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<CargoMessageSet> {
       const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-      // TODO: Upgrade relaynet-core to use Cargo.unwrapMessages() instead
-      const cargoPayload = EnvelopedData.deserialize(
-        bufferToArray(cargo.payloadSerialized),
-      ) as SessionlessEnvelopedData;
-      return CargoMessageSet.deserialize(await cargoPayload.decrypt(CCA_SENDER_PRIVATE_KEY));
+      const { payload } = await cargo.unwrapPayload(CCA_SENDER_PRIVATE_KEY);
+      return payload;
     }
   });
 });

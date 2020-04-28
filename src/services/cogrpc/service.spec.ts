@@ -365,6 +365,13 @@ describe('collectCargo', () => {
     DUMMY_PARCEL_SERIALIZED = Buffer.from(await DUMMY_PARCEL.serialize(keyPair.privateKey));
   });
 
+  let AUTHORIZATION_METADATA: grpc.MetadataValue;
+  beforeAll(async () => {
+    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
+    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
+    AUTHORIZATION_METADATA = `Relaynet-CCA ${ccaSerialized.toString('base64')}`;
+  });
+
   describe('CCA validation', () => {
     test('UNAUTHENTICATED should be returned if Authorization is missing', async cb => {
       CALL.on('error', error => {
@@ -463,6 +470,7 @@ describe('collectCargo', () => {
   });
 
   test('Mongoose connection should bound to current DB URI', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
     expect(MOCK_MONGOOSE_CREATE_CONNECTION).not.toBeCalled();
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -472,9 +480,7 @@ describe('collectCargo', () => {
   });
 
   test('Parcel store should be bound to correct bucket', async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
@@ -485,9 +491,7 @@ describe('collectCargo', () => {
   });
 
   test('Parcels retrieved should be limited to sender of CCA', async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
@@ -497,9 +501,7 @@ describe('collectCargo', () => {
   test.todo('No cargo should be returned if CCA was already used');
 
   test('Call should end immediately if there is no cargo for specified gateway', async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
@@ -507,12 +509,10 @@ describe('collectCargo', () => {
   });
 
   test('One cargo should be returned if all messages fit in it', async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
-      arrayToAsyncIterable([{ expiryDate: new Date(), message: DUMMY_PARCEL_SERIALIZED }]),
+      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
     );
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -522,14 +522,12 @@ describe('collectCargo', () => {
   });
 
   test('Multiple cargoes should be returned if necessary', async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
       arrayToAsyncIterable([
-        { expiryDate: new Date(), message: DUMMY_PARCEL_SERIALIZED },
-        { expiryDate: new Date(), message: DUMMY_PARCEL_SERIALIZED },
+        { expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED },
+        { expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED },
       ]),
     );
 
@@ -545,6 +543,8 @@ describe('collectCargo', () => {
   test.todo('Cargoes should be signed with current key');
 
   test('Mongoose connection should be closed at the end of the call', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);

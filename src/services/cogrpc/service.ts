@@ -3,7 +3,12 @@ import {
   CargoDeliveryAck,
   CargoRelayServerMethodSet,
 } from '@relaycorp/relaynet-cogrpc';
-import { Cargo, CargoCollectionAuthorization } from '@relaycorp/relaynet-core';
+import {
+  Cargo,
+  CargoCollectionAuthorization,
+  CargoMessageStream,
+  Gateway,
+} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
@@ -12,18 +17,26 @@ import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
+import { ObjectStoreClient } from '../../backingServices/objectStorage';
+import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { retrieveOwnCertificates } from '../certs';
+import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import { ParcelStore } from '../parcelStore';
 
 interface ServiceImplementationOptions {
-  readonly cogrpcAddress: string;
+  readonly parcelStoreBucket: string;
   readonly mongoUri: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
+  readonly cogrpcAddress: string;
 }
 
 export function makeServiceImplementation(
   options: ServiceImplementationOptions,
 ): CargoRelayServerMethodSet {
+  const objectStoreClient = ObjectStoreClient.initFromEnv();
+  const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
+
   return {
     async deliverCargo(
       call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
@@ -75,19 +88,23 @@ export function makeServiceImplementation(
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
-      return collectCargo(call, options.cogrpcAddress);
+      await collectCargo(call, options.mongoUri, options.cogrpcAddress, parcelStore);
     },
   };
 }
 
 export async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
+  mongoUri: string,
   ownCogrpcAddress: string,
+  parcelStore: ParcelStore,
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
 
+  // tslint:disable-next-line:no-let
+  let cca: CargoCollectionAuthorization;
   try {
-    await parseAndValidateCCAFromMetadata(authorizationMetadata, ownCogrpcAddress);
+    cca = await parseAndValidateCCAFromMetadata(authorizationMetadata, ownCogrpcAddress);
   } catch (error) {
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
@@ -96,7 +113,23 @@ export async function collectCargo(
     return;
   }
 
-  call.end();
+  const publicKeyStore = new MongoPublicKeyStore(createConnection(mongoUri));
+  const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
+
+  const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(cca.recipientAddress);
+
+  async function* encapsulateMessages(messages: CargoMessageStream): AsyncIterable<Buffer> {
+    yield* await gateway.generateCargoes(messages, cca.senderCertificate, Buffer.from([1, 2]));
+  }
+
+  async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {
+    for await (const cargoSerialized of cargoesSerialized) {
+      const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
+      call.write(delivery);
+    }
+  }
+
+  await pipe(cargoMessages, encapsulateMessages, sendCargoes);
 }
 
 async function parseAndValidateCCAFromMetadata(

@@ -10,6 +10,9 @@ export function runServer(): void {
   const cogrpcAddress = getEnvVar('COGRPC_ADDRESS')
     .required()
     .asString();
+  const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET')
+    .required()
+    .asString();
   const mongoUri = getEnvVar('MONGO_URI')
     .required()
     .asString();
@@ -26,6 +29,7 @@ export function runServer(): void {
     mongoUri,
     natsClusterId,
     natsServerUrl,
+    parcelStoreBucket,
   });
   server.addService(CargoRelayService, serviceImplementation);
   const bindResult = server.bind(NETLOC, ServerCredentials.createInsecure());

@@ -26,18 +26,22 @@ const BASE_ENV_VARS = {
   MONGO_URI: 'mongo://example.com',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
+  PARCEL_STORE_BUCKET: 'bucket-name',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 describe('runServer', () => {
-  test.each(['MONGO_URI', 'NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'COGRPC_ADDRESS'])(
-    'Environment variable %s should be present',
-    envVar => {
-      mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
+  test.each([
+    'MONGO_URI',
+    'NATS_SERVER_URL',
+    'NATS_CLUSTER_ID',
+    'COGRPC_ADDRESS',
+    'PARCEL_STORE_BUCKET',
+  ])('Environment variable %s should be present', envVar => {
+    mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
-      expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
-    },
-  );
+    expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
+  });
 
   test('CogRPC service should be added', () => {
     runServer();
@@ -48,6 +52,7 @@ describe('runServer', () => {
       mongoUri: BASE_ENV_VARS.MONGO_URI,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
+      parcelStoreBucket: BASE_ENV_VARS.PARCEL_STORE_BUCKET,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

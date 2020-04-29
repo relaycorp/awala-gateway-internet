@@ -560,7 +560,7 @@ describe('collectCargo', () => {
     CALL.on('error', async callError => {
       expect(MOCK_PINO.error).toBeCalledWith(
         { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
-        'Failed to deliver cargo',
+        'Failed to send cargo',
       );
 
       expect(callError).toEqual({

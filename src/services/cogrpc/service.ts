@@ -120,30 +120,33 @@ export async function collectCargo(
     return;
   }
 
-  const mongooseConnection = createConnection(mongoUri);
-  call.on('end', () => mongooseConnection.close());
-
-  const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
-  const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
-
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
-  const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress);
-
   async function* encapsulateMessages(messages: CargoMessageStream): AsyncIterable<Buffer> {
+    const mongooseConnection = createConnection(mongoUri);
+    call.on('end', () => mongooseConnection.close());
+
+    const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
+    const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
+
     yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {
     for await (const cargoSerialized of cargoesSerialized) {
+      // We aren't keeping the delivery ids because we're currently not doing anything with the ACKs
       const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
       call.write(delivery);
     }
   }
 
+  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
   try {
-    await pipe(cargoMessages, encapsulateMessages, sendCargoes);
+    await pipe(
+      await parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
+      encapsulateMessages,
+      sendCargoes,
+    );
   } catch (err) {
-    LOGGER.error({ err, peerGatewayAddress }, 'Failed to deliver cargo');
+    LOGGER.error({ err, peerGatewayAddress }, 'Failed to send cargo');
     call.emit('error', {
       code: grpc.status.UNAVAILABLE,
       message: 'Internal server error; please try again later',

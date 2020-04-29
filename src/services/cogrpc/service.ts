@@ -52,45 +52,7 @@ export function makeServiceImplementation(
     async deliverCargo(
       call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
     ): Promise<void> {
-      const mongooseConnection = createConnection(options.mongoUri);
-      const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
-      await mongooseConnection.close();
-
-      const natsClient = new NatsStreamingClient(
-        options.natsServerUrl,
-        options.natsClusterId,
-        `cogrpc-${uuid()}`,
-      );
-      const natsPublisher = natsClient.makePublisher('crc-cargo');
-
-      async function* validateDelivery(
-        source: AsyncIterable<CargoDelivery>,
-      ): AsyncIterable<PublisherMessage> {
-        for await (const delivery of source) {
-          try {
-            const cargo = await Cargo.deserialize(delivery.cargo);
-            await cargo.validate(trustedCerts);
-          } catch (error) {
-            // Acknowledge that we got it, not that it was accepted and stored. See:
-            // https://github.com/relaynet/specs/issues/38
-            call.write({ id: delivery.id });
-            continue;
-          }
-          yield { id: delivery.id, data: delivery.cargo };
-        }
-      }
-
-      async function ackDelivery(source: AsyncIterable<string>): Promise<void> {
-        for await (const deliveryId of source) {
-          call.write({ id: deliveryId });
-        }
-      }
-
-      try {
-        await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
-      } finally {
-        natsClient.disconnect();
-      }
+      await deliverCargo(call, options.mongoUri, options.natsServerUrl, options.natsClusterId);
     },
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
@@ -107,7 +69,50 @@ export function makeServiceImplementation(
   };
 }
 
-export async function collectCargo(
+async function deliverCargo(
+  call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
+  mongoUri: string,
+  natsServerUrl: string,
+  natsClusterId: string,
+): Promise<void> {
+  const mongooseConnection = createConnection(mongoUri);
+  const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
+  await mongooseConnection.close();
+
+  const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
+  const natsPublisher = natsClient.makePublisher('crc-cargo');
+
+  async function* validateDelivery(
+    source: AsyncIterable<CargoDelivery>,
+  ): AsyncIterable<PublisherMessage> {
+    for await (const delivery of source) {
+      try {
+        const cargo = await Cargo.deserialize(delivery.cargo);
+        await cargo.validate(trustedCerts);
+      } catch (error) {
+        // Acknowledge that we got it, not that it was accepted and stored. See:
+        // https://github.com/relaynet/specs/issues/38
+        call.write({ id: delivery.id });
+        continue;
+      }
+      yield { id: delivery.id, data: delivery.cargo };
+    }
+  }
+
+  async function ackDelivery(source: AsyncIterable<string>): Promise<void> {
+    for await (const deliveryId of source) {
+      call.write({ id: deliveryId });
+    }
+  }
+
+  try {
+    await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+  } finally {
+    natsClient.disconnect();
+  }
+}
+
+async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongoUri: string,
   ownCogrpcAddress: string,

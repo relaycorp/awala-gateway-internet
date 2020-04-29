@@ -90,11 +90,9 @@ describe('fetchKey', () => {
 });
 
 describe('saveKey', () => {
-  const stubModelExec = mockSpy(jest.fn(), async () => PEER_PUBLIC_KEY_DATA);
+  const stubModelExec = mockSpy(jest.fn());
   const stubFindOneAndUpdate = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
-  beforeEach(() =>
-    stubGetModelForClass.mockReturnValue({ findOneAndUpdate: stubFindOneAndUpdate }),
-  );
+  beforeEach(() => stubGetModelForClass.mockReturnValue({ updateOne: stubFindOneAndUpdate }));
 
   let PEER_SESSION_KEY: OriginatorSessionKey;
   beforeAll(() => {

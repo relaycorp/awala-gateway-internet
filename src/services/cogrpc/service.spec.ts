@@ -542,6 +542,8 @@ describe('collectCargo', () => {
     expect(MOCK_FETCH_NODE_KEY).toBeCalledWith(gatewayKeyId);
   });
 
+  test.todo('CCA should be logged as fulfilled to make sure it is only used once');
+
   test('Mongoose connection should be closed at the end of the call', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 

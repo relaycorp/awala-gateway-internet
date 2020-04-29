@@ -42,8 +42,6 @@ export class MongoPublicKeyStore extends PublicKeyStore {
       keyId: keyData.publicKeyId,
       peerPrivateAddress,
     };
-    await this.keyDataModel
-      .findOneAndUpdate({ peerPrivateAddress }, dbData, { upsert: true })
-      .exec();
+    await this.keyDataModel.updateOne({ peerPrivateAddress }, dbData, { upsert: true }).exec();
   }
 }

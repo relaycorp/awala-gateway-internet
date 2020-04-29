@@ -14,6 +14,9 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
 
     this.metadata = new grpc.Metadata();
 
+    // Mimic what the gRPC server would do
+    this.on('error', () => this.end());
+
     jest.spyOn(this, 'emit' as any);
     jest.spyOn(this, 'on' as any);
     jest.spyOn(this, 'end' as any);
@@ -34,6 +37,11 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
   public _write(value: Input, _encoding: string, callback: (error?: Error) => void): void {
     this.input.push(value);
     callback();
+  }
+
+  public end(cb?: () => void): void {
+    super.end(cb);
+    this.emit('end');
   }
 
   public convertToGrpcStream(): grpc.ServerDuplexStream<Input, Output> {

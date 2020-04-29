@@ -21,6 +21,7 @@ import uuid from 'uuid-random';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
+import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
@@ -53,10 +54,6 @@ export function makeServiceImplementation(
       const mongooseConnection = createConnection(options.mongoUri);
       const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
       await mongooseConnection.close();
-
-      call.on('end', () => {
-        call.end();
-      });
 
       const natsClient = new NatsStreamingClient(
         options.natsServerUrl,
@@ -122,7 +119,7 @@ export async function collectCargo(
   // tslint:disable-next-line:no-let
   let cca: CargoCollectionAuthorization;
   try {
-    cca = await parseAndValidateCCAFromMetadata(authorizationMetadata, ownCogrpcAddress);
+    cca = await parseAndValidateCCAFromMetadata(authorizationMetadata);
   } catch (error) {
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
@@ -131,21 +128,35 @@ export async function collectCargo(
     return;
   }
 
-  async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    const mongooseConnection = createConnection(mongoUri);
+  if (cca.recipientAddress !== ownCogrpcAddress) {
+    call.emit('error', {
+      code: grpc.status.INVALID_ARGUMENT,
+      message: 'CCA recipient is a different gateway',
+    });
+    return;
+  }
 
+  const mongooseConnection = createConnection(mongoUri);
+  call.on('end', () => mongooseConnection.close());
+
+  if (await wasCCAFulfilled(cca, mongooseConnection)) {
+    call.emit('error', {
+      code: grpc.status.PERMISSION_DENIED,
+      message: 'CCA was already fulfilled',
+    });
+    return;
+  }
+
+  async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
     const gateway = new Gateway(vaultKeyStore, publicKeyStore);
-    try {
-      yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
-    } finally {
-      await mongooseConnection.close();
-    }
+    yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {
     for await (const cargoSerialized of cargoesSerialized) {
       // We aren't keeping the delivery ids because we're currently not doing anything with the ACKs
+      // In the future we might use the ACKs to support back-pressure
       const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
       call.write(delivery);
     }
@@ -164,12 +175,14 @@ export async function collectCargo(
       code: grpc.status.UNAVAILABLE,
       message: 'Internal server error; please try again later',
     });
+    return;
   }
+
+  await recordCCAFulfillment(cca, mongooseConnection);
 }
 
 async function parseAndValidateCCAFromMetadata(
   authorizationMetadata: readonly grpc.MetadataValue[],
-  expectedTargetGatewayAddress: string,
 ): Promise<CargoCollectionAuthorization> {
   if (authorizationMetadata.length !== 1) {
     throw new Error('Authorization metadata should be specified exactly once');
@@ -191,10 +204,6 @@ async function parseAndValidateCCAFromMetadata(
     cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
   } catch (_) {
     throw new Error('CCA is malformed');
-  }
-
-  if (cca.recipientAddress !== expectedTargetGatewayAddress) {
-    throw new Error('CCA recipient is a different gateway');
   }
 
   return cca;

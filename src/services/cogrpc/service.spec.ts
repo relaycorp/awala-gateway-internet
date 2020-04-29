@@ -20,15 +20,12 @@ import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import mongoose from 'mongoose';
+import uuid from 'uuid-random';
 
 import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import {
-  configureMockEnvVars,
-  expectBuffersToEqual,
-  getMockContext,
-  makeEmptyCertificate,
-} from '../_test_utils';
+import { configureMockEnvVars, expectBuffersToEqual, makeEmptyCertificate } from '../_test_utils';
+import * as ccaFulfillments from '../ccaFulfilments';
 import * as certs from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
@@ -308,16 +305,6 @@ describe('deliverCargo', () => {
       expect(RETRIEVE_OWN_CERTIFICATES_SPY).toBeCalledTimes(1);
     });
   });
-
-  test('Call should end when client attempts to end connection', async () => {
-    await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-    expect(CALL.on).toBeCalledWith('end', expect.any(Function));
-    const endCallback = getMockContext(CALL.on).calls[0][1];
-
-    expect(CALL.end).toBeCalledTimes(1);
-    endCallback();
-    expect(CALL.end).toBeCalledTimes(2);
-  });
 });
 
 describe('collectCargo', () => {
@@ -356,6 +343,15 @@ describe('collectCargo', () => {
     throw new Error('Do not use session keys');
   });
 
+  const MOCK_WAS_CCA_FULFILLED = mockSpy(
+    jest.spyOn(ccaFulfillments, 'wasCCAFulfilled'),
+    async () => false,
+  );
+  const MOCK_RECORD_CCA_FULFILLMENT = mockSpy(
+    jest.spyOn(ccaFulfillments, 'recordCCAFulfillment'),
+    async () => null,
+  );
+
   let DUMMY_PARCEL: Parcel;
   let DUMMY_PARCEL_SERIALIZED: Buffer;
   beforeAll(async () => {
@@ -373,9 +369,12 @@ describe('collectCargo', () => {
     DUMMY_PARCEL_SERIALIZED = Buffer.from(await DUMMY_PARCEL.serialize(keyPair.privateKey));
   });
 
+  const CCA_ID = uuid();
   let AUTHORIZATION_METADATA: grpc.MetadataValue;
   beforeAll(async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]));
+    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]), {
+      id: CCA_ID,
+    });
     const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
     AUTHORIZATION_METADATA = `Relaynet-CCA ${ccaSerialized.toString('base64')}`;
   });
@@ -455,10 +454,10 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('UNAUTHENTICATED should be returned if CCA is not bound for current gateway', async cb => {
+    test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async cb => {
       CALL.on('error', error => {
         expect(error).toEqual({
-          code: grpc.status.UNAUTHENTICATED,
+          code: grpc.status.INVALID_ARGUMENT,
           message: 'CCA recipient is a different gateway',
         });
 
@@ -472,6 +471,22 @@ describe('collectCargo', () => {
       );
       const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
       CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
+
+    test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async cb => {
+      CALL.on('error', error => {
+        expect(error).toEqual({
+          code: grpc.status.PERMISSION_DENIED,
+          message: 'CCA was already fulfilled',
+        });
+
+        cb();
+      });
+
+      MOCK_WAS_CCA_FULFILLED.mockResolvedValue(true);
+      CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
@@ -508,8 +523,6 @@ describe('collectCargo', () => {
     );
   });
 
-  test.todo('No cargo should be returned if CCA was already used');
-
   test('Call should end immediately if there is no cargo for specified gateway', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
@@ -542,13 +555,24 @@ describe('collectCargo', () => {
     expect(MOCK_FETCH_NODE_KEY).toBeCalledWith(gatewayKeyId);
   });
 
-  test.todo('CCA should be logged as fulfilled to make sure it is only used once');
+  test('CCA should be logged as fulfilled to make sure it is only used once', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledTimes(1);
+    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledWith(
+      expect.objectContaining({ id: CCA_ID }),
+      MOCK_MONGOOSE_CONNECTION,
+    );
+  });
 
   test('Mongoose connection should be closed at the end of the call', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
+    CALL.emit('end');
     expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
   });
 
@@ -568,10 +592,63 @@ describe('collectCargo', () => {
         message: 'Internal server error; please try again later',
       });
 
+      expect(MOCK_RECORD_CCA_FULFILLMENT).not.toBeCalled();
+
       cb();
     });
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
+  });
+
+  describe('Errors while generating cargo', () => {
+    const err = new Error('Whoops');
+    beforeEach(() => {
+      MOCK_FETCH_NODE_KEY.mockRejectedValue(err);
+      CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+    });
+
+    test('Error should be logged and end the call', async cb => {
+      CALL.on('error', async () => {
+        expect(MOCK_PINO.error).toBeCalledWith(
+          { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
+          'Failed to send cargo',
+        );
+        cb();
+      });
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
+
+    test('Call should end with an error for the client', async cb => {
+      CALL.on('error', callError => {
+        expect(callError).toEqual({
+          code: grpc.status.UNAVAILABLE,
+          message: 'Internal server error; please try again later',
+        });
+
+        cb();
+      });
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
+
+    test('CCA should not be marked as fulfilled', async cb => {
+      CALL.on('error', () => {
+        expect(MOCK_RECORD_CCA_FULFILLMENT).not.toBeCalled();
+        cb();
+      });
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
+
+    test('Mongoose connection should be closed at the end of the call', async cb => {
+      CALL.on('error', () => {
+        expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
+        cb();
+      });
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
   });
 
   async function validateCargoDelivery(cargoDelivery: CargoDelivery): Promise<void> {

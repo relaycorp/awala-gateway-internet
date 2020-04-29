@@ -10,7 +10,6 @@ import {
 } from '@relaycorp/relaynet-core';
 import envVar from 'env-var';
 import * as pkijs from 'pkijs';
-import MockInstance = jest.MockInstance;
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
@@ -45,25 +44,6 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
   });
 
   return (newEnvVars: EnvVarSet) => setEnvVars(newEnvVars);
-}
-
-// tslint:disable-next-line:readonly-array
-export function mockSpy<T, Y extends any[]>(
-  spy: MockInstance<T, Y>,
-  mockImplementation?: () => any,
-): MockInstance<T, Y> {
-  beforeEach(() => {
-    spy.mockReset();
-    if (mockImplementation) {
-      spy.mockImplementation(mockImplementation);
-    }
-  });
-
-  afterAll(() => {
-    spy.mockRestore();
-  });
-
-  return spy;
 }
 
 export function castMock<T>(partialMock: Partial<T>): T {

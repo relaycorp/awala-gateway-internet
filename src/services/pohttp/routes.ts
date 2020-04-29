@@ -1,5 +1,6 @@
 import { Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
@@ -7,8 +8,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
-
-const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
+import { EXPIRY_METADATA_KEY, GATEWAY_BOUND_OBJECT_KEY_PREFIX } from '../parcelStore';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -61,7 +61,7 @@ export default async function registerRoutes(
       // tslint:disable-next-line:no-let
       let parcel;
       try {
-        parcel = await Parcel.deserialize(request.body);
+        parcel = await Parcel.deserialize(bufferToArray(request.body));
       } catch (error) {
         return reply.code(400).send({ message: 'Payload is not a valid RAMF-serialized parcel' });
       }
@@ -111,7 +111,7 @@ export default async function registerRoutes(
       const parcelObjectKey = await calculateParcelObjectKey(parcel, recipientGatewayAddress);
       const parcelObject = {
         body: request.body,
-        metadata: { 'parcel-expiry': convertDateToTimestamp(parcel.expiryDate).toString() },
+        metadata: { [EXPIRY_METADATA_KEY]: convertDateToTimestamp(parcel.expiryDate).toString() },
       };
       try {
         await objectStoreClient.putObject(parcelObject, parcelObjectKey, objectStoreBucket);

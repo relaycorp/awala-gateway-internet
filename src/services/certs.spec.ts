@@ -5,26 +5,18 @@ import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Connection } from 'mongoose';
 
+import { mockSpy } from '../_test_utils';
 import { expectBuffersToEqual, generateStubEndpointCertificate } from './_test_utils';
 import { retrieveOwnCertificates } from './certs';
 import { OwnCertificate } from './models';
 
-// @ts-ignore
-const stubConnection: Connection = { whoAreYou: 'the-stub-connection' };
+const stubConnection: Connection = { whoAreYou: 'the-stub-connection' } as any;
 
-const mockGetModelForClass = jest.spyOn(typegoose, 'getModelForClass');
-const mockModelExec = jest.fn().mockResolvedValue([]);
-const mockFind = jest.fn(() => {
-  return { exec: mockModelExec };
-});
-beforeEach(() => {
-  mockModelExec.mockClear();
-  mockFind.mockClear();
-
-  mockGetModelForClass.mockReset();
-  mockGetModelForClass.mockReturnValue({ find: mockFind });
-});
-afterAll(() => mockGetModelForClass.mockRestore());
+const stubModelExec = mockSpy(jest.fn(), async () => []);
+const stubFind = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
+const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'), () => ({
+  find: stubFind,
+}));
 
 let stubOwnCerts: readonly OwnCertificate[];
 beforeAll(async () => {
@@ -47,8 +39,8 @@ describe('retrieveOwnCertificates', () => {
   test('The specified connection should be used', async () => {
     await retrieveOwnCertificates(stubConnection);
 
-    expect(mockGetModelForClass).toBeCalledTimes(1);
-    expect(mockGetModelForClass).toBeCalledWith(OwnCertificate, {
+    expect(stubGetModelForClass).toBeCalledTimes(1);
+    expect(stubGetModelForClass).toBeCalledWith(OwnCertificate, {
       existingConnection: stubConnection,
     });
   });
@@ -56,8 +48,8 @@ describe('retrieveOwnCertificates', () => {
   test('All records should be queried', async () => {
     await retrieveOwnCertificates(stubConnection);
 
-    expect(mockFind).toBeCalledTimes(1);
-    expect(mockFind).toBeCalledWith({});
+    expect(stubFind).toBeCalledTimes(1);
+    expect(stubFind).toBeCalledWith({});
   });
 
   test('An empty array should be returned when there are no certificates', async () => {
@@ -67,8 +59,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('A single certificate should be returned when there is one certificate', async () => {
-    mockModelExec.mockReset();
-    mockModelExec.mockResolvedValueOnce([stubOwnCerts[0]]);
+    stubModelExec.mockReset();
+    stubModelExec.mockResolvedValueOnce([stubOwnCerts[0]]);
 
     const certs = await retrieveOwnCertificates(stubConnection);
 
@@ -77,8 +69,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('Multiple certificates should be retuned when there are multiple certificates', async () => {
-    mockModelExec.mockReset();
-    mockModelExec.mockResolvedValueOnce(stubOwnCerts);
+    stubModelExec.mockReset();
+    stubModelExec.mockResolvedValueOnce(stubOwnCerts);
 
     const certs = await retrieveOwnCertificates(stubConnection);
 

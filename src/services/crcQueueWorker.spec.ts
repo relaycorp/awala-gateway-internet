@@ -2,21 +2,15 @@
 
 import * as vaultKeystore from '@relaycorp/keystore-vault';
 import { Cargo, CargoMessageSet, Parcel, RAMFSyntaxError } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
+import { mockPino, mockSpy } from '../_test_utils';
 import * as natsStreaming from '../backingServices/natsStreaming';
-import {
-  castMock,
-  configureMockEnvVars,
-  generateStubPdaChain,
-  mockSpy,
-  PdaChain,
-} from './_test_utils';
+import * as privateKeyStore from '../backingServices/privateKeyStore';
+import { castMock, configureMockEnvVars, generateStubPdaChain, PdaChain } from './_test_utils';
 
-const mockPino = { info: jest.fn() };
-jest.mock('pino', () => jest.fn().mockImplementation(() => mockPino));
-beforeEach(() => mockPino.info.mockReset());
-
+const mockLogger = mockPino();
 import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
@@ -66,10 +60,7 @@ const STUB_VAULT_TOKEN = 'letmein';
 const STUB_VAULT_KV_PREFIX = 'keys/';
 
 const mockPrivateKeyStore = castMock<vaultKeystore.VaultPrivateKeyStore>({});
-const mockVaultKeyStoreClass = mockSpy(
-  jest.spyOn(vaultKeystore, 'VaultPrivateKeyStore'),
-  () => mockPrivateKeyStore,
-);
+mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
 //endregion
 
@@ -93,7 +84,7 @@ describe('processIncomingCrcCargo', () => {
     stubPdaChain = await generateStubPdaChain();
   });
 
-  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'VAULT_URL', 'VAULT_TOKEN', 'VAULT_KV_PREFIX'])(
+  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
     'Environment variable %s should be present',
     async envVar => {
       mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
@@ -136,38 +127,6 @@ describe('processIncomingCrcCargo', () => {
     });
   });
 
-  describe('Vault keystore', () => {
-    test('Client should connect to the server in VAULT_URL', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        STUB_VAULT_URL,
-        expect.anything(),
-        expect.anything(),
-      );
-    });
-
-    test('Client should use token in VAULT_TOKEN', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        expect.anything(),
-        STUB_VAULT_TOKEN,
-        expect.anything(),
-      );
-    });
-
-    test('Client should use k/v prefix in VAULT_KV_PREFIX', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockVaultKeyStoreClass).toBeCalledWith(
-        expect.anything(),
-        expect.anything(),
-        STUB_VAULT_KV_PREFIX,
-      );
-    });
-  });
-
   describe('Queue subscription', () => {
     test('Worker should subscribe to channel "crc-cargo"', async () => {
       await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -202,9 +161,7 @@ describe('processIncomingCrcCargo', () => {
 
   test('Parcels contained in cargo should be published on channel "crc-parcels"', async () => {
     const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcelSerialized = Buffer.from(
-      await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcelSerialized = await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
     mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
 
@@ -217,7 +174,7 @@ describe('processIncomingCrcCargo', () => {
 
     expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
     expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
-    expect(mockPublishedMessages).toEqual([stubParcelSerialized]);
+    expect(mockPublishedMessages.map(bufferToArray)).toEqual([stubParcelSerialized]);
   });
 
   test('Cargo containing invalid messages should be ignored and logged', async () => {
@@ -225,13 +182,9 @@ describe('processIncomingCrcCargo', () => {
     // one message and it's valid.
 
     const stubParcel1 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel1Serialized = Buffer.from(
-      await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel2Serialized = Buffer.from(
-      await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
+    const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubCargo1MessageSet = new CargoMessageSet(
       new Set([Buffer.from('Not a parcel'), stubParcel1Serialized]),
     );
@@ -252,10 +205,13 @@ describe('processIncomingCrcCargo', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockPublishedMessages).toEqual([stubParcel1Serialized, stubParcel2Serialized]);
+    expect(mockPublishedMessages.map(bufferToArray)).toEqual([
+      stubParcel1Serialized,
+      stubParcel2Serialized,
+    ]);
 
     const cargoSenderAddress = await stubCargo1.senderCertificate.calculateSubjectPrivateAddress();
-    expect(mockPino.info).toBeCalledWith(
+    expect(mockLogger.info).toBeCalledWith(
       {
         cargoId: stubCargo1.id,
         error: expect.any(RAMFSyntaxError),

@@ -12,6 +12,15 @@ const NETLOC = '0.0.0.0:8080';
 const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256;
 
 export function runServer(): void {
+  const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID')
+    .required()
+    .asString();
+  const cogrpcAddress = getEnvVar('COGRPC_ADDRESS')
+    .required()
+    .asString();
+  const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET')
+    .required()
+    .asString();
   const mongoUri = getEnvVar('MONGO_URI')
     .required()
     .asString();
@@ -24,9 +33,12 @@ export function runServer(): void {
 
   const server = new Server({ 'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH });
   const serviceImplementation = makeServiceImplementation({
+    cogrpcAddress,
+    gatewayKeyIdBase64,
     mongoUri,
     natsClusterId,
     natsServerUrl,
+    parcelStoreBucket,
   });
   server.addService(CargoRelayService, serviceImplementation);
   const bindResult = server.bind(NETLOC, ServerCredentials.createInsecure());

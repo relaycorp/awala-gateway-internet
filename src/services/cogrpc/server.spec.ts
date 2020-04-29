@@ -4,7 +4,8 @@ import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
 import { EnvVarError } from 'env-var';
 import * as grpc from 'grpc';
 
-import { configureMockEnvVars, mockSpy } from '../_test_utils';
+import { mockSpy } from '../../_test_utils';
+import { configureMockEnvVars } from '../_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { runServer } from './server';
 import * as cogrpcService from './service';
@@ -25,25 +26,29 @@ jest.mock('grpc', () => {
   };
 });
 
-const stubMongoUri = 'mongo://example.com';
-const stubNatsServerUrl = 'nats://example.com';
-const stubNatsClusterId = 'nats-cluster-id';
 const BASE_ENV_VARS = {
-  MONGO_URI: stubMongoUri,
-  NATS_CLUSTER_ID: stubNatsClusterId,
-  NATS_SERVER_URL: stubNatsServerUrl,
+  COGRPC_ADDRESS: 'https://cogrpc.example.com/',
+  GATEWAY_KEY_ID: 'base64-encoded key id',
+  MONGO_URI: 'mongo://example.com',
+  NATS_CLUSTER_ID: 'nats-cluster-id',
+  NATS_SERVER_URL: 'nats://example.com',
+  PARCEL_STORE_BUCKET: 'bucket-name',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 describe('runServer', () => {
-  test.each(['MONGO_URI', 'NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
-    'Environment variable %s should be present',
-    envVar => {
-      mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
+  test.each([
+    'GATEWAY_KEY_ID',
+    'MONGO_URI',
+    'NATS_SERVER_URL',
+    'NATS_CLUSTER_ID',
+    'COGRPC_ADDRESS',
+    'PARCEL_STORE_BUCKET',
+  ])('Environment variable %s should be present', envVar => {
+    mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
-      expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
-    },
-  );
+    expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
+  });
 
   test('Server should be configured to accept the largest possible RAMF messages', () => {
     const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
@@ -63,9 +68,12 @@ describe('runServer', () => {
 
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
     expect(makeServiceImplementationSpy).toBeCalledWith({
-      mongoUri: stubMongoUri,
-      natsClusterId: stubNatsClusterId,
-      natsServerUrl: stubNatsServerUrl,
+      cogrpcAddress: BASE_ENV_VARS.COGRPC_ADDRESS,
+      gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
+      mongoUri: BASE_ENV_VARS.MONGO_URI,
+      natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
+      natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
+      parcelStoreBucket: BASE_ENV_VARS.PARCEL_STORE_BUCKET,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

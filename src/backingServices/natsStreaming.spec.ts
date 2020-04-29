@@ -3,7 +3,7 @@
 import { EventEmitter } from 'events';
 import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
 
-import { mockSpy } from '../services/_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
   public readonly close = jest.fn();
@@ -459,18 +459,3 @@ describe('NatsStreamingClient', () => {
     });
   });
 });
-
-async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
-  for (const item of array) {
-    yield item;
-  }
-}
-
-async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promise<readonly T[]> {
-  // tslint:disable-next-line:readonly-array
-  const values = [];
-  for await (const item of iterable) {
-    values.push(item);
-  }
-  return values;
-}

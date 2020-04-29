@@ -2,9 +2,13 @@ import { EnvVarError } from 'env-var';
 import * as http from 'http';
 import * as https from 'https';
 
-import { configureMockEnvVars, getMockContext, mockSpy } from '../services/_test_utils';
+import { asyncIterableToArray, mockSpy } from '../_test_utils';
+import { configureMockEnvVars, getMockContext } from '../services/_test_utils';
 
 const mockS3Client = {
+  deleteObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
+  getObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({}) })),
+  listObjectsV2: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve({ Contents: [] }) })),
   putObject: mockSpy(jest.fn(), () => ({ promise: () => Promise.resolve() })),
 };
 jest.mock('aws-sdk', () => ({
@@ -22,6 +26,8 @@ const OBJECT_KEY = 'the-object.txt';
 const OBJECT: StoreObject = { body: Buffer.from('the-body'), metadata: { foo: 'bar' } };
 
 describe('ObjectStore', () => {
+  const CLIENT = new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+
   describe('Constructor', () => {
     describe('Client', () => {
       test('Specified endpoint should be used', () => {
@@ -174,11 +180,111 @@ describe('ObjectStore', () => {
     });
   });
 
-  describe('putObject', () => {
-    const client = new ObjectStoreClient(ENDPOINT, ACCESS_KEY, SECRET_ACCESS_KEY);
+  describe('listObjectKeys', () => {
+    const PREFIX = 'prefix/';
 
+    test('Filter criteria should be honored', async () => {
+      await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(mockS3Client.listObjectsV2).toBeCalledTimes(1);
+      expect(mockS3Client.listObjectsV2).toBeCalledWith({
+        Bucket: BUCKET,
+        Prefix: PREFIX,
+      });
+    });
+
+    test('Keys for objects matching criteria should be yielded', async () => {
+      const objectKeys: readonly string[] = [`${PREFIX}logo.png`, `${PREFIX}logo.gif`];
+      mockS3Client.listObjectsV2.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys.map(k => ({ Key: k })),
+            IsTruncated: false,
+          }),
+      });
+
+      const retrievedKeys = await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(retrievedKeys).toEqual(objectKeys);
+    });
+
+    test('Pagination should be handled seamlessly', async () => {
+      const objectKeys1: readonly string[] = [`${PREFIX}logo.png`, `${PREFIX}logo.gif`];
+      const continuationToken = 'continue==';
+      mockS3Client.listObjectsV2.mockReturnValueOnce({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys1.map(k => ({ Key: k })),
+            ContinuationToken: continuationToken,
+            IsTruncated: true,
+          }),
+      });
+      const objectKeys2: readonly string[] = [`${PREFIX}style.css`, `${PREFIX}mobile.css`];
+      mockS3Client.listObjectsV2.mockReturnValueOnce({
+        promise: () =>
+          Promise.resolve({
+            Contents: objectKeys2.map(k => ({ Key: k })),
+            IsTruncated: false,
+          }),
+      });
+
+      const retrievedKeys = await asyncIterableToArray(CLIENT.listObjectKeys(PREFIX, BUCKET));
+
+      expect(retrievedKeys).toEqual([...objectKeys1, ...objectKeys2]);
+
+      expect(mockS3Client.listObjectsV2).toBeCalledTimes(2);
+      expect(mockS3Client.listObjectsV2).toBeCalledWith({
+        Bucket: BUCKET,
+        ContinuationToken: continuationToken,
+        Prefix: PREFIX,
+      });
+    });
+  });
+
+  describe('getObject', () => {
+    test('Object should be retrieved with the specified parameters', async () => {
+      await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(mockS3Client.getObject).toBeCalledTimes(1);
+      expect(mockS3Client.getObject).toBeCalledWith({
+        Bucket: BUCKET,
+        Key: OBJECT_KEY,
+      });
+    });
+
+    test('Body and metadata should be output', async () => {
+      mockS3Client.getObject.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Body: OBJECT.body,
+            Metadata: OBJECT.metadata,
+          }),
+      });
+
+      const object = await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(object).toHaveProperty('body', OBJECT.body);
+      expect(object).toHaveProperty('metadata', OBJECT.metadata);
+    });
+
+    test('Metadata should fall back to empty object when undefined', async () => {
+      mockS3Client.getObject.mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Body: OBJECT.body,
+          }),
+      });
+
+      const object = await CLIENT.getObject(OBJECT_KEY, BUCKET);
+
+      expect(object).toHaveProperty('body', OBJECT.body);
+      expect(object).toHaveProperty('metadata', {});
+    });
+  });
+
+  describe('putObject', () => {
     test('Object should be created with specified parameters', async () => {
-      await client.putObject(OBJECT, OBJECT_KEY, BUCKET);
+      await CLIENT.putObject(OBJECT, OBJECT_KEY, BUCKET);
 
       expect(mockS3Client.putObject).toBeCalledTimes(1);
       expect(mockS3Client.putObject).toBeCalledWith({
@@ -186,6 +292,18 @@ describe('ObjectStore', () => {
         Bucket: BUCKET,
         Key: OBJECT_KEY,
         Metadata: OBJECT.metadata,
+      });
+    });
+  });
+
+  describe('deleteObject', () => {
+    test('Specified object should be deleted', async () => {
+      await CLIENT.deleteObject(OBJECT_KEY, BUCKET);
+
+      expect(mockS3Client.deleteObject).toBeCalledTimes(1);
+      expect(mockS3Client.deleteObject).toBeCalledWith({
+        Bucket: BUCKET,
+        Key: OBJECT_KEY,
       });
     });
   });

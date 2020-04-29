@@ -21,7 +21,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import mongoose from 'mongoose';
 
-import { arrayToAsyncIterable, mockSpy } from '../../_test_utils';
+import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import {
   configureMockEnvVars,
@@ -33,6 +33,8 @@ import * as certs from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
+
+const MOCK_PINO = mockPino();
 import { makeServiceImplementation } from './service';
 
 //region Fixtures
@@ -501,7 +503,9 @@ describe('collectCargo', () => {
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
-    expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(COGRPC_ADDRESS);
+    expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
+      await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+    );
   });
 
   test.todo('No cargo should be returned if CCA was already used');
@@ -527,8 +531,6 @@ describe('collectCargo', () => {
     await validateCargoDelivery(CALL.input[0]);
   });
 
-  test.todo('Multiple cargoes should be returned if necessary');
-
   test.todo('PCAs should be included in payload');
 
   test('Cargoes should be signed with current key', async () => {
@@ -550,7 +552,27 @@ describe('collectCargo', () => {
     expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
   });
 
-  test.todo('Errors should be logged and end the call');
+  test('Errors while generating cargo should be logged and end the call', async cb => {
+    const err = new Error('Whoops');
+    MOCK_FETCH_NODE_KEY.mockRejectedValue(err);
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    CALL.on('error', async callError => {
+      expect(MOCK_PINO.error).toBeCalledWith(
+        { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
+        'Failed to deliver cargo',
+      );
+
+      expect(callError).toEqual({
+        code: grpc.status.UNAVAILABLE,
+        message: 'Internal server error; please try again later',
+      });
+
+      cb();
+    });
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+  });
 
   async function validateCargoDelivery(cargoDelivery: CargoDelivery): Promise<void> {
     expect(cargoDelivery).toHaveProperty('id', expect.stringMatching(/^[0-9a-f-]+$/));

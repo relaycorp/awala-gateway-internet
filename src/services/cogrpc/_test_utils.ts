@@ -13,6 +13,11 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     super({ objectMode: true });
 
     this.metadata = new grpc.Metadata();
+
+    jest.spyOn(this, 'emit' as any);
+    jest.spyOn(this, 'on' as any);
+    jest.spyOn(this, 'end' as any);
+    jest.spyOn(this, 'write' as any);
   }
 
   public _read(_size: number): void {
@@ -37,7 +42,3 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     return (this as unknown) as grpc.ServerDuplexStream<Input, Output>;
   }
 }
-jest.spyOn(MockGrpcBidiCall.prototype, 'emit');
-jest.spyOn(MockGrpcBidiCall.prototype, 'on');
-jest.spyOn(MockGrpcBidiCall.prototype, 'end');
-jest.spyOn(MockGrpcBidiCall.prototype, 'write');

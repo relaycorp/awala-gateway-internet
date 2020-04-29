@@ -13,6 +13,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
 import { createConnection } from 'mongoose';
+import pino from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
@@ -31,6 +32,8 @@ interface ServiceImplementationOptions {
   readonly natsClusterId: string;
   readonly cogrpcAddress: string;
 }
+
+const LOGGER = pino();
 
 export function makeServiceImplementation(
   options: ServiceImplementationOptions,
@@ -123,7 +126,8 @@ export async function collectCargo(
   const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
   const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
 
-  const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(cca.recipientAddress);
+  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const cargoMessages = await parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress);
 
   async function* encapsulateMessages(messages: CargoMessageStream): AsyncIterable<Buffer> {
     yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
@@ -136,7 +140,15 @@ export async function collectCargo(
     }
   }
 
-  await pipe(cargoMessages, encapsulateMessages, sendCargoes);
+  try {
+    await pipe(cargoMessages, encapsulateMessages, sendCargoes);
+  } catch (err) {
+    LOGGER.error({ err, peerGatewayAddress }, 'Failed to deliver cargo');
+    call.emit('error', {
+      code: grpc.status.UNAVAILABLE,
+      message: 'Internal server error; please try again later',
+    });
+  }
 }
 
 async function parseAndValidateCCAFromMetadata(

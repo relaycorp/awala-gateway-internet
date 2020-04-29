@@ -28,6 +28,6 @@ mongo.db.createCollection('own_certificates');
 Create Minio buckets:
 
 ```
-MC_HOST_minio=http://ACCESS_KEY:letmeinpls@object-store:9000
+MC_HOST_minio=http://THE-KEY-ID:letmeinpls@object-store:9000
 docker run --rm --network=relaynet-internet-gateway_default -e MC_HOST_minio minio/mc mb minio/relaynet-public-gateway
 ```

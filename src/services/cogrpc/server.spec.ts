@@ -6,19 +6,24 @@ import * as grpc from 'grpc';
 
 import { mockSpy } from '../../_test_utils';
 import { configureMockEnvVars } from '../_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 
-const addServiceSpy = jest.spyOn(grpc.Server.prototype, 'addService');
-const bindSpy = jest.spyOn(grpc.Server.prototype, 'bind');
-const startSpy = jest.spyOn(grpc.Server.prototype, 'start');
 const makeServiceImplementationSpy = mockSpy(
   jest.spyOn(cogrpcService, 'makeServiceImplementation'),
 );
-beforeEach(() => {
-  addServiceSpy.mockReset();
-  bindSpy.mockReset();
-  startSpy.mockReset();
+const mockServer = {
+  addService: mockSpy(jest.fn()),
+  bind: mockSpy(jest.fn(), () => 1),
+  start: mockSpy(jest.fn()),
+};
+jest.mock('grpc', () => {
+  const grpcOriginal = jest.requireActual('grpc');
+  return {
+    ...grpcOriginal,
+    Server: jest.fn().mockImplementation(() => mockServer),
+  };
 });
 
 const BASE_ENV_VARS = {
@@ -45,6 +50,19 @@ describe('runServer', () => {
     expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
   });
 
+  test('Server should be configured to accept the largest possible RAMF messages', () => {
+    const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
+
+    runServer();
+
+    expect(grpc.Server).toBeCalledTimes(1);
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({
+        'grpc.max_receive_message_length': expectMaxLength,
+      }),
+    );
+  });
+
   test('CogRPC service should be added', () => {
     runServer();
 
@@ -59,19 +77,19 @@ describe('runServer', () => {
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 
-    expect(addServiceSpy).toBeCalledTimes(1);
-    expect(addServiceSpy).toBeCalledWith(CargoRelayService, serviceImplementation);
+    expect(mockServer.addService).toBeCalledTimes(1);
+    expect(mockServer.addService).toBeCalledWith(CargoRelayService, serviceImplementation);
   });
 
   test('Server should listen on 0.0.0.0:8080', () => {
     runServer();
 
-    expect(bindSpy).toBeCalledTimes(1);
-    expect(bindSpy).toBeCalledWith('0.0.0.0:8080', expect.anything());
+    expect(mockServer.bind).toBeCalledTimes(1);
+    expect(mockServer.bind).toBeCalledWith('0.0.0.0:8080', expect.anything());
   });
 
   test('Failing to listen on specified port should result in error', () => {
-    bindSpy.mockReturnValueOnce(-1);
+    mockServer.bind.mockReturnValueOnce(-1);
 
     expect(() => runServer()).toThrowWithMessage(Error, 'Failed to listen on 0.0.0.0:8080');
   });
@@ -79,15 +97,18 @@ describe('runServer', () => {
   test('Server should not use TLS', () => {
     runServer();
 
-    expect(bindSpy).toBeCalledTimes(1);
-    expect(bindSpy).toBeCalledWith(expect.anything(), grpc.ServerCredentials.createInsecure());
+    expect(mockServer.bind).toBeCalledTimes(1);
+    expect(mockServer.bind).toBeCalledWith(
+      expect.anything(),
+      grpc.ServerCredentials.createInsecure(),
+    );
   });
 
   test('gRPC server should be started as the last step', () => {
     runServer();
 
-    expect(startSpy).toBeCalledTimes(1);
-    expect(startSpy).toBeCalledWith();
-    expect(startSpy).toHaveBeenCalledAfter(bindSpy as jest.Mock);
+    expect(mockServer.start).toBeCalledTimes(1);
+    expect(mockServer.start).toBeCalledWith();
+    expect(mockServer.start).toHaveBeenCalledAfter(mockServer.bind as jest.Mock);
   });
 });

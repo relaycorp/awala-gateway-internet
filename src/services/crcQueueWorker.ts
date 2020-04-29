@@ -1,5 +1,4 @@
 import { Cargo, Parcel } from '@relaycorp/relaynet-core';
-import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';

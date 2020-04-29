@@ -1,3 +1,4 @@
+import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   CargoDelivery,
   CargoDeliveryAck,
@@ -42,6 +43,8 @@ export function makeServiceImplementation(
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
   const currentKeyId = Buffer.from(options.gatewayKeyIdBase64, 'base64');
+
+  const vaultKeyStore = initVaultKeyStore();
 
   return {
     async deliverCargo(
@@ -94,7 +97,14 @@ export function makeServiceImplementation(
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
-      await collectCargo(call, options.mongoUri, options.cogrpcAddress, currentKeyId, parcelStore);
+      await collectCargo(
+        call,
+        options.mongoUri,
+        options.cogrpcAddress,
+        currentKeyId,
+        parcelStore,
+        vaultKeyStore,
+      );
     },
   };
 }
@@ -105,6 +115,7 @@ export async function collectCargo(
   ownCogrpcAddress: string,
   currentKeyId: Buffer,
   parcelStore: ParcelStore,
+  vaultKeyStore: VaultPrivateKeyStore,
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
 
@@ -120,14 +131,16 @@ export async function collectCargo(
     return;
   }
 
-  async function* encapsulateMessages(messages: CargoMessageStream): AsyncIterable<Buffer> {
+  async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const mongooseConnection = createConnection(mongoUri);
-    call.on('end', () => mongooseConnection.close());
 
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
-    const gateway = new Gateway(initVaultKeyStore(), publicKeyStore);
-
-    yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
+    const gateway = new Gateway(vaultKeyStore, publicKeyStore);
+    try {
+      yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
+    } finally {
+      await mongooseConnection.close();
+    }
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {
@@ -142,7 +155,7 @@ export async function collectCargo(
   try {
     await pipe(
       await parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
-      encapsulateMessages,
+      encapsulateMessagesInCargo,
       sendCargoes,
     );
   } catch (err) {

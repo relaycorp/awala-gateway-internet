@@ -547,8 +547,6 @@ describe('collectCargo', () => {
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
-    CALL.emit('end');
-
     expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
   });
 

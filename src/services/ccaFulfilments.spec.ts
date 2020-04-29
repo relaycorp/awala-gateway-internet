@@ -12,8 +12,8 @@ import { mockSpy } from '../_test_utils';
 import { recordCCAFulfillment, wasCCAFulfilled } from './ccaFulfilments';
 import { CCAFulfillment } from './models';
 
-const STUB_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
-const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
+const MOCK_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
+const MOCK_GET_MODEL_FOR_CLASS = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 
 let CCA: CargoCollectionAuthorization;
 beforeAll(async () => {
@@ -31,19 +31,19 @@ beforeAll(async () => {
 
 describe('wasCCAFulfilled', () => {
   const MOCK_MONGOOSE_EXISTS = mockSpy(jest.fn());
-  beforeEach(() => stubGetModelForClass.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS }));
+  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS }));
 
   test('Existing connection should be used', async () => {
-    await wasCCAFulfilled(CCA, STUB_CONNECTION);
+    await wasCCAFulfilled(CCA, MOCK_CONNECTION);
 
-    expect(stubGetModelForClass).toBeCalledTimes(1);
-    expect(stubGetModelForClass).toBeCalledWith(CCAFulfillment, {
-      existingConnection: STUB_CONNECTION,
+    expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledTimes(1);
+    expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledWith(CCAFulfillment, {
+      existingConnection: MOCK_CONNECTION,
     });
   });
 
   test('Fulfillments should be filtered by peer address and CCA id', async () => {
-    await wasCCAFulfilled(CCA, STUB_CONNECTION);
+    await wasCCAFulfilled(CCA, MOCK_CONNECTION);
 
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledTimes(1);
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledWith({
@@ -55,7 +55,7 @@ describe('wasCCAFulfilled', () => {
   test('Unfulfilled CCA should be reported as such', async () => {
     MOCK_MONGOOSE_EXISTS.mockResolvedValue(false);
 
-    const wasFulfilled = await wasCCAFulfilled(CCA, STUB_CONNECTION);
+    const wasFulfilled = await wasCCAFulfilled(CCA, MOCK_CONNECTION);
 
     expect(wasFulfilled).toBeFalse();
   });
@@ -63,7 +63,7 @@ describe('wasCCAFulfilled', () => {
   test('Fulfilled CCA should be reported as such', async () => {
     MOCK_MONGOOSE_EXISTS.mockResolvedValue(true);
 
-    const wasFulfilled = await wasCCAFulfilled(CCA, STUB_CONNECTION);
+    const wasFulfilled = await wasCCAFulfilled(CCA, MOCK_CONNECTION);
 
     expect(wasFulfilled).toBeTrue();
   });
@@ -77,19 +77,21 @@ describe('recordCCAFulfillment', () => {
   const MOCK_MONGOOSE_REPLACE_ONE = mockSpy(jest.fn(), () => ({
     setOptions: MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS,
   }));
-  beforeEach(() => stubGetModelForClass.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE }));
+  beforeEach(() =>
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE }),
+  );
 
   test('Existing connection should be used', async () => {
-    await recordCCAFulfillment(CCA, STUB_CONNECTION);
+    await recordCCAFulfillment(CCA, MOCK_CONNECTION);
 
-    expect(stubGetModelForClass).toBeCalledTimes(1);
-    expect(stubGetModelForClass).toBeCalledWith(CCAFulfillment, {
-      existingConnection: STUB_CONNECTION,
+    expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledTimes(1);
+    expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledWith(CCAFulfillment, {
+      existingConnection: MOCK_CONNECTION,
     });
   });
 
   test('Fulfillment should be upserted', async () => {
-    await recordCCAFulfillment(CCA, STUB_CONNECTION);
+    await recordCCAFulfillment(CCA, MOCK_CONNECTION);
 
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledTimes(1);
     const peerPrivateAddress = await CCA.senderCertificate.calculateSubjectPrivateAddress();

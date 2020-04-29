@@ -10,11 +10,13 @@ import {
   Cargo,
   CargoCollectionAuthorization,
   CargoMessageSet,
+  CargoMessageStream,
   Certificate,
   generateRSAKeyPair,
   issueEndpointCertificate,
   issueGatewayCertificate,
   Parcel,
+  ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -24,10 +26,11 @@ import uuid from 'uuid-random';
 
 import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import { configureMockEnvVars, expectBuffersToEqual, makeEmptyCertificate } from '../_test_utils';
+import { configureMockEnvVars, makeEmptyCertificate } from '../_test_utils';
 import * as ccaFulfillments from '../ccaFulfilments';
 import * as certs from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import * as parcelCollectionAck from '../parcelCollectionAck';
 import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
 
@@ -329,6 +332,12 @@ describe('collectCargo', () => {
     jest.spyOn(ParcelStore.prototype, 'retrieveActiveParcelsForGateway'),
     async () => arrayToAsyncIterable([]),
   );
+  const MOCK_GENERATE_PCAS = mockSpy(
+    jest.spyOn(parcelCollectionAck, 'generatePCAs'),
+    async function*(): CargoMessageStream {
+      yield* arrayToAsyncIterable([]);
+    },
+  );
 
   const MOCK_FETCH_NODE_KEY = mockSpy(
     jest.spyOn(VaultPrivateKeyStore.prototype, 'fetchNodeKey'),
@@ -541,10 +550,38 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(CALL.input).toHaveLength(1);
-    await validateCargoDelivery(CALL.input[0]);
+    await validateCargoDelivery(CALL.input[0], [DUMMY_PARCEL_SERIALIZED]);
   });
 
-  test.todo('PCAs should be included in payload');
+  test('PCAs should be limited to the sender of the CCA', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(MOCK_GENERATE_PCAS).toBeCalledTimes(1);
+    expect(MOCK_GENERATE_PCAS).toBeCalledWith(
+      await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+      MOCK_MONGOOSE_CONNECTION,
+    );
+  });
+
+  test('PCAs should be included in payload', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
+      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
+    );
+    const pca = new ParcelCollectionAck('0beef', 'https://endpoint.example/', 'the-id');
+    const pcaSerialized = Buffer.from(pca.serialize());
+    MOCK_GENERATE_PCAS.mockReturnValue(
+      arrayToAsyncIterable([{ expiryDate: new Date(), message: pcaSerialized }]),
+    );
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(CALL.input).toHaveLength(1);
+    await validateCargoDelivery(CALL.input[0], [pcaSerialized, DUMMY_PARCEL_SERIALIZED]);
+  });
 
   test('Cargoes should be signed with current key', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
@@ -651,15 +688,20 @@ describe('collectCargo', () => {
     });
   });
 
-  async function validateCargoDelivery(cargoDelivery: CargoDelivery): Promise<void> {
+  async function validateCargoDelivery(
+    cargoDelivery: CargoDelivery,
+    expectedMessagesSerialized: readonly Buffer[],
+  ): Promise<void> {
     expect(cargoDelivery).toHaveProperty('id', expect.stringMatching(/^[0-9a-f-]+$/));
+
     expect(cargoDelivery).toHaveProperty('cargo');
     const cargoMessageSet = await unwrapCargoMessages(cargoDelivery.cargo);
-    expect(cargoMessageSet.messages).toHaveProperty('size', 1);
-    expectBuffersToEqual(
-      Array.from(cargoMessageSet.messages)[0],
-      bufferToArray(DUMMY_PARCEL_SERIALIZED),
-    );
+    const cargoMessages = Array.from(cargoMessageSet.messages).map(m => Buffer.from(m));
+    expect(cargoMessages).toHaveLength(expectedMessagesSerialized.length);
+    for (const expectedMessageSerialized of expectedMessagesSerialized) {
+      const matchingMessages = cargoMessages.filter(m => m.equals(expectedMessageSerialized));
+      expect(matchingMessages).toHaveLength(1);
+    }
   }
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<CargoMessageSet> {

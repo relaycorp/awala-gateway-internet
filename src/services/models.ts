@@ -36,3 +36,29 @@ export class CCAFulfillment {
   @prop({ required: true, expires: 0 })
   public ccaExpiryDate!: Date;
 }
+
+@index(
+  {
+    parcelId: 1,
+    peerGatewayPrivateAddress: 1,
+    recipientEndpointAddress: 1,
+    senderEndpointPrivateAddress: 1,
+  },
+  { unique: true },
+)
+export class ParcelCollection {
+  @prop({ required: true })
+  public peerGatewayPrivateAddress!: string;
+
+  @prop({ required: true })
+  public senderEndpointPrivateAddress!: string;
+
+  @prop({ required: true })
+  public recipientEndpointAddress!: string;
+
+  @prop({ required: true })
+  public parcelId!: string;
+
+  @prop({ required: true, expires: 0 })
+  public parcelExpiryDate!: Date;
+}

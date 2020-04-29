@@ -24,6 +24,7 @@ import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import { generatePCAs } from '../parcelCollectionAck';
 import { ParcelStore } from '../parcelStore';
 
 interface ServiceImplementationOptions {
@@ -163,12 +164,12 @@ export async function collectCargo(
   }
 
   const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const cargoMessageStream = await concatMessageStreams(
+    generatePCAs(peerGatewayAddress, mongooseConnection),
+    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
+  );
   try {
-    await pipe(
-      await parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
-      encapsulateMessagesInCargo,
-      sendCargoes,
-    );
+    await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
     LOGGER.error({ err, peerGatewayAddress }, 'Failed to send cargo');
     call.emit('error', {
@@ -207,4 +208,12 @@ async function parseAndValidateCCAFromMetadata(
   }
 
   return cca;
+}
+
+async function* concatMessageStreams(
+  ...streams: readonly CargoMessageStream[]
+): CargoMessageStream {
+  for (const iterable of streams) {
+    yield* await iterable;
+  }
 }

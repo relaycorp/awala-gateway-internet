@@ -1,6 +1,5 @@
 import { Cargo, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
 import pino from 'pino';
@@ -11,7 +10,7 @@ import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 const logger = pino();
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
-  const natsStreamingClient = initNatsStreamingClient(workerName);
+  const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
   const privateKeyStore = initVaultKeyStore();
 
   async function* unwrapCargoPayload(
@@ -55,14 +54,4 @@ async function consumeAsyncIterator<T>(iterator: AsyncIterable<T>): Promise<void
   // tslint:disable-next-line:no-empty
   for await (const _ of iterator) {
   }
-}
-
-function initNatsStreamingClient(clientId: string): NatsStreamingClient {
-  const natsServerUrl = getEnvVar('NATS_SERVER_URL')
-    .required()
-    .asString();
-  const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
-    .required()
-    .asString();
-  return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
 }

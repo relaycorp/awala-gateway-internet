@@ -6,7 +6,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy } from '../_test_utils';
-import * as natsStreaming from '../backingServices/natsStreaming';
+import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
 import * as privateKeyStore from '../backingServices/privateKeyStore';
 import { castMock, configureMockEnvVars, generateStubPdaChain, PdaChain } from './_test_utils';
 
@@ -19,7 +19,7 @@ const STUB_NATS_SERVER = 'nats://example.com';
 const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
 const STUB_WORKER_NAME = 'worker-name';
 
-let mockNatsClient: natsStreaming.NatsStreamingClient;
+let mockNatsClient: NatsStreamingClient;
 let mockQueueMessages: readonly stan.Message[];
 // tslint:disable-next-line:readonly-array
 let mockPublishedMessages: Buffer[];
@@ -28,7 +28,7 @@ beforeEach(() => {
   mockPublishedMessages = [];
 
   async function* mockMakePublisher(
-    messages: AsyncIterable<natsStreaming.PublisherMessage>,
+    messages: AsyncIterable<PublisherMessage>,
   ): AsyncIterable<string> {
     for await (const message of messages) {
       mockPublishedMessages.push(message.data as Buffer);
@@ -42,16 +42,13 @@ beforeEach(() => {
     }
   }
 
-  mockNatsClient = castMock<natsStreaming.NatsStreamingClient>({
+  mockNatsClient = castMock<NatsStreamingClient>({
     disconnect: jest.fn(),
     makePublisher: jest.fn().mockReturnValue(mockMakePublisher),
     makeQueueConsumer: jest.fn().mockImplementation(mockMakeQueueConsumer),
   });
 });
-const mockNatsClientClass = mockSpy(
-  jest.spyOn(natsStreaming, 'NatsStreamingClient'),
-  () => mockNatsClient,
-);
+mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
 
 //region Keystore-related fixtures
 
@@ -71,7 +68,7 @@ const BASE_ENV_VARS = {
   VAULT_TOKEN: STUB_VAULT_TOKEN,
   VAULT_URL: STUB_VAULT_URL,
 };
-const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
+configureMockEnvVars(BASE_ENV_VARS);
 
 const mockCargoUnwrapPayload = mockSpy(
   jest.spyOn(Cargo.prototype, 'unwrapPayload'),
@@ -82,49 +79,6 @@ describe('processIncomingCrcCargo', () => {
   let stubPdaChain: PdaChain;
   beforeAll(async () => {
     stubPdaChain = await generateStubPdaChain();
-  });
-
-  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
-    'Environment variable %s should be present',
-    async envVar => {
-      mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
-
-      await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toMatchObject({
-        message: new RegExp(envVar),
-      });
-    },
-  );
-
-  describe('NATS Streaming connection', () => {
-    test('Client should connect to server in NATS_SERVER_URL', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClientClass).toBeCalledWith(
-        STUB_NATS_SERVER,
-        expect.anything(),
-        expect.anything(),
-      );
-    });
-
-    test('Client should connect to cluster in NATS_CLUSTER_ID', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClientClass).toBeCalledWith(
-        expect.anything(),
-        STUB_NATS_CLUSTER_ID,
-        expect.anything(),
-      );
-    });
-
-    test('Worker name should be used as NATS client id', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClientClass).toBeCalledWith(
-        expect.anything(),
-        expect.anything(),
-        STUB_WORKER_NAME,
-      );
-    });
   });
 
   describe('Queue subscription', () => {

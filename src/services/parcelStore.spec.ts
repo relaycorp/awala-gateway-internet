@@ -5,10 +5,10 @@ const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
+const PARCEL_SERIALIZED = Buffer.from('The RAMF-serialized parcel');
 
 describe('retrieveActiveParcelsForGateway', () => {
   const PEER_GATEWAY_ADDRESS = 'gateway-address';
-  const PARCEL_SERIALIZED = Buffer.from('The RAMF-serialized parcel');
 
   const mockGetObject = mockSpy(jest.fn());
   const mockListObjectKeys = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
@@ -185,4 +185,86 @@ describe('retrieveActiveParcelsForGateway', () => {
     const date = getDateRelativeToNow(deltaSeconds);
     return getTimestamp(date).toString();
   }
+});
+
+describe('retrieveInternetBoundParcel', () => {
+  const mockGetObject = mockSpy(jest.fn(), async () => ({ body: PARCEL_SERIALIZED }));
+  const mockObjectStoreClient: ObjectStoreClient = { getObject: mockGetObject } as any;
+  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+
+  test('Object should be retrieved from the right bucket', async () => {
+    await store.retrieveInternetBoundParcel('');
+
+    expect(mockGetObject).toBeCalledWith(expect.anything(), BUCKET);
+  });
+
+  test('Lookup object key should be prefixed', async () => {
+    const key = 'thingy.parcel';
+    await store.retrieveInternetBoundParcel(key);
+
+    expect(mockGetObject).toBeCalledWith(`parcels/internet-bound/${key}`, expect.anything());
+  });
+
+  test('Parcel should be returned', async () => {
+    const parcelSerialized = await store.retrieveInternetBoundParcel('key');
+
+    expect(parcelSerialized).toEqual(PARCEL_SERIALIZED);
+  });
+});
+
+describe('storeInternetBoundParcel', () => {
+  const mockPutObject = mockSpy(jest.fn());
+  const mockObjectStoreClient: ObjectStoreClient = { putObject: mockPutObject } as any;
+  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+
+  test('Generated object key should be output', async () => {
+    const key = await store.storeInternetBoundParcel(PARCEL_SERIALIZED);
+
+    expect(key).toMatch(/^[0-9a-f-]+$/);
+  });
+
+  test('Object should be put in the right bucket', async () => {
+    await store.storeInternetBoundParcel(PARCEL_SERIALIZED);
+
+    expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
+  });
+
+  test('Full object key should be prefixed', async () => {
+    const key = await store.storeInternetBoundParcel(PARCEL_SERIALIZED);
+
+    expect(mockPutObject).toBeCalledWith(
+      expect.anything(),
+      `parcels/internet-bound/${key}`,
+      expect.anything(),
+    );
+  });
+
+  test('Parcel serialization should be stored', async () => {
+    await store.storeInternetBoundParcel(PARCEL_SERIALIZED);
+
+    expect(mockPutObject).toBeCalledWith(
+      expect.objectContaining({ body: PARCEL_SERIALIZED }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+});
+
+describe('deleteInternetBoundParcel', () => {
+  const mockDeleteObject = mockSpy(jest.fn(), async () => ({ body: PARCEL_SERIALIZED }));
+  const mockObjectStoreClient: ObjectStoreClient = { deleteObject: mockDeleteObject } as any;
+  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+
+  test('Object should be deleted from the right bucket', async () => {
+    await store.deleteInternetBoundParcel('');
+
+    expect(mockDeleteObject).toBeCalledWith(expect.anything(), BUCKET);
+  });
+
+  test('Full object key should be prefixed', async () => {
+    const key = 'thingy.parcel';
+    await store.deleteInternetBoundParcel(key);
+
+    expect(mockDeleteObject).toBeCalledWith(`parcels/internet-bound/${key}`, expect.anything());
+  });
 });

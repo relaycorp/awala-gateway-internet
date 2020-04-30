@@ -5,10 +5,11 @@ const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
-const GATEWAY_ADDRESS = 'gateway-address';
-const PARCEL_SERIALIZED = Buffer.from('The RAMF-serialized parcel');
 
 describe('retrieveActiveParcelsForGateway', () => {
+  const PEER_GATEWAY_ADDRESS = 'gateway-address';
+  const PARCEL_SERIALIZED = Buffer.from('The RAMF-serialized parcel');
+
   const mockGetObject = mockSpy(jest.fn());
   const mockListObjectKeys = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
   const mockObjectStoreClient: ObjectStoreClient = {
@@ -18,10 +19,10 @@ describe('retrieveActiveParcelsForGateway', () => {
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
   test('Parcels should be limited to those for the specified gateway', async () => {
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS));
+    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS));
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(
-      `parcels/gateway-bound/${GATEWAY_ADDRESS}/`,
+      `parcels/gateway-bound/${PEER_GATEWAY_ADDRESS}/`,
       expect.anything(),
     );
   });
@@ -35,7 +36,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     };
     setMockParcelObjectStore(objectsByKey);
 
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS));
+    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS));
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
     expect(mockGetObject).toBeCalledTimes(1);
@@ -59,7 +60,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
     );
 
     expect(activeParcels).toEqual([
@@ -83,7 +84,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     });
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
@@ -108,7 +109,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
   });
@@ -128,7 +129,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
@@ -154,7 +155,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 

@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
 
 import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
+import { configureMockEnvVars } from '../services/_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
   public readonly close = jest.fn();
@@ -456,6 +457,43 @@ describe('NatsStreamingClient', () => {
       await asyncIterableToArray(publisher2([STUB_MESSAGE_1]));
 
       expect(mockNatsConnect).toBeCalledTimes(2);
+    });
+  });
+
+  describe('NATS Streaming connection', () => {
+    const ENV_VARS = {
+      NATS_CLUSTER_ID: STUB_CLUSTER_ID,
+      NATS_SERVER_URL: STUB_SERVER_URL,
+    };
+    const mockEnvVars = configureMockEnvVars(ENV_VARS);
+
+    const CLIENT_ID = 'the-client-id';
+
+    test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
+      'Environment variable %s should be present',
+      envVar => {
+        mockEnvVars({ ...ENV_VARS, [envVar]: undefined });
+
+        expect(() => NatsStreamingClient.initFromEnv(CLIENT_ID)).toThrow(new RegExp(envVar));
+      },
+    );
+
+    test('Client should connect to server in NATS_SERVER_URL', () => {
+      const client = NatsStreamingClient.initFromEnv(CLIENT_ID);
+
+      expect(client.serverUrl).toEqual(STUB_SERVER_URL);
+    });
+
+    test('Client should connect to cluster in NATS_CLUSTER_ID', () => {
+      const client = NatsStreamingClient.initFromEnv(CLIENT_ID);
+
+      expect(client.clusterId).toEqual(STUB_CLUSTER_ID);
+    });
+
+    test('Worker name should be used as NATS client id', () => {
+      const client = NatsStreamingClient.initFromEnv(CLIENT_ID);
+
+      expect(client.clientId).toEqual(CLIENT_ID);
     });
   });
 });

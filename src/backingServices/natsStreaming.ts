@@ -1,3 +1,4 @@
+import { get as getEnvVar } from 'env-var';
 import { connect, Message, Stan } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
 import * as streamToIt from 'stream-to-it';
@@ -9,13 +10,23 @@ export interface PublisherMessage {
 }
 
 export class NatsStreamingClient {
+  public static initFromEnv(clientId: string): NatsStreamingClient {
+    const natsServerUrl = getEnvVar('NATS_SERVER_URL')
+      .required()
+      .asString();
+    const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
+      .required()
+      .asString();
+    return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
+  }
+
   // tslint:disable-next-line:readonly-keyword
   protected connection?: Stan;
 
   constructor(
-    protected readonly serverUrl: string,
-    protected readonly clusterId: string,
-    protected readonly clientId: string,
+    public readonly serverUrl: string,
+    public readonly clusterId: string,
+    public readonly clientId: string,
   ) {}
 
   public makePublisher(

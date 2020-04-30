@@ -9,9 +9,10 @@ import {
   Parcel,
 } from '@relaycorp/relaynet-core';
 import envVar from 'env-var';
+import * as stan from 'node-nats-streaming';
 import * as pkijs from 'pkijs';
 
-const TOMORROW = new Date();
+export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export function getMockContext(mockedObject: any): jest.MockContext<any, any> {
@@ -162,4 +163,11 @@ export function reSerializeCertificate(cert: Certificate): Certificate {
   // For example, `extension.parsedValue` would be `undefined` in
   // https://github.com/PeculiarVentures/PKI.js/blob/9a39551aa9f1445406f96680318014c8d714e8e3/src/CertificateChainValidationEngine.js#L155
   return Certificate.deserialize(cert.serialize());
+}
+
+export function mockStanMessage(messageData: Buffer | ArrayBuffer): stan.Message {
+  return castMock<stan.Message>({
+    ack: jest.fn(),
+    getRawData: () => Buffer.from(messageData),
+  });
 }

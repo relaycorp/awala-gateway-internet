@@ -1,11 +1,13 @@
 import { CargoMessageStream } from '@relaycorp/relaynet-core';
 import pino from 'pino';
+import uuid from 'uuid-random';
 
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
 
 const LOGGER = pino();
 
 export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
+const INTERNET_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound';
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
@@ -40,6 +42,31 @@ export class ParcelStore {
       yield { expiryDate: parcelExpiryDate, message: parcelObject.body };
     }
   }
+
+  public async retrieveInternetBoundParcel(parcelObjectKey: string): Promise<Buffer> {
+    const storeObject = await this.objectStoreClient.getObject(
+      makeFullInternetBoundObjectKey(parcelObjectKey),
+      this.bucket,
+    );
+    return storeObject.body;
+  }
+
+  public async storeInternetBoundParcel(parcelSerialized: Buffer): Promise<string> {
+    const objectKey = uuid();
+    await this.objectStoreClient.putObject(
+      { body: parcelSerialized, metadata: {} },
+      makeFullInternetBoundObjectKey(objectKey),
+      this.bucket,
+    );
+    return objectKey;
+  }
+
+  public async deleteInternetBoundParcel(parcelObjectKey: string): Promise<void> {
+    await this.objectStoreClient.deleteObject(
+      makeFullInternetBoundObjectKey(parcelObjectKey),
+      this.bucket,
+    );
+  }
 }
 
 function getDateFromTimestamp(timestampString: string): Date | null {
@@ -50,6 +77,10 @@ function getDateFromTimestamp(timestampString: string): Date | null {
   const parcelExpiryTimestamp = parseInt(timestampString, 10);
   const parcelExpiryDate = new Date(parcelExpiryTimestamp * 1_000);
   return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
+}
+
+function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
+  return `${INTERNET_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
 // TODO: Move here

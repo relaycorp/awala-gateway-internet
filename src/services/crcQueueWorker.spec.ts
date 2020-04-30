@@ -8,10 +8,16 @@ import * as stan from 'node-nats-streaming';
 import { mockPino, mockSpy } from '../_test_utils';
 import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
 import * as privateKeyStore from '../backingServices/privateKeyStore';
-import { castMock, configureMockEnvVars, generateStubPdaChain, PdaChain } from './_test_utils';
+import {
+  castMock,
+  configureMockEnvVars,
+  generateStubPdaChain,
+  mockStanMessage,
+  PdaChain,
+} from './_test_utils';
+import { processIncomingCrcCargo } from './crcQueueWorker';
 
 const mockLogger = mockPino();
-import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
 
@@ -221,10 +227,3 @@ describe('processIncomingCrcCargo', () => {
     return stubCargo.serialize(stubPdaChain.privateGatewayPrivateKey);
   }
 });
-
-function mockStanMessage(messageData: Buffer | ArrayBuffer): stan.Message {
-  return castMock<stan.Message>({
-    ack: jest.fn(),
-    getRawData: () => Buffer.from(messageData),
-  });
-}

@@ -15,9 +15,9 @@ import {
   mockStanMessage,
   PdaChain,
 } from './_test_utils';
-import { processIncomingCrcCargo } from './crcQueueWorker';
 
 const mockLogger = mockPino();
+import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
 

@@ -185,6 +185,7 @@ async function collectCargo(
   }
 
   await recordCCAFulfillment(cca, mongooseConnection);
+  call.end();
 }
 
 async function parseAndValidateCCAFromMetadata(

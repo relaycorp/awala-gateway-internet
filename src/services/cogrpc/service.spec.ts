@@ -538,6 +538,7 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(CALL.write).not.toBeCalled();
+    expect(CALL.end).toBeCalled();
   });
 
   test('One cargo should be returned if all messages fit in it', async () => {
@@ -551,6 +552,18 @@ describe('collectCargo', () => {
 
     expect(CALL.input).toHaveLength(1);
     await validateCargoDelivery(CALL.input[0], [DUMMY_PARCEL_SERIALIZED]);
+  });
+
+  test('Call should end after cargo has been delivered', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
+      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
+    );
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(CALL.end).toBeCalled();
   });
 
   test('PCAs should be limited to the sender of the CCA', async () => {
@@ -610,7 +623,7 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     CALL.emit('end');
-    expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
+    expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalled();
   });
 
   test('Errors while generating cargo should be logged and end the call', async cb => {

@@ -19,6 +19,12 @@ Queued parcels and cargoes are stored in an S3-compatible bucket under the follo
 
 With the Docker Compose project running in the background (e.g., `docker-compose up --build --remove-orphans --abort-on-container-exit -d`), run the following commands to bootstrap the backing services.
 
+Create Vault backend:
+
+```
+docker-compose exec -e VAULT_ADDR='http://127.0.0.1:8200' -e VAULT_TOKEN=letmein vault vault secrets enable -path=gw-keys kv-v2
+```
+
 Create MongoDB collections:
 
 ```

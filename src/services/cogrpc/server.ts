@@ -7,10 +7,9 @@ import { makeServiceImplementation } from './service';
 
 const NETLOC = '0.0.0.0:8080';
 
-// Add some wiggle room to the maximum message size so we can include the overhead in serializing
-// Protocol Buffers messages.
-const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256;
-
+const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256; // Include protobuf overhead
+const MAX_CONCURRENT_CALLS = 3;
+const MAX_METADATA_SIZE = 3_500; // ~2.5kib for a base64-encoded CCA + overhead
 const MAX_CONNECTION_AGE_MINUTES = 15;
 const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
 const MAX_CONNECTION_IDLE_SECONDS = 5;
@@ -36,11 +35,11 @@ export function runServer(): void {
     .asString();
 
   const server = new Server({
-    'grpc.max_concurrent_streams': 3,
+    'grpc.max_concurrent_streams': MAX_CONCURRENT_CALLS,
     'grpc.max_connection_age_grace_ms': MAX_CONNECTION_AGE_GRACE_SECONDS * 1_000,
     'grpc.max_connection_age_ms': MAX_CONNECTION_AGE_MINUTES * 60 * 1_000,
     'grpc.max_connection_idle_ms': MAX_CONNECTION_IDLE_SECONDS * 1_000,
-    'grpc.max_metadata_size': 3_500,
+    'grpc.max_metadata_size': MAX_METADATA_SIZE,
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
   const serviceImplementation = makeServiceImplementation({

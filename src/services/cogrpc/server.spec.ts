@@ -50,16 +50,53 @@ describe('runServer', () => {
     expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
   });
 
-  test('Server should be configured to accept the largest possible RAMF messages', () => {
+  test('Server should accept the largest possible RAMF messages', () => {
     const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
 
     runServer();
 
-    expect(grpc.Server).toBeCalledTimes(1);
     expect(grpc.Server).toBeCalledWith(
-      expect.objectContaining({
-        'grpc.max_receive_message_length': expectMaxLength,
-      }),
+      expect.objectContaining({ 'grpc.max_receive_message_length': expectMaxLength }),
+    );
+  });
+
+  test('Server should accept metadata of up to 3.5 kb', () => {
+    runServer();
+
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({ 'grpc.max_metadata_size': 3_500 }),
+    );
+  });
+
+  test('Server should accept up to 3 concurrent calls per connection', () => {
+    runServer();
+
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({ 'grpc.max_concurrent_streams': 3 }),
+    );
+  });
+
+  test('Server should allow connections to last up to 15 minutes', () => {
+    runServer();
+
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({ 'grpc.max_connection_age_ms': 15 * 60 * 1_000 }),
+    );
+  });
+
+  test('Server should allow clients to gracefully end connections in up to 30 seconds', () => {
+    runServer();
+
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({ 'grpc.max_connection_age_grace_ms': 30_000 }),
+    );
+  });
+
+  test('Server should allow connections to go idle for up to 5 seconds', () => {
+    runServer();
+
+    expect(grpc.Server).toBeCalledWith(
+      expect.objectContaining({ 'grpc.max_connection_idle_ms': 5_000 }),
     );
   });
 

@@ -11,6 +11,10 @@ const NETLOC = '0.0.0.0:8080';
 // Protocol Buffers messages.
 const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256;
 
+const MAX_CONNECTION_AGE_MINUTES = 15;
+const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
+const MAX_CONNECTION_IDLE_SECONDS = 5;
+
 export function runServer(): void {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID')
     .required()
@@ -31,7 +35,14 @@ export function runServer(): void {
     .required()
     .asString();
 
-  const server = new Server({ 'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH });
+  const server = new Server({
+    'grpc.max_concurrent_streams': 3,
+    'grpc.max_connection_age_grace_ms': MAX_CONNECTION_AGE_GRACE_SECONDS * 1_000,
+    'grpc.max_connection_age_ms': MAX_CONNECTION_AGE_MINUTES * 60 * 1_000,
+    'grpc.max_connection_idle_ms': MAX_CONNECTION_IDLE_SECONDS * 1_000,
+    'grpc.max_metadata_size': 3_500,
+    'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
+  });
   const serviceImplementation = makeServiceImplementation({
     cogrpcAddress,
     gatewayKeyIdBase64,

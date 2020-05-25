@@ -13,7 +13,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
-import { createConnection } from 'mongoose';
+import { Connection, createConnection } from 'mongoose';
 import pino from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
@@ -36,11 +36,13 @@ interface ServiceImplementationOptions {
   readonly cogrpcAddress: string;
 }
 
+const MONGOOSE_OPTIONS = { useNewUrlParser: true, useUnifiedTopology: true };
+
 const LOGGER = pino();
 
-export function makeServiceImplementation(
+export async function makeServiceImplementation(
   options: ServiceImplementationOptions,
-): CargoRelayServerMethodSet {
+): Promise<CargoRelayServerMethodSet> {
   const objectStoreClient = ObjectStoreClient.initFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
@@ -48,18 +50,21 @@ export function makeServiceImplementation(
 
   const vaultKeyStore = initVaultKeyStore();
 
+  const mongooseConnection = await createConnection(options.mongoUri, MONGOOSE_OPTIONS);
+  mongooseConnection.on('error', err => LOGGER.error({ err }, 'Mongoose connection error'));
+
   return {
     async deliverCargo(
       call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
     ): Promise<void> {
-      await deliverCargo(call, options.mongoUri, options.natsServerUrl, options.natsClusterId);
+      await deliverCargo(call, mongooseConnection, options.natsServerUrl, options.natsClusterId);
     },
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
       await collectCargo(
         call,
-        options.mongoUri,
+        mongooseConnection,
         options.cogrpcAddress,
         currentKeyId,
         parcelStore,
@@ -71,13 +76,11 @@ export function makeServiceImplementation(
 
 async function deliverCargo(
   call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
-  mongoUri: string,
+  mongooseConnection: Connection,
   natsServerUrl: string,
   natsClusterId: string,
 ): Promise<void> {
-  const mongooseConnection = createConnection(mongoUri);
   const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
-  await mongooseConnection.close();
 
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');
@@ -114,7 +117,7 @@ async function deliverCargo(
 
 async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
-  mongoUri: string,
+  mongooseConnection: Connection,
   ownCogrpcAddress: string,
   currentKeyId: Buffer,
   parcelStore: ParcelStore,
@@ -141,9 +144,6 @@ async function collectCargo(
     });
     return;
   }
-
-  const mongooseConnection = createConnection(mongoUri);
-  call.on('end', () => mongooseConnection.close());
 
   if (await wasCCAFulfilled(cca, mongooseConnection)) {
     call.emit('error', {

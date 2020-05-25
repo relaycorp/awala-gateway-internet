@@ -42,7 +42,7 @@ export async function runServer(): Promise<void> {
     'grpc.max_metadata_size': MAX_METADATA_SIZE,
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
-  const serviceImplementation = makeServiceImplementation({
+  const serviceImplementation = await makeServiceImplementation({
     cogrpcAddress,
     gatewayKeyIdBase64,
     mongoUri,

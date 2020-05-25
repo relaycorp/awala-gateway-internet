@@ -1,7 +1,13 @@
 /* tslint:disable:no-let */
 
-import * as vaultKeystore from '@relaycorp/keystore-vault';
-import { Cargo, CargoMessageSet, Parcel, RAMFSyntaxError } from '@relaycorp/relaynet-core';
+import {
+  Cargo,
+  CargoMessageSet,
+  MockPrivateKeyStore,
+  Parcel,
+  RAMFSyntaxError,
+  SessionlessEnvelopedData,
+} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
@@ -62,7 +68,8 @@ const STUB_VAULT_URL = 'https://vault.com';
 const STUB_VAULT_TOKEN = 'letmein';
 const STUB_VAULT_KV_PREFIX = 'keys/';
 
-const mockPrivateKeyStore = castMock<vaultKeystore.VaultPrivateKeyStore>({});
+let mockPrivateKeyStore: MockPrivateKeyStore;
+beforeEach(() => (mockPrivateKeyStore = new MockPrivateKeyStore()));
 mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
 //endregion
@@ -76,15 +83,17 @@ const BASE_ENV_VARS = {
 };
 configureMockEnvVars(BASE_ENV_VARS);
 
-const mockCargoUnwrapPayload = mockSpy(
-  jest.spyOn(Cargo.prototype, 'unwrapPayload'),
-  () => new CargoMessageSet(new Set()),
-);
-
 describe('processIncomingCrcCargo', () => {
   let stubPdaChain: PdaChain;
   beforeAll(async () => {
     stubPdaChain = await generateStubPdaChain();
+  });
+
+  beforeEach(async () => {
+    await mockPrivateKeyStore.registerNodeKey(
+      stubPdaChain.publicGatewayPrivateKey,
+      stubPdaChain.publicGatewayCert,
+    );
   });
 
   describe('Queue subscription', () => {
@@ -125,19 +134,14 @@ describe('processIncomingCrcCargo', () => {
     const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
     mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
 
-    mockCargoUnwrapPayload.mockResolvedValueOnce({ payload: stubCargoMessageSet });
-
     await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockCargoUnwrapPayload).toBeCalledTimes(1);
-    expect(mockCargoUnwrapPayload).toBeCalledWith(mockPrivateKeyStore);
 
     expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
     expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
     expect(mockPublishedMessages.map(bufferToArray)).toEqual([stubParcelSerialized]);
   });
 
-  test('Cargo containing invalid messages should be ignored and logged', async () => {
+  test('Cargo containing invalid messages should be logged and ignored', async () => {
     // First cargo contains an invalid messages followed by a valid. The second cargo contains
     // one message and it's valid.
 
@@ -146,22 +150,15 @@ describe('processIncomingCrcCargo', () => {
     const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
     const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
     const stubCargo1MessageSet = new CargoMessageSet(
-      new Set([Buffer.from('Not a parcel'), stubParcel1Serialized]),
+      new Set([Buffer.from('Not valid'), stubParcel1Serialized]),
     );
-    const stubCargo1 = new Cargo(
-      await stubPdaChain.publicGatewayCert.getCommonName(),
-      stubPdaChain.privateGatewayCert,
-      Buffer.from(stubCargo1MessageSet.serialize()),
-    );
+    const stubCargo1Serialized = await generateCargo(stubCargo1MessageSet);
 
     const stubCargo2MessageSet = new CargoMessageSet(new Set([stubParcel2Serialized]));
     mockQueueMessages = [
-      mockStanMessage(await stubCargo1.serialize(stubPdaChain.privateGatewayPrivateKey)),
+      mockStanMessage(await stubCargo1Serialized),
       mockStanMessage(await generateCargo(stubCargo2MessageSet)),
     ];
-
-    mockCargoUnwrapPayload.mockResolvedValueOnce({ payload: stubCargo1MessageSet });
-    mockCargoUnwrapPayload.mockResolvedValueOnce({ payload: stubCargo2MessageSet });
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
@@ -170,10 +167,10 @@ describe('processIncomingCrcCargo', () => {
       stubParcel2Serialized,
     ]);
 
-    const cargoSenderAddress = await stubCargo1.senderCertificate.calculateSubjectPrivateAddress();
+    const cargoSenderAddress = await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
     expect(mockLogger.info).toBeCalledWith(
       {
-        cargoId: stubCargo1.id,
+        cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
         error: expect.any(RAMFSyntaxError),
         senderAddress: cargoSenderAddress,
       },
@@ -181,7 +178,7 @@ describe('processIncomingCrcCargo', () => {
     );
   });
 
-  test('Cargo message should be acknowledged after messages have been processed', async () => {
+  test('Cargo should be acknowledged after messages have been processed', async () => {
     const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
     const stubParcelSerialized = Buffer.from(
       await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
@@ -190,12 +187,9 @@ describe('processIncomingCrcCargo', () => {
     const stanMessage = mockStanMessage(await generateCargo(stubCargoMessageSet));
     mockQueueMessages = [stanMessage];
 
-    mockCargoUnwrapPayload.mockResolvedValueOnce({ payload: stubCargoMessageSet });
-
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
     expect(stanMessage.ack).toBeCalledTimes(1);
-    expect(stanMessage.ack).toBeCalledWith();
   });
 
   test('NATS connection should be closed upon successful completion', async () => {
@@ -219,10 +213,14 @@ describe('processIncomingCrcCargo', () => {
   });
 
   async function generateCargo(cargoMessageSet: CargoMessageSet): Promise<ArrayBuffer> {
+    const payload = await SessionlessEnvelopedData.encrypt(
+      cargoMessageSet.serialize(),
+      stubPdaChain.publicGatewayCert,
+    );
     const stubCargo = new Cargo(
       await stubPdaChain.publicGatewayCert.getCommonName(),
       stubPdaChain.privateGatewayCert,
-      Buffer.from(cargoMessageSet.serialize()),
+      Buffer.from(payload.serialize()),
     );
     return stubCargo.serialize(stubPdaChain.privateGatewayPrivateKey);
   }

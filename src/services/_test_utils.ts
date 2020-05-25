@@ -53,6 +53,7 @@ export function castMock<T>(partialMock: Partial<T>): T {
 
 export interface PdaChain {
   readonly publicGatewayCert: Certificate;
+  readonly publicGatewayPrivateKey: CryptoKey;
   readonly privateGatewayCert: Certificate;
   readonly privateGatewayPrivateKey: CryptoKey;
   readonly peerEndpointCert: Certificate;
@@ -107,6 +108,7 @@ export async function generateStubPdaChain(): Promise<PdaChain> {
     privateGatewayCert,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     publicGatewayCert,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
   };
 }
 

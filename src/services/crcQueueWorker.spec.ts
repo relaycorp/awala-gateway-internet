@@ -83,145 +83,143 @@ const BASE_ENV_VARS = {
 };
 configureMockEnvVars(BASE_ENV_VARS);
 
-describe('processIncomingCrcCargo', () => {
-  let stubPdaChain: PdaChain;
-  beforeAll(async () => {
-    stubPdaChain = await generateStubPdaChain();
-  });
-
-  beforeEach(async () => {
-    await mockPrivateKeyStore.registerNodeKey(
-      stubPdaChain.publicGatewayPrivateKey,
-      stubPdaChain.publicGatewayCert,
-    );
-  });
-
-  describe('Queue subscription', () => {
-    test('Worker should subscribe to channel "crc-cargo"', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
-        'crc-cargo',
-        expect.anything(),
-        expect.anything(),
-      );
-    });
-
-    test('Subscription should use queue "worker"', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
-        expect.anything(),
-        'worker',
-        expect.anything(),
-      );
-    });
-
-    test('Subscription should use durable name "worker"', async () => {
-      await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-      expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
-        expect.anything(),
-        expect.anything(),
-        'worker',
-      );
-    });
-  });
-
-  test('Parcels contained in cargo should be published on channel "crc-parcels"', async () => {
-    const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcelSerialized = await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
-    const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
-    mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
-
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
-    expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
-    expect(mockPublishedMessages.map(bufferToArray)).toEqual([stubParcelSerialized]);
-  });
-
-  test('Cargo containing invalid messages should be logged and ignored', async () => {
-    // First cargo contains an invalid messages followed by a valid. The second cargo contains
-    // one message and it's valid.
-
-    const stubParcel1 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
-    const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
-    const stubCargo1MessageSet = new CargoMessageSet(
-      new Set([Buffer.from('Not valid'), stubParcel1Serialized]),
-    );
-    const stubCargo1Serialized = await generateCargo(stubCargo1MessageSet);
-
-    const stubCargo2MessageSet = new CargoMessageSet(new Set([stubParcel2Serialized]));
-    mockQueueMessages = [
-      mockStanMessage(await stubCargo1Serialized),
-      mockStanMessage(await generateCargo(stubCargo2MessageSet)),
-    ];
-
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockPublishedMessages.map(bufferToArray)).toEqual([
-      stubParcel1Serialized,
-      stubParcel2Serialized,
-    ]);
-
-    const cargoSenderAddress = await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
-    expect(mockLogger.info).toBeCalledWith(
-      {
-        cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
-        error: expect.any(RAMFSyntaxError),
-        senderAddress: cargoSenderAddress,
-      },
-      `Cargo contains an invalid message`,
-    );
-  });
-
-  test('Cargo should be acknowledged after messages have been processed', async () => {
-    const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-    const stubParcelSerialized = Buffer.from(
-      await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
-    );
-    const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
-    const stanMessage = mockStanMessage(await generateCargo(stubCargoMessageSet));
-    mockQueueMessages = [stanMessage];
-
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(stanMessage.ack).toBeCalledTimes(1);
-  });
-
-  test('NATS connection should be closed upon successful completion', async () => {
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-    expect(mockNatsClient.disconnect).toBeCalledWith();
-  });
-
-  test('NATS connection should be closed upon error', async () => {
-    const error = new Error('Not on my watch');
-    // @ts-ignore
-    mockNatsClient.makePublisher.mockReturnValue(() => {
-      throw error;
-    });
-
-    await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
-
-    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-    expect(mockNatsClient.disconnect).toBeCalledWith();
-  });
-
-  async function generateCargo(cargoMessageSet: CargoMessageSet): Promise<ArrayBuffer> {
-    const payload = await SessionlessEnvelopedData.encrypt(
-      cargoMessageSet.serialize(),
-      stubPdaChain.publicGatewayCert,
-    );
-    const stubCargo = new Cargo(
-      await stubPdaChain.publicGatewayCert.getCommonName(),
-      stubPdaChain.privateGatewayCert,
-      Buffer.from(payload.serialize()),
-    );
-    return stubCargo.serialize(stubPdaChain.privateGatewayPrivateKey);
-  }
+let stubPdaChain: PdaChain;
+beforeAll(async () => {
+  stubPdaChain = await generateStubPdaChain();
 });
+
+beforeEach(async () => {
+  await mockPrivateKeyStore.registerNodeKey(
+    stubPdaChain.publicGatewayPrivateKey,
+    stubPdaChain.publicGatewayCert,
+  );
+});
+
+describe('Queue subscription', () => {
+  test('Worker should subscribe to channel "crc-cargo"', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
+      'crc-cargo',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  test('Subscription should use queue "worker"', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
+      expect.anything(),
+      'worker',
+      expect.anything(),
+    );
+  });
+
+  test('Subscription should use durable name "worker"', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'worker',
+    );
+  });
+});
+
+test('Parcels contained in cargo should be published on channel "crc-parcels"', async () => {
+  const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+  const stubParcelSerialized = await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
+  const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
+  mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
+
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
+  expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
+  expect(mockPublishedMessages.map(bufferToArray)).toEqual([stubParcelSerialized]);
+});
+
+test('Cargo containing invalid messages should be logged and ignored', async () => {
+  // First cargo contains an invalid messages followed by a valid. The second cargo contains
+  // one message and it's valid.
+
+  const stubParcel1 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+  const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
+  const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+  const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
+  const stubCargo1MessageSet = new CargoMessageSet(
+    new Set([Buffer.from('Not valid'), stubParcel1Serialized]),
+  );
+  const stubCargo1Serialized = await generateCargo(stubCargo1MessageSet);
+
+  const stubCargo2MessageSet = new CargoMessageSet(new Set([stubParcel2Serialized]));
+  mockQueueMessages = [
+    mockStanMessage(await stubCargo1Serialized),
+    mockStanMessage(await generateCargo(stubCargo2MessageSet)),
+  ];
+
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  expect(mockPublishedMessages.map(bufferToArray)).toEqual([
+    stubParcel1Serialized,
+    stubParcel2Serialized,
+  ]);
+
+  const cargoSenderAddress = await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  expect(mockLogger.info).toBeCalledWith(
+    {
+      cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
+      error: expect.any(RAMFSyntaxError),
+      senderAddress: cargoSenderAddress,
+    },
+    `Cargo contains an invalid message`,
+  );
+});
+
+test('Cargo should be acknowledged after messages have been processed', async () => {
+  const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+  const stubParcelSerialized = Buffer.from(
+    await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
+  );
+  const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
+  const stanMessage = mockStanMessage(await generateCargo(stubCargoMessageSet));
+  mockQueueMessages = [stanMessage];
+
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  expect(stanMessage.ack).toBeCalledTimes(1);
+});
+
+test('NATS connection should be closed upon successful completion', async () => {
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+  expect(mockNatsClient.disconnect).toBeCalledWith();
+});
+
+test('NATS connection should be closed upon error', async () => {
+  const error = new Error('Not on my watch');
+  // @ts-ignore
+  mockNatsClient.makePublisher.mockReturnValue(() => {
+    throw error;
+  });
+
+  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
+
+  expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+  expect(mockNatsClient.disconnect).toBeCalledWith();
+});
+
+async function generateCargo(cargoMessageSet: CargoMessageSet): Promise<ArrayBuffer> {
+  const payload = await SessionlessEnvelopedData.encrypt(
+    cargoMessageSet.serialize(),
+    stubPdaChain.publicGatewayCert,
+  );
+  const stubCargo = new Cargo(
+    await stubPdaChain.publicGatewayCert.getCommonName(),
+    stubPdaChain.privateGatewayCert,
+    Buffer.from(payload.serialize()),
+  );
+  return stubCargo.serialize(stubPdaChain.privateGatewayPrivateKey);
+}

@@ -1,7 +1,6 @@
 /* tslint:disable:no-let */
 
 import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
-import { EnvVarError } from 'env-var';
 import * as grpc from 'grpc';
 
 import { mockSpy } from '../../_test_utils';
@@ -44,64 +43,64 @@ describe('runServer', () => {
     'NATS_CLUSTER_ID',
     'COGRPC_ADDRESS',
     'PARCEL_STORE_BUCKET',
-  ])('Environment variable %s should be present', envVar => {
+  ])('Environment variable %s should be present', async envVar => {
     mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
-    expect(runServer).toThrowWithMessage(EnvVarError, new RegExp(envVar));
+    await expect(runServer).rejects.toMatchObject(new RegExp(envVar));
   });
 
-  test('Server should accept the largest possible RAMF messages', () => {
+  test('Server should accept the largest possible RAMF messages', async () => {
     const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
 
-    runServer();
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_receive_message_length': expectMaxLength }),
     );
   });
 
-  test('Server should accept metadata of up to 3.5 kb', () => {
-    runServer();
+  test('Server should accept metadata of up to 3.5 kb', async () => {
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_metadata_size': 3_500 }),
     );
   });
 
-  test('Server should accept up to 3 concurrent calls per connection', () => {
-    runServer();
+  test('Server should accept up to 3 concurrent calls per connection', async () => {
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_concurrent_streams': 3 }),
     );
   });
 
-  test('Server should allow connections to last up to 15 minutes', () => {
-    runServer();
+  test('Server should allow connections to last up to 15 minutes', async () => {
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_connection_age_ms': 15 * 60 * 1_000 }),
     );
   });
 
-  test('Server should allow clients to gracefully end connections in up to 30 seconds', () => {
-    runServer();
+  test('Server should allow clients to gracefully end connections in up to 30 seconds', async () => {
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_connection_age_grace_ms': 30_000 }),
     );
   });
 
-  test('Server should allow connections to go idle for up to 5 seconds', () => {
-    runServer();
+  test('Server should allow connections to go idle for up to 5 seconds', async () => {
+    await runServer();
 
     expect(grpc.Server).toBeCalledWith(
       expect.objectContaining({ 'grpc.max_connection_idle_ms': 5_000 }),
     );
   });
 
-  test('CogRPC service should be added', () => {
-    runServer();
+  test('CogRPC service should be added', async () => {
+    await runServer();
 
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
     expect(makeServiceImplementationSpy).toBeCalledWith({
@@ -118,21 +117,23 @@ describe('runServer', () => {
     expect(mockServer.addService).toBeCalledWith(CargoRelayService, serviceImplementation);
   });
 
-  test('Server should listen on 0.0.0.0:8080', () => {
-    runServer();
+  test('Server should listen on 0.0.0.0:8080', async () => {
+    await runServer();
 
     expect(mockServer.bind).toBeCalledTimes(1);
     expect(mockServer.bind).toBeCalledWith('0.0.0.0:8080', expect.anything());
   });
 
-  test('Failing to listen on specified port should result in error', () => {
+  test('Failing to listen on specified port should result in error', async () => {
     mockServer.bind.mockReturnValueOnce(-1);
 
-    expect(() => runServer()).toThrowWithMessage(Error, 'Failed to listen on 0.0.0.0:8080');
+    await expect(() => runServer()).rejects.toMatchObject({
+      message: 'Failed to listen on 0.0.0.0:8080',
+    });
   });
 
-  test('Server should not use TLS', () => {
-    runServer();
+  test('Server should not use TLS', async () => {
+    await runServer();
 
     expect(mockServer.bind).toBeCalledTimes(1);
     expect(mockServer.bind).toBeCalledWith(
@@ -141,8 +142,8 @@ describe('runServer', () => {
     );
   });
 
-  test('gRPC server should be started as the last step', () => {
-    runServer();
+  test('gRPC server should be started as the last step', async () => {
+    await runServer();
 
     expect(mockServer.start).toBeCalledTimes(1);
     expect(mockServer.start).toBeCalledWith();

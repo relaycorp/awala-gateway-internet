@@ -14,7 +14,7 @@ const MAX_CONNECTION_AGE_MINUTES = 15;
 const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
 const MAX_CONNECTION_IDLE_SECONDS = 5;
 
-export function runServer(): void {
+export async function runServer(): Promise<void> {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID')
     .required()
     .asString();

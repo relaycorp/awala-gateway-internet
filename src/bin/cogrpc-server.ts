@@ -3,6 +3,10 @@ require('make-promises-safe');
 
 import { runServer } from '../services/cogrpc/server';
 
-runServer();
-// tslint:disable-next-line:no-console
-console.log('Ready to receive requests');
+async function main(): Promise<void> {
+  await runServer();
+  // tslint:disable-next-line:no-console
+  console.log('Ready to receive requests');
+}
+
+main();

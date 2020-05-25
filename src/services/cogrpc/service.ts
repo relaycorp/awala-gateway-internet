@@ -36,6 +36,8 @@ interface ServiceImplementationOptions {
   readonly cogrpcAddress: string;
 }
 
+const MONGOOSE_OPTIONS = { useNewUrlParser: true, useUnifiedTopology: true };
+
 const LOGGER = pino();
 
 export async function makeServiceImplementation(
@@ -48,7 +50,7 @@ export async function makeServiceImplementation(
 
   const vaultKeyStore = initVaultKeyStore();
 
-  const mongooseConnection = await createConnection(options.mongoUri, { useNewUrlParser: true });
+  const mongooseConnection = await createConnection(options.mongoUri, MONGOOSE_OPTIONS);
   mongooseConnection.on('error', err => LOGGER.error({ err }, 'Mongoose connection error'));
 
   return {

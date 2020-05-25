@@ -110,6 +110,16 @@ describe('makeServiceImplementation', () => {
       );
     });
 
+    test('Connection should use unified topology', async () => {
+      await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
+
+      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledTimes(1);
+      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
+        expect.anything(),
+        expect.objectContaining({ useUnifiedTopology: true }),
+      );
+    });
+
     test('Errors while establishing connection should be propagated', async () => {
       const error = new Error('Database credentials are wrong');
       MOCK_MONGOOSE_CREATE_CONNECTION.mockRejectedValue(error);

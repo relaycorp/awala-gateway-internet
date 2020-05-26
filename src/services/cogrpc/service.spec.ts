@@ -26,6 +26,7 @@ import mongoose from 'mongoose';
 import uuid from 'uuid-random';
 
 import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
+import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { configureMockEnvVars, makeEmptyCertificate } from '../_test_utils';
 import * as ccaFulfillments from '../ccaFulfilments';
@@ -43,7 +44,6 @@ import { makeServiceImplementation } from './service';
 const COGRPC_ADDRESS = 'https://cogrpc.example.com/';
 const GATEWAY_KEY_ID_BASE64 = 'MTM1Nzkk';
 const PARCEL_STORE_BUCKET = 'parcels-bucket';
-const MONGO_URI = 'mongodb://example.com';
 const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
 
@@ -63,8 +63,8 @@ beforeAll(async () => {
 });
 
 const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = new EventEmitter() as any;
-const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
-  jest.spyOn(mongoose, 'createConnection'),
+const MOCK_CREATE_MONGOOSE_CONNECTION = mockSpy(
+  jest.spyOn(mongo, 'createMongooseConnectionFromEnv'),
   jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
 );
 beforeEach(() => MOCK_MONGOOSE_CONNECTION.removeAllListeners());
@@ -81,7 +81,6 @@ configureMockEnvVars({
 const SERVICE_IMPLEMENTATION_OPTIONS = {
   cogrpcAddress: COGRPC_ADDRESS,
   gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
-  mongoUri: MONGO_URI,
   natsClusterId: NATS_CLUSTER_ID,
   natsServerUrl: NATS_SERVER_URL,
   parcelStoreBucket: PARCEL_STORE_BUCKET,
@@ -92,37 +91,16 @@ const SERVICE_IMPLEMENTATION_OPTIONS = {
 describe('makeServiceImplementation', () => {
   describe('Mongoose connection', () => {
     test('Connection should be created preemptively before any RPC', async () => {
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).not.toBeCalled();
+      expect(MOCK_CREATE_MONGOOSE_CONNECTION).not.toBeCalled();
 
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledTimes(1);
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(MONGO_URI, expect.anything());
-    });
-
-    test('Connection should be created with new URL parser', async () => {
-      await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
-
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledTimes(1);
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
-        expect.anything(),
-        expect.objectContaining({ useNewUrlParser: true }),
-      );
-    });
-
-    test('Connection should use unified topology', async () => {
-      await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
-
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledTimes(1);
-      expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
-        expect.anything(),
-        expect.objectContaining({ useUnifiedTopology: true }),
-      );
+      expect(MOCK_CREATE_MONGOOSE_CONNECTION).toBeCalledTimes(1);
     });
 
     test('Errors while establishing connection should be propagated', async () => {
       const error = new Error('Database credentials are wrong');
-      MOCK_MONGOOSE_CREATE_CONNECTION.mockRejectedValue(error);
+      MOCK_CREATE_MONGOOSE_CONNECTION.mockRejectedValue(error);
 
       await expect(makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS)).rejects.toEqual(
         error,

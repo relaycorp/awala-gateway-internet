@@ -24,9 +24,6 @@ export async function runServer(): Promise<void> {
   const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET')
     .required()
     .asString();
-  const mongoUri = getEnvVar('MONGO_URI')
-    .required()
-    .asString();
   const natsServerUrl = getEnvVar('NATS_SERVER_URL')
     .required()
     .asString();
@@ -45,7 +42,6 @@ export async function runServer(): Promise<void> {
   const serviceImplementation = await makeServiceImplementation({
     cogrpcAddress,
     gatewayKeyIdBase64,
-    mongoUri,
     natsClusterId,
     natsServerUrl,
     parcelStoreBucket,

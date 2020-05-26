@@ -13,11 +13,12 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
-import { Connection, createConnection } from 'mongoose';
+import { Connection } from 'mongoose';
 import pino from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
+import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
@@ -30,13 +31,10 @@ import { ParcelStore } from '../parcelStore';
 interface ServiceImplementationOptions {
   readonly gatewayKeyIdBase64: string;
   readonly parcelStoreBucket: string;
-  readonly mongoUri: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
   readonly cogrpcAddress: string;
 }
-
-const MONGOOSE_OPTIONS = { useNewUrlParser: true, useUnifiedTopology: true };
 
 const LOGGER = pino();
 
@@ -50,7 +48,7 @@ export async function makeServiceImplementation(
 
   const vaultKeyStore = initVaultKeyStore();
 
-  const mongooseConnection = await createConnection(options.mongoUri, MONGOOSE_OPTIONS);
+  const mongooseConnection = await createMongooseConnectionFromEnv();
   mongooseConnection.on('error', err => LOGGER.error({ err }, 'Mongoose connection error'));
 
   return {

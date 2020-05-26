@@ -6,6 +6,7 @@ import {
   MockPrivateKeyStore,
   Parcel,
   RAMFSyntaxError,
+  RelaynetError,
   SessionlessEnvelopedData,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -130,8 +131,7 @@ describe('Queue subscription', () => {
 test('Parcels contained in cargo should be published on channel "crc-parcels"', async () => {
   const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
   const stubParcelSerialized = await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
-  const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
-  mockQueueMessages = [mockStanMessage(await generateCargo(stubCargoMessageSet))];
+  mockQueueMessages = [mockStanMessage(await generateCargoSerialized(stubParcelSerialized))];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
@@ -148,15 +148,14 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
   const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
   const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
-  const stubCargo1MessageSet = new CargoMessageSet(
-    new Set([Buffer.from('Not valid'), stubParcel1Serialized]),
+  const stubCargo1Serialized = await generateCargoSerialized(
+    Buffer.from('Not valid'),
+    stubParcel1Serialized,
   );
-  const stubCargo1Serialized = await generateCargo(stubCargo1MessageSet);
 
-  const stubCargo2MessageSet = new CargoMessageSet(new Set([stubParcel2Serialized]));
   mockQueueMessages = [
     mockStanMessage(await stubCargo1Serialized),
-    mockStanMessage(await generateCargo(stubCargo2MessageSet)),
+    mockStanMessage(await generateCargoSerialized(stubParcel2Serialized)),
   ];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -182,8 +181,7 @@ test('Cargo should be acknowledged after messages have been processed', async ()
   const stubParcelSerialized = Buffer.from(
     await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
   );
-  const stubCargoMessageSet = new CargoMessageSet(new Set([stubParcelSerialized]));
-  const stanMessage = mockStanMessage(await generateCargo(stubCargoMessageSet));
+  const stanMessage = mockStanMessage(await generateCargoSerialized(stubParcelSerialized));
   mockQueueMessages = [stanMessage];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -211,15 +209,20 @@ test('NATS connection should be closed upon error', async () => {
   expect(mockNatsClient.disconnect).toBeCalledWith();
 });
 
-async function generateCargo(cargoMessageSet: CargoMessageSet): Promise<ArrayBuffer> {
+async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {
+  const cargoMessageSet = new CargoMessageSet(new Set(items));
   const payload = await SessionlessEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
     stubPdaChain.publicGatewayCert,
   );
-  const stubCargo = new Cargo(
+  return new Cargo(
     await stubPdaChain.publicGatewayCert.getCommonName(),
     stubPdaChain.privateGatewayCert,
     Buffer.from(payload.serialize()),
   );
-  return stubCargo.serialize(stubPdaChain.privateGatewayPrivateKey);
+}
+
+async function generateCargoSerialized(...items: readonly ArrayBuffer[]): Promise<ArrayBuffer> {
+  const cargo = await generateCargo(...items);
+  return cargo.serialize(stubPdaChain.privateGatewayPrivateKey);
 }

@@ -8,7 +8,7 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 const LOGGER = pino();
 
 export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound'; // TODO: RENAME to gateway-bound
+const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {

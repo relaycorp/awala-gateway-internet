@@ -239,7 +239,7 @@ describe('retrieveEndpointBoundParcel', () => {
     const key = 'thingy.parcel';
     await store.retrieveEndpointBoundParcel(key);
 
-    expect(mockGetObject).toBeCalledWith(`parcels/internet-bound/${key}`, expect.anything());
+    expect(mockGetObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
   });
 
   test('Parcel should be returned', async () => {
@@ -271,7 +271,7 @@ describe('storeEndpointBoundParcel', () => {
 
     expect(mockPutObject).toBeCalledWith(
       expect.anything(),
-      `parcels/internet-bound/${key}`,
+      `parcels/endpoint-bound/${key}`,
       expect.anything(),
     );
   });
@@ -302,6 +302,6 @@ describe('deleteEndpointBoundParcel', () => {
     const key = 'thingy.parcel';
     await store.deleteEndpointBoundParcel(key);
 
-    expect(mockDeleteObject).toBeCalledWith(`parcels/internet-bound/${key}`, expect.anything());
+    expect(mockDeleteObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
   });
 });

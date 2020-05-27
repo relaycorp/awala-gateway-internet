@@ -47,8 +47,9 @@ export class NatsStreamingClient {
   }
 
   public async publishMessage(messageData: Buffer | string, channel: string): Promise<void> {
-    const publisher = this.makePublisher(channel);
-    await consumeAsyncIterable(publisher([{ id: 'single-message', data: messageData }]));
+    const connection = await this.connect();
+    const publishPromisified = promisify(connection.publish).bind(connection);
+    await publishPromisified(channel, messageData);
   }
 
   public async *makeQueueConsumer(
@@ -93,6 +94,9 @@ export class NatsStreamingClient {
     this.connection?.close();
   }
 
+  /**
+   * Create a new connection or reuse an existing one.
+   */
   protected async connect(): Promise<Stan> {
     return new Promise<Stan>((resolve, _reject) => {
       if (this.connection) {
@@ -109,11 +113,5 @@ export class NatsStreamingClient {
         this.connection = undefined;
       });
     });
-  }
-}
-
-async function consumeAsyncIterable<T>(iterable: AsyncIterable<T>): Promise<void> {
-  // tslint:disable-next-line:no-empty
-  for await (const _ of iterable) {
   }
 }

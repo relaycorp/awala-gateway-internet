@@ -11,8 +11,8 @@ import {
   MockPrivateKeyStore,
   MockPublicKeyStore,
   Parcel,
+  ParcelCollectionAck,
   PrivateKeyStoreError,
-  RAMFSyntaxError,
   SessionEnvelopedData,
   SessionlessEnvelopedData,
   SessionPublicKeyData,
@@ -22,7 +22,8 @@ import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy } from '../_test_utils';
 import * as mongo from '../backingServices/mongo';
-import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
+import { NatsStreamingClient } from '../backingServices/natsStreaming';
+import { ObjectStoreClient } from '../backingServices/objectStorage';
 import * as privateKeyStore from '../backingServices/privateKeyStore';
 import {
   castMock,
@@ -34,6 +35,7 @@ import {
 } from './_test_utils';
 import * as mongoPublicKeyStore from './MongoPublicKeyStore';
 import * as parcelCollection from './parcelCollection';
+import { ParcelStore } from './parcelStore';
 
 const mockLogger = mockPino();
 import { processIncomingCrcCargo } from './crcQueueWorker';
@@ -52,13 +54,8 @@ beforeEach(() => {
   mockQueueMessages = [];
   mockPublishedMessages = [];
 
-  async function* mockMakePublisher(
-    messages: AsyncIterable<PublisherMessage>,
-  ): AsyncIterable<string> {
-    for await (const message of messages) {
-      mockPublishedMessages.push(message.data as Buffer);
-      yield message.id;
-    }
+  async function mockPublishMessage(messageData: Buffer, _channel: string): Promise<void> {
+    mockPublishedMessages.push(messageData);
   }
 
   async function* mockMakeQueueConsumer(): AsyncIterable<stan.Message> {
@@ -69,8 +66,8 @@ beforeEach(() => {
 
   mockNatsClient = castMock<NatsStreamingClient>({
     disconnect: jest.fn(),
-    makePublisher: jest.fn().mockReturnValue(mockMakePublisher),
     makeQueueConsumer: jest.fn().mockImplementation(mockMakeQueueConsumer),
+    publishMessage: jest.fn().mockImplementation(mockPublishMessage),
   });
 });
 mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
@@ -95,7 +92,13 @@ beforeEach(() => {
 mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 mockSpy(jest.spyOn(mongoPublicKeyStore, 'MongoPublicKeyStore'), () => mockPublicKeyStore);
 
-// Parcel collection fixtures
+//region Parcel store-related fixtures
+const PARCEL_STORE_BUCKET = 'the-bucket';
+const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
+mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
+mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
+
+//region Parcel collection fixtures
 
 mockSpy(jest.spyOn(parcelCollection, 'wasParcelCollected'), () => false);
 mockSpy(jest.spyOn(parcelCollection, 'recordParcelCollection'), () => undefined);
@@ -105,6 +108,7 @@ mockSpy(jest.spyOn(parcelCollection, 'recordParcelCollection'), () => undefined)
 const BASE_ENV_VARS = {
   NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
   NATS_SERVER_URL: STUB_NATS_SERVER,
+  PARCEL_STORE_BUCKET,
   VAULT_KV_PREFIX: STUB_VAULT_KV_PREFIX,
   VAULT_TOKEN: STUB_VAULT_TOKEN,
   VAULT_URL: STUB_VAULT_URL,
@@ -188,7 +192,7 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
     {
       cargoId: cargo.id,
       err: expect.objectContaining({ message: expect.stringMatching(/Could not deserialize/) }),
-      senderAddress: await cargo.senderCertificate.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await cargo.senderCertificate.calculateSubjectPrivateAddress(),
       worker: STUB_WORKER_NAME,
     },
     `Cargo payload is invalid`,
@@ -211,7 +215,7 @@ test('Cargo failing to be unwrapped due to keystore errors should remain in queu
     {
       cargoId: cargo.id,
       err: expect.any(PrivateKeyStoreError),
-      senderAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
       worker: STUB_WORKER_NAME,
     },
     'Failed to retrieve key from Vault',
@@ -264,9 +268,11 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockNatsClient.makePublisher).toBeCalledTimes(1);
-    expect(mockNatsClient.makePublisher).toBeCalledWith('crc-parcels');
-    expect(mockPublishedMessages.map(bufferToArray)).toEqual([PARCEL_SERIALIZED]);
+    expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
+    expect(mockNatsClient.publishMessage).toBeCalledWith(
+      Buffer.from(PARCEL_SERIALIZED),
+      'crc-parcels',
+    );
   });
 
   test('Parcels should have their collection recorded', async () => {
@@ -300,7 +306,7 @@ describe('Parcel processing', () => {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
-        senderAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
       'Parcel was previously processed',
@@ -328,11 +334,52 @@ describe('Parcel processing', () => {
       {
         cargoId: cargo.id,
         err: expect.any(InvalidMessageError),
-        senderAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
       'Parcel is invalid and/or did not originate in the gateway that created the cargo',
     );
+  });
+});
+
+describe('PCA processing', () => {
+  const PCA = new ParcelCollectionAck('0deadbeef', '0deadc0de', 'the-id');
+
+  test('Corresponding parcel should be deleted if it exists', async () => {
+    mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PCA.serialize()))];
+
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(ParcelStore.prototype.deleteGatewayBoundParcel).toBeCalledWith(
+      PCA.parcelId,
+      PCA.senderEndpointPrivateAddress,
+      PCA.recipientEndpointAddress,
+      await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+    );
+    expect(mockPublishedMessages).toHaveLength(0);
+  });
+
+  test('PCA for non-existing parcel should be ignored', async () => {
+    const err = new Error('Object does not exist');
+    getMockInstance(ParcelStore.prototype.deleteGatewayBoundParcel).mockRejectedValue(err);
+
+    const cargo = await generateCargo(PCA.serialize());
+    mockQueueMessages = [
+      mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey)),
+    ];
+
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockLogger.debug).toBeCalledWith(
+      {
+        cargoId: cargo.id,
+        err,
+        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        workerName: STUB_WORKER_NAME,
+      },
+      'Could not find parcel for PCA',
+    );
+    expect(mockPublishedMessages).toHaveLength(0);
   });
 });
 
@@ -365,8 +412,9 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   expect(mockLogger.info).toBeCalledWith(
     {
       cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
-      error: expect.any(RAMFSyntaxError),
-      senderAddress: cargoSenderAddress,
+      error: expect.any(InvalidMessageError),
+      peerGatewayAddress: cargoSenderAddress,
+      worker: STUB_WORKER_NAME,
     },
     `Cargo contains an invalid message`,
   );
@@ -394,8 +442,7 @@ test('NATS connection should be closed upon successful completion', async () => 
 
 test('NATS connection should be closed upon error', async () => {
   const error = new Error('Not on my watch');
-  // @ts-ignore
-  mockNatsClient.makePublisher.mockReturnValue(() => {
+  getMockInstance(mockNatsClient.makeQueueConsumer).mockImplementation(function*(): Iterable<any> {
     throw error;
   });
 

@@ -211,7 +211,6 @@ describe('NatsStreamingClient', () => {
 
     await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
 
-    expect(client.makePublisher).toBeCalledWith(STUB_CHANNEL);
     expect(mockConnection.publish).toBeCalledWith(
       STUB_CHANNEL,
       STUB_MESSAGE_1.data,

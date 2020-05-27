@@ -49,7 +49,7 @@ export async function processInternetBoundParcels(
           parcelRecipientAddress: messageData.parcelRecipientAddress,
         };
       } else {
-        await parcelStore.deleteInternetBoundParcel(messageData.parcelObjectKey);
+        await parcelStore.deleteEndpointBoundParcel(messageData.parcelObjectKey);
         message.ack();
       }
     }
@@ -57,7 +57,7 @@ export async function processInternetBoundParcels(
 
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
     for await (const parcelData of activeParcels) {
-      const parcelSerialized = await parcelStore.retrieveInternetBoundParcel(
+      const parcelSerialized = await parcelStore.retrieveEndpointBoundParcel(
         parcelData.parcelObjectKey,
       );
 
@@ -67,7 +67,7 @@ export async function processInternetBoundParcels(
         });
       } catch (err) {
         if (err instanceof PoHTTPInvalidParcelError) {
-          await parcelStore.deleteInternetBoundParcel(parcelData.parcelObjectKey);
+          await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
           parcelData.ack();
         } else {
           LOGGER.warn(

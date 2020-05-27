@@ -7,7 +7,7 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 const LOGGER = pino();
 
 export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const INTERNET_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound';
+const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound';
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
@@ -43,7 +43,7 @@ export class ParcelStore {
     }
   }
 
-  public async retrieveInternetBoundParcel(parcelObjectKey: string): Promise<Buffer> {
+  public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer> {
     const storeObject = await this.objectStoreClient.getObject(
       makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
@@ -51,7 +51,7 @@ export class ParcelStore {
     return storeObject.body;
   }
 
-  public async storeInternetBoundParcel(parcelSerialized: Buffer): Promise<string> {
+  public async storeEndpointBoundParcel(parcelSerialized: Buffer): Promise<string> {
     const objectKey = uuid();
     await this.objectStoreClient.putObject(
       { body: parcelSerialized, metadata: {} },
@@ -61,7 +61,7 @@ export class ParcelStore {
     return objectKey;
   }
 
-  public async deleteInternetBoundParcel(parcelObjectKey: string): Promise<void> {
+  public async deleteEndpointBoundParcel(parcelObjectKey: string): Promise<void> {
     await this.objectStoreClient.deleteObject(
       makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
@@ -80,7 +80,7 @@ function getDateFromTimestamp(timestampString: string): Date | null {
 }
 
 function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
-  return `${INTERNET_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
+  return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
 // TODO: Move here

@@ -32,7 +32,7 @@ import { configureMockEnvVars, makeEmptyCertificate } from '../_test_utils';
 import * as ccaFulfillments from '../ccaFulfilments';
 import * as certs from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
-import * as parcelCollectionAck from '../parcelCollectionAck';
+import * as parcelCollectionAck from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
 

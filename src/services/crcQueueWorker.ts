@@ -14,6 +14,7 @@ import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../backingServices/natsStreaming';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
+import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
 
 const logger = pino();
 
@@ -63,8 +64,10 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
       }
 
       for (const parcelSerialized of unwrapResult.payload.messages) {
+        // tslint:disable-next-line:no-let
+        let parcel: Parcel;
         try {
-          await Parcel.deserialize(parcelSerialized);
+          parcel = await Parcel.deserialize(parcelSerialized);
         } catch (error) {
           logger.info(
             { cargoId: cargo.id, error, senderAddress },
@@ -72,7 +75,34 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
           );
           continue;
         }
+
+        try {
+          await parcel.validate([cargo.senderCertificate]);
+        } catch (err) {
+          logger.info(
+            { cargoId: cargo.id, err, senderAddress, worker: workerName },
+            'Parcel is invalid and/or did not originate in the gateway that created the cargo',
+          );
+          // TODO: The parcel should be ignored when the following bug is fixed:
+          // https://github.com/relaycorp/relaynet-internet-gateway/issues/15
+          // continue;
+        }
+
+        if (await wasParcelCollected(parcel, senderAddress, mongooseConnection)) {
+          logger.debug(
+            {
+              cargoId: cargo.id,
+              parcelId: parcel.id,
+              parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+              senderAddress,
+              worker: workerName,
+            },
+            'Parcel was previously processed',
+          );
+          continue;
+        }
         yield { data: Buffer.from(parcelSerialized), id: 'ignored-id' };
+        await recordParcelCollection(parcel, senderAddress, mongooseConnection);
       }
       message.ack();
     }

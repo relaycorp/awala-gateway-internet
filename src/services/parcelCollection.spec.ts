@@ -1,24 +1,99 @@
-import { ParcelCollectionAck } from '@relaycorp/relaynet-core';
+/* tslint:disable:no-let */
+
+import { generateRSAKeyPair, Parcel, ParcelCollectionAck } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';
 
 import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
+import { generateStubEndpointCertificate } from './_test_utils';
 import { ParcelCollection } from './models';
-import { generatePCAs } from './parcelCollection';
+import { generatePCAs, recordParcelCollection, wasParcelCollected } from './parcelCollection';
 
 const PEER_GATEWAY_PRIVATE_ADDRESS = '0deadbeef';
 
 const MOCK_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
 const MOCK_GET_MODEL_FOR_CLASS = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 
+let PARCEL: Parcel;
+beforeAll(async () => {
+  const senderKeyPair = await generateRSAKeyPair();
+  const senderCertificate = await generateStubEndpointCertificate(senderKeyPair);
+  PARCEL = new Parcel('https://example.com', senderCertificate, Buffer.from([]));
+});
+
+describe('wasParcelCollected', () => {
+  const MOCK_MONGOOSE_EXISTS = mockSpy(jest.fn());
+  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS }));
+
+  test('Lookup should use parcel id, sender, recipient and peer GW address', async () => {
+    await wasParcelCollected(PARCEL, PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION);
+
+    expect(MOCK_MONGOOSE_EXISTS).toBeCalledWith({
+      parcelId: PARCEL.id,
+      peerGatewayPrivateAddress: PEER_GATEWAY_PRIVATE_ADDRESS,
+      recipientEndpointAddress: PARCEL.recipientAddress,
+      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+    });
+  });
+
+  test('True should be returned if it was already collected', async () => {
+    MOCK_MONGOOSE_EXISTS.mockReturnValue(true);
+
+    await expect(
+      wasParcelCollected(PARCEL, PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION),
+    ).resolves.toBeTrue();
+  });
+
+  test('False should be returned if it has not been collected', async () => {
+    MOCK_MONGOOSE_EXISTS.mockReturnValue(false);
+
+    await expect(
+      wasParcelCollected(PARCEL, PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION),
+    ).resolves.toBeFalse();
+  });
+});
+
+describe('recordParcelCollection', () => {
+  const MOCK_MONGOOSE_REPLACE_ONE_EXEC = mockSpy(jest.fn());
+  const MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS = mockSpy(jest.fn(), () => ({
+    exec: MOCK_MONGOOSE_REPLACE_ONE_EXEC,
+  }));
+  const MOCK_MONGOOSE_REPLACE_ONE = mockSpy(jest.fn(), () => ({
+    setOptions: MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS,
+  }));
+  beforeEach(() =>
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE }),
+  );
+
+  test('Parcel metadata should be upserted', async () => {
+    await recordParcelCollection(PARCEL, PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION);
+
+    const collection = {
+      parcelId: PARCEL.id,
+      peerGatewayPrivateAddress: PEER_GATEWAY_PRIVATE_ADDRESS,
+      recipientEndpointAddress: PARCEL.recipientAddress,
+      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+    };
+    expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledWith(collection, {
+      ...collection,
+      parcelExpiryDate: PARCEL.expiryDate,
+    });
+    expect(MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS).toBeCalledWith({ upsert: true });
+    expect(MOCK_MONGOOSE_REPLACE_ONE_EXEC).toBeCalled();
+  });
+});
+
 describe('generatePCAs', () => {
-  const PARCEL_COLLECTION: ParcelCollection = {
-    parcelExpiryDate: new Date(2014, 2),
-    parcelId: 'the-id',
-    peerGatewayPrivateAddress: PEER_GATEWAY_PRIVATE_ADDRESS,
-    recipientEndpointAddress: 'http://example.com',
-    senderEndpointPrivateAddress: '0beef',
-  };
+  let PARCEL_COLLECTION: ParcelCollection;
+  beforeAll(async () => {
+    PARCEL_COLLECTION = {
+      parcelExpiryDate: PARCEL.expiryDate,
+      parcelId: PARCEL.id,
+      peerGatewayPrivateAddress: PEER_GATEWAY_PRIVATE_ADDRESS,
+      recipientEndpointAddress: PARCEL.recipientAddress,
+      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+    };
+  });
 
   const MOCK_MONGOOSE_FIND = mockSpy(jest.fn(), async function*(): AsyncIterable<ParcelCollection> {
     yield* arrayToAsyncIterable([]);

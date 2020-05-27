@@ -36,6 +36,7 @@ export function mockSpy<T, Y extends any[]>(
 
 export function mockPino(): pino.Logger {
   const mockPinoLogger = {
+    debug: mockSpy(jest.fn()),
     error: mockSpy(jest.fn()),
     info: mockSpy(jest.fn()),
     warn: mockSpy(jest.fn()),

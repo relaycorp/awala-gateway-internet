@@ -4,7 +4,7 @@ import { Connection } from 'mongoose';
 
 import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
 import { ParcelCollection } from './models';
-import { generatePCAs } from './parcelCollectionAck';
+import { generatePCAs } from './parcelCollection';
 
 const PEER_GATEWAY_PRIVATE_ADDRESS = '0deadbeef';
 

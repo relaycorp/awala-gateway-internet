@@ -25,7 +25,7 @@ import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
-import { generatePCAs } from '../parcelCollectionAck';
+import { generatePCAs } from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 
 interface ServiceImplementationOptions {

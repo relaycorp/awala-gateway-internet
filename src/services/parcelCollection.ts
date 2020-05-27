@@ -10,8 +10,7 @@ export async function* generatePCAs(
 ): CargoMessageStream {
   const collectionModel = getModelForClass(ParcelCollection, { existingConnection: connection });
 
-  // @ts-ignore
-  for await (const collection of collectionModel.find({ peerGatewayPrivateAddress })) {
+  for await (const collection of collectionModel.find({ peerGatewayPrivateAddress }) as any) {
     const pca = new ParcelCollectionAck(
       collection.senderEndpointPrivateAddress,
       collection.recipientEndpointAddress,

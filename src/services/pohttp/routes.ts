@@ -1,14 +1,13 @@
 import { Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { createHash } from 'crypto';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
-import { EXPIRY_METADATA_KEY, GATEWAY_BOUND_OBJECT_KEY_PREFIX } from '../parcelStore';
+import { calculatedGatewayBoundParcelObjectKey, EXPIRY_METADATA_KEY } from '../parcelStore';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -152,21 +151,14 @@ async function calculateParcelObjectKey(
   recipientGatewayAddress: string,
 ): Promise<string> {
   const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-  return [
-    GATEWAY_BOUND_OBJECT_KEY_PREFIX,
-    recipientGatewayAddress,
-    parcel.recipientAddress,
+  return calculatedGatewayBoundParcelObjectKey(
+    parcel.id,
     senderPrivateAddress,
-    sha256Hex(parcel.id), // Use the digest to avoid using potentially illegal characters
-  ].join('/');
+    parcel.recipientAddress,
+    recipientGatewayAddress,
+  );
 }
 
 function convertDateToTimestamp(expiryDate: Date): number {
   return Math.floor(expiryDate.getTime() / 1_000);
-}
-
-function sha256Hex(plaintext: string): string {
-  return createHash('sha256')
-    .update(plaintext)
-    .digest('hex');
 }

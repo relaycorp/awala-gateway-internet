@@ -1,7 +1,6 @@
 /* tslint:disable:no-let */
 
 import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
-import { createHash } from 'crypto';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
@@ -14,6 +13,7 @@ import {
   generateStubParcel,
   generateStubPdaChain,
   PdaChain,
+  sha256Hex,
 } from '../_test_utils';
 import * as certs from '../certs';
 import { makeServer } from './server';
@@ -309,9 +309,3 @@ describe('receiveParcel', () => {
     });
   });
 });
-
-function sha256Hex(plaintext: string): string {
-  return createHash('sha256')
-    .update(plaintext)
-    .digest('hex');
-}

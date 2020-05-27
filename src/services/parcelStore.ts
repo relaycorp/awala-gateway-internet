@@ -1,4 +1,5 @@
 import { CargoMessageStream } from '@relaycorp/relaynet-core';
+import { createHash } from 'crypto';
 import pino from 'pino';
 import uuid from 'uuid-random';
 
@@ -7,11 +8,11 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 const LOGGER = pino();
 
 export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound';
+const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound'; // TODO: RENAME to gateway-bound
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
-  constructor(protected objectStoreClient: ObjectStoreClient, public bucket: string) {}
+  constructor(protected objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
   public async *retrieveActiveParcelsForGateway(gatewayAddress: string): CargoMessageStream {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
@@ -41,6 +42,21 @@ export class ParcelStore {
       }
       yield { expiryDate: parcelExpiryDate, message: parcelObject.body };
     }
+  }
+
+  public async deleteGatewayBoundParcel(
+    parcelId: string,
+    senderPrivateAddress: string,
+    recipientAddress: string,
+    recipientGatewayAddress: string,
+  ): Promise<void> {
+    const parcelKey = calculatedGatewayBoundParcelObjectKey(
+      parcelId,
+      senderPrivateAddress,
+      recipientAddress,
+      recipientGatewayAddress,
+    );
+    await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
   }
 
   public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer> {
@@ -81,6 +97,27 @@ function getDateFromTimestamp(timestampString: string): Date | null {
 
 function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
+}
+
+export function calculatedGatewayBoundParcelObjectKey(
+  parcelId: string,
+  senderPrivateAddress: string,
+  recipientAddress: string,
+  recipientGatewayAddress: string,
+): string {
+  return [
+    GATEWAY_BOUND_OBJECT_KEY_PREFIX,
+    recipientGatewayAddress,
+    recipientAddress,
+    senderPrivateAddress,
+    sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
+  ].join('/');
+}
+
+function sha256Hex(plaintext: string): string {
+  return createHash('sha256')
+    .update(plaintext)
+    .digest('hex');
 }
 
 // TODO: Move here

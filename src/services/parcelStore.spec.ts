@@ -1,5 +1,6 @@
 import { arrayToAsyncIterable, asyncIterableToArray, mockPino, mockSpy } from '../_test_utils';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
+import { sha256Hex } from './_test_utils';
 
 const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';
@@ -185,6 +186,42 @@ describe('retrieveActiveParcelsForGateway', () => {
     const date = getDateRelativeToNow(deltaSeconds);
     return getTimestamp(date).toString();
   }
+});
+
+describe('deleteGatewayBoundParcel', () => {
+  const mockDeleteObject = mockSpy(jest.fn(), async () => ({ body: PARCEL_SERIALIZED }));
+  const mockObjectStoreClient: ObjectStoreClient = { deleteObject: mockDeleteObject } as any;
+  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+
+  test('Object should be deleted from the right bucket', async () => {
+    await store.deleteGatewayBoundParcel('', '', '', '');
+
+    expect(mockDeleteObject).toBeCalledWith(expect.anything(), BUCKET);
+  });
+
+  test('Full object key should be prefixed', async () => {
+    const parcelId = 'thingy.parcel';
+    const senderPrivateAddress = '0deadbeef';
+    const recipientAddress = '0deadc0de';
+    const recipientGatewayAddress = '0beef';
+    await store.deleteGatewayBoundParcel(
+      parcelId,
+      senderPrivateAddress,
+      recipientAddress,
+      recipientGatewayAddress,
+    );
+
+    expect(mockDeleteObject).toBeCalledWith(
+      [
+        'parcels/gateway-bound',
+        recipientGatewayAddress,
+        recipientAddress,
+        senderPrivateAddress,
+        sha256Hex(parcelId),
+      ].join('/'),
+      expect.anything(),
+    );
+  });
 });
 
 describe('retrieveEndpointBoundParcel', () => {

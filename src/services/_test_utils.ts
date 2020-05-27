@@ -8,6 +8,7 @@ import {
   issueGatewayCertificate,
   Parcel,
 } from '@relaycorp/relaynet-core';
+import { createHash } from 'crypto';
 import envVar from 'env-var';
 import * as stan from 'node-nats-streaming';
 import * as pkijs from 'pkijs';
@@ -176,4 +177,10 @@ export function mockStanMessage(messageData: Buffer | ArrayBuffer): stan.Message
     ack: jest.fn(),
     getRawData: () => Buffer.from(messageData),
   });
+}
+
+export function sha256Hex(plaintext: string): string {
+  return createHash('sha256')
+    .update(plaintext)
+    .digest('hex');
 }

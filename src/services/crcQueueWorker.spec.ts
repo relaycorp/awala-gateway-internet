@@ -143,6 +143,16 @@ beforeEach(async () => {
   );
 });
 
+let PARCEL: Parcel;
+let PARCEL_SERIALIZED: ArrayBuffer;
+beforeAll(async () => {
+  PARCEL = new Parcel('https://example.com', stubPdaChain.pdaCert, Buffer.from('hi'), {
+    senderCaCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
+  });
+  PARCEL.creationDate.setMilliseconds(0);
+  PARCEL_SERIALIZED = await PARCEL.serialize(stubPdaChain.pdaGranteePrivateKey);
+});
+
 describe('Queue subscription', () => {
   test('Worker should subscribe to channel "crc-cargo"', async () => {
     await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -247,14 +257,6 @@ test('Session keys of sender should be stored if present', async () => {
 });
 
 describe('Parcel processing', () => {
-  let PARCEL: Parcel;
-  let PARCEL_SERIALIZED: ArrayBuffer;
-  beforeAll(async () => {
-    PARCEL = new Parcel('https://example.com', stubPdaChain.pdaCert, Buffer.from('hi'));
-    PARCEL.creationDate.setMilliseconds(0);
-    PARCEL_SERIALIZED = await PARCEL.serialize(stubPdaChain.pdaGranteePrivateKey);
-  });
-
   test('Parcels should be published on channel "crc-parcels"', async () => {
     mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
 
@@ -305,8 +307,7 @@ describe('Parcel processing', () => {
     );
   });
 
-  test.skip('Parcels from different gateway should be logged and ignored', async () => {
-    // TODO: https://github.com/relaycorp/relaynet-internet-gateway/issues/15
+  test('Parcels from different gateway should be logged and ignored', async () => {
     const differentPdaChain = await generateStubPdaChain();
     const parcel = new Parcel('https://example.com', differentPdaChain.pdaCert, Buffer.from('hi'), {
       senderCaCertificateChain: [differentPdaChain.privateGatewayCert],
@@ -370,13 +371,18 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   // First cargo contains an invalid messages followed by a valid. The second cargo contains
   // one message and it's valid.
 
-  const stubParcel1 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-  const stubParcel1Serialized = await stubParcel1.serialize(stubPdaChain.pdaGranteePrivateKey);
-  const stubParcel2 = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
-  const stubParcel2Serialized = await stubParcel2.serialize(stubPdaChain.pdaGranteePrivateKey);
+  const additionalParcel = new Parcel(
+    'https://example.com',
+    stubPdaChain.pdaCert,
+    Buffer.from('hi'),
+    {
+      senderCaCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
+    },
+  );
+  const stubParcel2Serialized = await additionalParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
   const stubCargo1Serialized = await generateCargoSerialized(
     Buffer.from('Not valid'),
-    stubParcel1Serialized,
+    PARCEL_SERIALIZED,
   );
 
   mockQueueMessages = [
@@ -387,7 +393,7 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
   expect(mockPublishedMessages.map(bufferToArray)).toEqual([
-    stubParcel1Serialized,
+    PARCEL_SERIALIZED,
     stubParcel2Serialized,
   ]);
 

@@ -49,18 +49,15 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         unwrapResult = await cargo.unwrapPayload(privateKeyStore);
       } catch (err) {
         if (err instanceof PrivateKeyStoreError) {
-          logger.error(
-            { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
-            'Failed to retrieve key from Vault',
-          );
-        } else {
-          logger.info(
-            { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
-            'Cargo payload is invalid',
-          );
-          message.ack();
+          // Vault is down or returned an unexpected response
+          throw err;
         }
-        break;
+        logger.info(
+          { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
+          'Cargo payload is invalid',
+        );
+        message.ack();
+        continue;
       }
 
       // If the sender uses channel session, store its public key for later use.

@@ -201,7 +201,7 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
   expect(stanMessage.ack).toBeCalledTimes(1);
 });
 
-test('Cargo failing to be unwrapped due to keystore errors should remain in queue', async () => {
+test('Keystore errors should be propagated and cargo should remain in the queue', async () => {
   const cargo = await generateCargo();
   const stanMessage = mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey));
   mockQueueMessages = [stanMessage];
@@ -209,16 +209,8 @@ test('Cargo failing to be unwrapped due to keystore errors should remain in queu
   // Mimic a downtime in Vault
   mockPrivateKeyStore = new MockPrivateKeyStore(false, true);
 
-  await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-  expect(mockLogger.error).toBeCalledWith(
-    {
-      cargoId: cargo.id,
-      err: expect.any(PrivateKeyStoreError),
-      peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-      worker: STUB_WORKER_NAME,
-    },
-    'Failed to retrieve key from Vault',
+  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toBeInstanceOf(
+    PrivateKeyStoreError,
   );
 
   expect(stanMessage.ack).not.toBeCalled();

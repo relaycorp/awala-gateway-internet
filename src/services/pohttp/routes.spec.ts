@@ -157,7 +157,7 @@ describe('receiveParcel', () => {
     );
   });
 
-  test.skip('Parcel should be refused if sender certification path is not trusted', async () => {
+  test('Parcel should be refused if sender certification path is not trusted', async () => {
     const unauthorizedSenderKeyPair = await generateRSAKeyPair();
     const unauthorizedCert = await generateStubEndpointCertificate(unauthorizedSenderKeyPair);
     const parcel = await generateStubParcel({
@@ -165,7 +165,7 @@ describe('receiveParcel', () => {
       senderCertificate: unauthorizedCert,
       senderCertificateChain: [stubPdaChain.privateGatewayCert],
     });
-    const payload = await parcel.serialize(unauthorizedSenderKeyPair.privateKey);
+    const payload = Buffer.from(await parcel.serialize(unauthorizedSenderKeyPair.privateKey));
     const response = await serverInstance.inject({
       ...validRequestOptions,
       headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
@@ -177,9 +177,6 @@ describe('receiveParcel', () => {
       'message',
       'Parcel sender is not authorized',
     );
-
-    expect(mockRetrieveOwnCertificates).toBeCalledTimes(1);
-    expect(mockRetrieveOwnCertificates).toBeCalledWith(mockFastifyMongooseObject.db);
 
     expect(mockNatsClient.publishMessage).not.toBeCalled();
   });

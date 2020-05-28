@@ -1,10 +1,11 @@
 import {
   Cargo,
   CargoMessageSet,
-  OriginatorSessionKey,
   Parcel,
   ParcelCollectionAck,
+  PrivateKeyStore,
   PrivateKeyStoreError,
+  PublicKeyStore,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -39,14 +40,11 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   async function processCargo(messages: AsyncIterable<stan.Message>): Promise<void> {
     for await (const message of messages) {
       const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
-      // tslint:disable-next-line:no-let
-      let unwrapResult: {
-        readonly payload: CargoMessageSet;
-        readonly senderSessionKey?: OriginatorSessionKey;
-      };
       const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
+      // tslint:disable-next-line:no-let
+      let cargoMessageSet: readonly ArrayBuffer[];
       try {
-        unwrapResult = await cargo.unwrapPayload(privateKeyStore);
+        cargoMessageSet = await unwrapCargo(cargo, privateKeyStore, publicKeyStore);
       } catch (err) {
         if (err instanceof PrivateKeyStoreError) {
           // Vault is down or returned an unexpected response
@@ -60,16 +58,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         continue;
       }
 
-      // If the sender uses channel session, store its public key for later use.
-      if (unwrapResult.senderSessionKey) {
-        await publicKeyStore.saveSessionKey(
-          unwrapResult.senderSessionKey,
-          cargo.senderCertificate,
-          cargo.creationDate,
-        );
-      }
-
-      for (const itemSerialized of unwrapResult.payload.messages) {
+      for (const itemSerialized of cargoMessageSet) {
         // tslint:disable-next-line:no-let
         let item: Parcel | ParcelCollectionAck;
         try {
@@ -94,6 +83,8 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
           await processPca(item, peerGatewayAddress, parcelStore, cargo.id, workerName);
         }
       }
+
+      // Take cargo off the queue
       message.ack();
     }
   }
@@ -104,6 +95,25 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   } finally {
     natsStreamingClient.disconnect();
   }
+}
+
+async function unwrapCargo(
+  cargo: Cargo,
+  privateKeyStore: PrivateKeyStore,
+  publicKeyStore: PublicKeyStore,
+): Promise<readonly ArrayBuffer[]> {
+  const unwrapResult = await cargo.unwrapPayload(privateKeyStore);
+
+  // If the sender uses channel session, store its public key for later use.
+  if (unwrapResult.senderSessionKey) {
+    await publicKeyStore.saveSessionKey(
+      unwrapResult.senderSessionKey,
+      cargo.senderCertificate,
+      cargo.creationDate,
+    );
+  }
+
+  return Array.from(unwrapResult.payload.messages);
 }
 
 async function processParcel(

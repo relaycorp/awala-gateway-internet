@@ -115,18 +115,18 @@ const BASE_ENV_VARS = {
 };
 configureMockEnvVars(BASE_ENV_VARS);
 
-let stubPdaChain: PdaChain;
+let CERT_CHAIN: PdaChain;
 let PUBLIC_GW_SESSION_KEY_PAIR: CryptoKeyPair;
 let PUBLIC_GW_SESSION_CERT: Certificate;
 beforeAll(async () => {
-  stubPdaChain = await generateStubPdaChain();
+  CERT_CHAIN = await generateStubPdaChain();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   PUBLIC_GW_SESSION_KEY_PAIR = await generateECDHKeyPair();
   PUBLIC_GW_SESSION_CERT = await issueInitialDHKeyCertificate({
-    issuerCertificate: stubPdaChain.publicGatewayCert,
-    issuerPrivateKey: stubPdaChain.publicGatewayPrivateKey,
+    issuerCertificate: CERT_CHAIN.publicGatewayCert,
+    issuerPrivateKey: CERT_CHAIN.publicGatewayPrivateKey,
     subjectPublicKey: PUBLIC_GW_SESSION_KEY_PAIR.publicKey,
     validityEndDate: tomorrow,
   });
@@ -134,8 +134,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await mockPrivateKeyStore.registerNodeKey(
-    stubPdaChain.publicGatewayPrivateKey,
-    stubPdaChain.publicGatewayCert,
+    CERT_CHAIN.publicGatewayPrivateKey,
+    CERT_CHAIN.publicGatewayCert,
   );
   await mockPrivateKeyStore.registerInitialSessionKey(
     PUBLIC_GW_SESSION_KEY_PAIR.privateKey,
@@ -146,11 +146,11 @@ beforeEach(async () => {
 let PARCEL: Parcel;
 let PARCEL_SERIALIZED: ArrayBuffer;
 beforeAll(async () => {
-  PARCEL = new Parcel('https://example.com', stubPdaChain.pdaCert, Buffer.from('hi'), {
-    senderCaCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
+  PARCEL = new Parcel('https://example.com', CERT_CHAIN.pdaCert, Buffer.from('hi'), {
+    senderCaCertificateChain: [CERT_CHAIN.peerEndpointCert, CERT_CHAIN.privateGatewayCert],
   });
   PARCEL.creationDate.setMilliseconds(0);
-  PARCEL_SERIALIZED = await PARCEL.serialize(stubPdaChain.pdaGranteePrivateKey);
+  PARCEL_SERIALIZED = await PARCEL.serialize(CERT_CHAIN.pdaGranteePrivateKey);
 });
 
 describe('Queue subscription', () => {
@@ -187,11 +187,11 @@ describe('Queue subscription', () => {
 
 test('Cargo with invalid payload should be logged and ignored', async () => {
   const cargo = new Cargo(
-    await stubPdaChain.publicGatewayCert.getCommonName(),
-    stubPdaChain.privateGatewayCert,
+    await CERT_CHAIN.publicGatewayCert.getCommonName(),
+    CERT_CHAIN.privateGatewayCert,
     Buffer.from('Not a CMS EnvelopedData value'),
   );
-  const cargoSerialized = await cargo.serialize(stubPdaChain.privateGatewayPrivateKey);
+  const cargoSerialized = await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey);
 
   const stanMessage = mockStanMessage(cargoSerialized);
   mockQueueMessages = [stanMessage];
@@ -213,7 +213,7 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
 
 test('Keystore errors should be propagated and cargo should remain in the queue', async () => {
   const cargo = await generateCargo();
-  const stanMessage = mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey));
+  const stanMessage = mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey));
   mockQueueMessages = [stanMessage];
 
   // Mimic a downtime in Vault
@@ -233,11 +233,11 @@ test('Session keys of sender should be stored if present', async () => {
     PUBLIC_GW_SESSION_CERT,
   );
   const cargo = new Cargo(
-    await stubPdaChain.publicGatewayCert.getCommonName(),
-    stubPdaChain.privateGatewayCert,
+    await CERT_CHAIN.publicGatewayCert.getCommonName(),
+    CERT_CHAIN.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );
-  const stanMessage = mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey));
+  const stanMessage = mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey));
   mockQueueMessages = [stanMessage];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -277,7 +277,7 @@ describe('Parcel processing', () => {
     expect(parcelCollection.recordParcelCollection).toBeCalledTimes(1);
     expect(parcelCollection.recordParcelCollection).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
-      await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
     );
   });
@@ -287,7 +287,7 @@ describe('Parcel processing', () => {
 
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
-      mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey)),
+      mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
     ];
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -300,7 +300,7 @@ describe('Parcel processing', () => {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
-        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
       'Parcel was previously processed',
@@ -316,7 +316,7 @@ describe('Parcel processing', () => {
 
     const cargo = await generateCargo(stubParcelSerialized);
     mockQueueMessages = [
-      mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey)),
+      mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
     ];
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
@@ -327,7 +327,7 @@ describe('Parcel processing', () => {
       {
         cargoId: cargo.id,
         err: expect.any(InvalidMessageError),
-        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
       'Parcel is invalid and/or did not originate in the gateway that created the cargo',
@@ -347,7 +347,7 @@ describe('PCA processing', () => {
       PCA.parcelId,
       PCA.senderEndpointPrivateAddress,
       PCA.recipientEndpointAddress,
-      await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
     expect(mockPublishedMessages).toHaveLength(0);
   });
@@ -358,7 +358,7 @@ describe('PCA processing', () => {
 
     const cargo = await generateCargo(PCA.serialize());
     mockQueueMessages = [
-      mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey)),
+      mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
     ];
 
     await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(err);
@@ -373,13 +373,13 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
 
   const additionalParcel = new Parcel(
     'https://example.com',
-    stubPdaChain.pdaCert,
+    CERT_CHAIN.pdaCert,
     Buffer.from('hi'),
     {
-      senderCaCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
+      senderCaCertificateChain: [CERT_CHAIN.peerEndpointCert, CERT_CHAIN.privateGatewayCert],
     },
   );
-  const stubParcel2Serialized = await additionalParcel.serialize(stubPdaChain.pdaGranteePrivateKey);
+  const stubParcel2Serialized = await additionalParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey);
   const stubCargo1Serialized = await generateCargoSerialized(
     Buffer.from('Not valid'),
     PARCEL_SERIALIZED,
@@ -397,7 +397,7 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
     stubParcel2Serialized,
   ]);
 
-  const cargoSenderAddress = await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  const cargoSenderAddress = await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
   expect(mockLogger.info).toBeCalledWith(
     {
       cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
@@ -410,9 +410,9 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
 });
 
 test('Cargo should be acknowledged after messages have been processed', async () => {
-  const stubParcel = new Parcel('recipient-address', stubPdaChain.pdaCert, Buffer.from('hi'));
+  const stubParcel = new Parcel('recipient-address', CERT_CHAIN.pdaCert, Buffer.from('hi'));
   const stubParcelSerialized = Buffer.from(
-    await stubParcel.serialize(stubPdaChain.pdaGranteePrivateKey),
+    await stubParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey),
   );
   const stanMessage = mockStanMessage(await generateCargoSerialized(stubParcelSerialized));
   mockQueueMessages = [stanMessage];
@@ -445,16 +445,16 @@ async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {
   const cargoMessageSet = new CargoMessageSet(new Set(items));
   const payload = await SessionlessEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
-    stubPdaChain.publicGatewayCert,
+    CERT_CHAIN.publicGatewayCert,
   );
   return new Cargo(
-    await stubPdaChain.publicGatewayCert.getCommonName(),
-    stubPdaChain.privateGatewayCert,
+    await CERT_CHAIN.publicGatewayCert.getCommonName(),
+    CERT_CHAIN.privateGatewayCert,
     Buffer.from(payload.serialize()),
   );
 }
 
 async function generateCargoSerialized(...items: readonly ArrayBuffer[]): Promise<ArrayBuffer> {
   const cargo = await generateCargo(...items);
-  return cargo.serialize(stubPdaChain.privateGatewayPrivateKey);
+  return cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey);
 }

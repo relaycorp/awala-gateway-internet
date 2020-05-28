@@ -351,8 +351,8 @@ describe('PCA processing', () => {
     expect(mockPublishedMessages).toHaveLength(0);
   });
 
-  test('PCA for non-existing parcel should be ignored', async () => {
-    const err = new Error('Object does not exist');
+  test('Errors while deleting corresponding parcel should be propagated', async () => {
+    const err = new Error('Storage server is down');
     getMockInstance(ParcelStore.prototype.deleteGatewayBoundParcel).mockRejectedValue(err);
 
     const cargo = await generateCargo(PCA.serialize());
@@ -360,17 +360,8 @@ describe('PCA processing', () => {
       mockStanMessage(await cargo.serialize(stubPdaChain.privateGatewayPrivateKey)),
     ];
 
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
+    await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(err);
 
-    expect(mockLogger.debug).toBeCalledWith(
-      {
-        cargoId: cargo.id,
-        err,
-        peerGatewayAddress: await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-        workerName: STUB_WORKER_NAME,
-      },
-      'Could not find parcel for PCA',
-    );
     expect(mockPublishedMessages).toHaveLength(0);
   });
 });

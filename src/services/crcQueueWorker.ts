@@ -80,11 +80,16 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
             workerName,
           );
         } else {
-          await processPca(item, peerGatewayAddress, parcelStore, cargo.id, workerName);
+          await parcelStore.deleteGatewayBoundParcel(
+            item.parcelId,
+            item.senderEndpointPrivateAddress,
+            item.recipientEndpointAddress,
+            peerGatewayAddress,
+          );
         }
       }
 
-      // Take cargo off the queue
+      // Take the cargo off the queue. No further processing is needed.
       message.ack();
     }
   }
@@ -152,23 +157,4 @@ async function processParcel(
   }
   await natsStreamingClient.publishMessage(Buffer.from(parcelSerialized), 'crc-parcels');
   await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
-}
-
-async function processPca(
-  pca: ParcelCollectionAck,
-  peerGatewayAddress: string,
-  parcelStore: ParcelStore,
-  cargoId: string,
-  workerName: string,
-): Promise<void> {
-  try {
-    await parcelStore.deleteGatewayBoundParcel(
-      pca.parcelId,
-      pca.senderEndpointPrivateAddress,
-      pca.recipientEndpointAddress,
-      peerGatewayAddress,
-    );
-  } catch (err) {
-    logger.debug({ cargoId, err, peerGatewayAddress, workerName }, 'Could not find parcel for PCA');
-  }
 }

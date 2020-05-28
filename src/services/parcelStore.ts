@@ -44,6 +44,14 @@ export class ParcelStore {
     }
   }
 
+  /**
+   * Delete specified parcel if it exists.
+   *
+   * @param parcelId
+   * @param senderPrivateAddress
+   * @param recipientAddress
+   * @param recipientGatewayAddress
+   */
   public async deleteGatewayBoundParcel(
     parcelId: string,
     senderPrivateAddress: string,

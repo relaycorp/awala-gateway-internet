@@ -137,9 +137,7 @@ async function processParcel(
       { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
       'Parcel is invalid and/or did not originate in the gateway that created the cargo',
     );
-    // TODO: The parcel should be ignored when the following bug is fixed:
-    // https://github.com/relaycorp/relaynet-internet-gateway/issues/15
-    // return;
+    return;
   }
 
   if (await wasParcelCollected(parcel, peerGatewayAddress, mongooseConnection)) {

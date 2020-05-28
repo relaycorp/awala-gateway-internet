@@ -79,31 +79,14 @@ export default async function registerRoutes(
       try {
         await parcel.validate(trustedCertificates);
       } catch (error) {
-        // See: https://github.com/relaycorp/relaynet-internet-gateway/issues/15
-        // tslint:disable-next-line:no-console
-        console.log({
-          attachedChain: await Promise.all(
-            parcel.senderCaCertificateChain.map(c => c.calculateSubjectPrivateAddress()),
-          ),
-          certPath: await Promise.all(
-            (await parcel.getSenderCertificationPath(trustedCertificates)).map(c =>
-              c.calculateSubjectPrivateAddress(),
-            ),
-          ),
-          err: error.message,
-          recipient: parcel.recipientAddress,
-          sender: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-          trusted: await Promise.all(
-            trustedCertificates.map(c => c.calculateSubjectPrivateAddress()),
-          ),
-        });
-        // return reply.code(400).send({ message: 'Parcel sender is not authorized' });
+        // TODO: Log this
+        return reply.code(400).send({ message: 'Parcel sender is not authorized' });
       }
 
       //endregion
 
       const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-      const recipientGatewayCert = certificatePath[0];
+      const recipientGatewayCert = certificatePath[certificatePath.length - 2];
       const recipientGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
 
       //region Save to object storage

@@ -11,7 +11,7 @@
 
 Queued parcels and cargoes are stored in an S3-compatible bucket under the following key prefixes:
 
-- `parcels/internet-bound/` for Internet-bound parcels. Those parcels won't stay long there because they'll either be delivered quickly or we may give up after trying for up to 24 hours. Consequently, objects in here can be automatically deleted after 24 hours.
+- `parcels/endpoint-bound/` for public endpoint-bound parcels. Those parcels won't stay long there because they'll either be delivered quickly or we may give up after trying for up to 24 hours. Consequently, objects in here can be automatically deleted after 24 hours.
 - `parcels/gateway-bound/` for private gateway-bound parcels. It may take up to 6 months for a parcel to be collected according to the Relaynet specs, so objects here can be automatically deleted after that time.
 - `cargoes/pending-unwrapping/`.
 

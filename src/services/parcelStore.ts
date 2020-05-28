@@ -1,4 +1,5 @@
 import { CargoMessageStream } from '@relaycorp/relaynet-core';
+import { createHash } from 'crypto';
 import pino from 'pino';
 import uuid from 'uuid-random';
 
@@ -7,11 +8,11 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 const LOGGER = pino();
 
 export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const INTERNET_BOUND_OBJECT_KEY_PREFIX = 'parcels/internet-bound';
+const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 export const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
-  constructor(protected objectStoreClient: ObjectStoreClient, public bucket: string) {}
+  constructor(protected objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
   public async *retrieveActiveParcelsForGateway(gatewayAddress: string): CargoMessageStream {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
@@ -43,7 +44,30 @@ export class ParcelStore {
     }
   }
 
-  public async retrieveInternetBoundParcel(parcelObjectKey: string): Promise<Buffer> {
+  /**
+   * Delete specified parcel if it exists.
+   *
+   * @param parcelId
+   * @param senderPrivateAddress
+   * @param recipientAddress
+   * @param recipientGatewayAddress
+   */
+  public async deleteGatewayBoundParcel(
+    parcelId: string,
+    senderPrivateAddress: string,
+    recipientAddress: string,
+    recipientGatewayAddress: string,
+  ): Promise<void> {
+    const parcelKey = calculatedGatewayBoundParcelObjectKey(
+      parcelId,
+      senderPrivateAddress,
+      recipientAddress,
+      recipientGatewayAddress,
+    );
+    await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
+  }
+
+  public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer> {
     const storeObject = await this.objectStoreClient.getObject(
       makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
@@ -51,7 +75,7 @@ export class ParcelStore {
     return storeObject.body;
   }
 
-  public async storeInternetBoundParcel(parcelSerialized: Buffer): Promise<string> {
+  public async storeEndpointBoundParcel(parcelSerialized: Buffer): Promise<string> {
     const objectKey = uuid();
     await this.objectStoreClient.putObject(
       { body: parcelSerialized, metadata: {} },
@@ -61,7 +85,7 @@ export class ParcelStore {
     return objectKey;
   }
 
-  public async deleteInternetBoundParcel(parcelObjectKey: string): Promise<void> {
+  public async deleteEndpointBoundParcel(parcelObjectKey: string): Promise<void> {
     await this.objectStoreClient.deleteObject(
       makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
@@ -80,7 +104,28 @@ function getDateFromTimestamp(timestampString: string): Date | null {
 }
 
 function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
-  return `${INTERNET_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
+  return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
+}
+
+export function calculatedGatewayBoundParcelObjectKey(
+  parcelId: string,
+  senderPrivateAddress: string,
+  recipientAddress: string,
+  recipientGatewayAddress: string,
+): string {
+  return [
+    GATEWAY_BOUND_OBJECT_KEY_PREFIX,
+    recipientGatewayAddress,
+    recipientAddress,
+    senderPrivateAddress,
+    sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
+  ].join('/');
+}
+
+function sha256Hex(plaintext: string): string {
+  return createHash('sha256')
+    .update(plaintext)
+    .digest('hex');
 }
 
 // TODO: Move here

@@ -47,11 +47,11 @@ const PARCEL_SERIALIZED = Buffer.from('Pretend this is a RAMF-serialized parcel'
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => undefined);
 
 const MOCK_RETRIEVE_INTERNET_PARCEL = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'retrieveInternetBoundParcel'),
+  jest.spyOn(ParcelStore.prototype, 'retrieveEndpointBoundParcel'),
   async () => PARCEL_SERIALIZED,
 );
 const MOCK_DELETE_INTERNET_PARCEL = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'deleteInternetBoundParcel'),
+  jest.spyOn(ParcelStore.prototype, 'deleteEndpointBoundParcel'),
   async () => undefined,
 );
 

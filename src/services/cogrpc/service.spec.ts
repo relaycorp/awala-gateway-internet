@@ -1,11 +1,7 @@
 /* tslint:disable:no-let */
 
+import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
-import {
-  CargoDelivery,
-  CargoDeliveryAck,
-  CargoRelayServerMethodSet,
-} from '@relaycorp/relaynet-cogrpc';
 import {
   Cargo,
   CargoCollectionAuthorization,

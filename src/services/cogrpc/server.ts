@@ -1,4 +1,4 @@
-import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
+import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
 import { Server, ServerCredentials } from 'grpc';
 

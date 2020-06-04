@@ -1,6 +1,6 @@
 /* tslint:disable:no-let */
 
-import { CargoRelayService } from '@relaycorp/relaynet-cogrpc';
+import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpc from 'grpc';
 
 import { mockSpy } from '../../_test_utils';

@@ -1,11 +1,33 @@
-name: Release
+name: Run CI and potentially release
 on:
+  pull_request:
   push:
-    branches:
-      - master
+    branches-ignore: [gh-pages]
 jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Setup node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Install dependencies
+        run: npm ci
+      - run: npm run static-checks
+      - run: npm run test:ci:unit
+      - run: docker-compose pull
   release:
     name: Release
+    needs: ci
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout

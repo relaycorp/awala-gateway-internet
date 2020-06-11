@@ -5,7 +5,11 @@ import { dirname } from 'path';
 const DOCKER_COMPOSE_CWD = dirname(dirname(__dirname));
 
 describe('PoHTTP server', () => {
-  beforeAll(startServices);
+  beforeAll(async () => {
+    jest.setTimeout(60_000);
+    await startServices();
+    jest.setTimeout(5_000);
+  });
   afterAll(tearDownServices);
 
   beforeAll(async () => {

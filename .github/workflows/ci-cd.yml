@@ -23,7 +23,10 @@ jobs:
         run: npm ci
       - run: npm run static-checks
       - run: npm run test:ci:unit
+
+      # Functional tests
       - run: docker-compose pull
+      - run: docker-compose build
       - run: npm run test:functional
   release:
     name: Release

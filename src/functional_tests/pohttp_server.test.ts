@@ -5,8 +5,6 @@ import { dirname } from 'path';
 const DOCKER_COMPOSE_CWD = dirname(dirname(__dirname));
 
 describe('PoHTTP server', () => {
-  beforeAll(() => jest.setTimeout(60_000));
-
   beforeAll(startServices);
   afterAll(tearDownServices);
 
@@ -24,15 +22,12 @@ describe('PoHTTP server', () => {
     await setUpGateway(gatewayCertificate, gatewayKeyPair.privateKey);
   });
 
-  beforeEach(() => jest.setTimeout(5_000));
-
   test('Valid parcel should be accepted', () => {
     expect(1).toEqual(1);
   });
 });
 
 async function startServices(): Promise<void> {
-  await dockerCompose.buildAll({ cwd: DOCKER_COMPOSE_CWD, log: true });
   await dockerCompose.upAll({ cwd: DOCKER_COMPOSE_CWD, log: true });
 }
 

@@ -24,6 +24,7 @@ jobs:
       - run: npm run static-checks
       - run: npm run test:ci:unit
       - run: docker-compose pull
+      - run: npm run test:functional
   release:
     name: Release
     needs: ci

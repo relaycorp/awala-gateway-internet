@@ -32,7 +32,6 @@ describe('PoHTTP server', () => {
 });
 
 async function startServices(): Promise<void> {
-  await dockerCompose.pullAll({ cwd: DOCKER_COMPOSE_CWD, log: true });
   await dockerCompose.buildAll({ cwd: DOCKER_COMPOSE_CWD, log: true });
   await dockerCompose.upAll({ cwd: DOCKER_COMPOSE_CWD, log: true });
 }

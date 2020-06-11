@@ -16,8 +16,7 @@
     "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",
     "test:ci:unit": "run-s build test:ci:unit:jest cov:send",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
-    "test:functional": "run-s build test:functional:docker",
-    "test:functional:docker": "./src/functional_tests/run.sh",
+    "test:functional": "jest --config jest.config.functional.js",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "cov:send": "codecov",
     "clean": "trash build test"
@@ -32,6 +31,7 @@
     "@types/pkijs": "0.0.2",
     "@types/verror": "^1.10.3",
     "codecov": "^3.5.0",
+    "docker-compose": "^0.23.4",
     "fastify-plugin": "^1.6.0",
     "jest": "^25.1.0",
     "jest-extended": "^0.11.5",

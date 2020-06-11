@@ -1,9 +1,9 @@
 const mainJestConfig = require('./jest.config');
 
 module.exports = {
-  moduleFileExtensions: ['js'],
+  moduleFileExtensions: mainJestConfig.moduleFileExtensions,
   preset: mainJestConfig.preset,
-  roots: ['build/main/functional_tests'],
+  roots: ['src/functional_tests'],
   testEnvironment: mainJestConfig.testEnvironment,
   setupFilesAfterEnv: mainJestConfig.setupFilesAfterEnv
 };

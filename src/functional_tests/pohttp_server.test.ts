@@ -36,7 +36,7 @@ const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET')
 
 describe('PoHTTP server', () => {
   beforeAll(async () => {
-    jest.setTimeout(20_000);
+    jest.setTimeout(15_000);
     await tearDownServices();
     await dockerCompose.upAll({ log: true });
     await sleep(2);

@@ -4,15 +4,19 @@
 require('make-promises-safe');
 
 import {
+  Certificate,
   generateECDHKeyPair,
   generateRSAKeyPair,
   issueGatewayCertificate,
   issueInitialDHKeyCertificate,
 } from '@relaycorp/relaynet-core';
+import { getModelForClass } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 
+import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
+import { OwnCertificate } from '../services/models';
 
 const NODE_CERTIFICATE_TTL_DAYS = 180;
 const SESSION_CERTIFICATE_TTL_DAYS = 60;
@@ -49,6 +53,7 @@ async function main(): Promise<void> {
   gatewayCertificate.pkijsCertificate.serialNumber.valueBlock.valueHex = bufferToArray(keyId);
 
   await sessionStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+  await saveOwnCertificate(gatewayCertificate);
 
   const initialSessionKeyPair = await generateECDHKeyPair();
   const sessionCertEndDate = new Date();
@@ -67,6 +72,13 @@ async function main(): Promise<void> {
       keyPairId: KEY_ID_BASE64,
     }),
   );
+}
+
+async function saveOwnCertificate(certificate: Certificate): Promise<void> {
+  const connection = await createMongooseConnectionFromEnv();
+  const ownCertificateModel = getModelForClass(OwnCertificate, { existingConnection: connection });
+  await ownCertificateModel.create({ serializationDer: Buffer.from(certificate.serialize()) });
+  await connection.close();
 }
 
 function base64Encode(payload: ArrayBuffer | Buffer): string {

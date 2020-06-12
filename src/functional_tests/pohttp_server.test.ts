@@ -17,10 +17,12 @@ import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { initS3Client, sleep } from './utils';
 
 dotEnv.config();
-process.env.POHTTP_TLS_REQUIRED = 'false';
-process.env.VAULT_URL = 'http://127.0.0.1:8200';
-process.env.OBJECT_STORE_ENDPOINT = 'http://127.0.0.1:9000';
-process.env.NATS_SERVER_URL = 'nats://127.0.0.1:4222';
+Object.assign(process.env, {
+  NATS_SERVER_URL: 'nats://127.0.0.1:4222',
+  OBJECT_STORE_ENDPOINT: 'http://127.0.0.1:9000',
+  POHTTP_TLS_REQUIRED: 'false',
+  VAULT_URL: 'http://127.0.0.1:8200',
+});
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);

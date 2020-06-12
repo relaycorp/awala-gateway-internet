@@ -36,8 +36,9 @@ describe('PoHTTP server', () => {
   beforeAll(async () => {
     jest.setTimeout(20_000);
     await tearDownServices();
-    await setUpServices();
-    await setUpGateway();
+    await dockerCompose.upAll({ log: true });
+    await sleep(2);
+    await bootstrapData();
   });
   afterAll(tearDownServices);
 
@@ -115,31 +116,22 @@ describe('PoHTTP server', () => {
   });
 });
 
-async function setUpServices(): Promise<void> {
-  await dockerCompose.upAll({ log: true });
-  await sleep(2);
-
+async function bootstrapData(): Promise<void> {
   // Configure Vault
   await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
     commandOptions: ['--env', 'VAULT_ADDR=http://127.0.0.1:8200', '--env', 'VAULT_TOKEN=letmein'],
     log: true,
   });
 
-  await bootstrapObjectStorage();
-}
-
-async function bootstrapObjectStorage(): Promise<void> {
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,
   }).promise();
+
+  await dockerCompose.exec('cogrpc', ['ts-node-dev', 'src/bin/generate-keypairs.ts']);
 }
 
 async function tearDownServices(): Promise<void> {
   await dockerCompose.down({ commandOptions: ['--remove-orphans'], log: true });
-}
-
-async function setUpGateway(): Promise<void> {
-  await dockerCompose.exec('cogrpc', ['ts-node-dev', 'src/bin/generate-keypairs.ts']);
 }
 
 async function generatePdaChain(): Promise<{

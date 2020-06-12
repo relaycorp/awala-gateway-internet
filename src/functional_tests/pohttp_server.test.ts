@@ -7,24 +7,30 @@ import {
   Parcel,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel, PoHTTPError } from '@relaycorp/relaynet-pohttp';
-import { S3 } from 'aws-sdk';
 import { AxiosError } from 'axios';
 import * as dockerCompose from 'docker-compose';
 import * as dotEnv from 'dotenv';
 import { get as getEnvVar } from 'env-var';
+import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
-import { sleep } from './utils';
+import { initS3Client, sleep } from './utils';
 
 dotEnv.config();
 process.env.POHTTP_TLS_REQUIRED = 'false';
 process.env.VAULT_URL = 'http://127.0.0.1:8200';
 process.env.OBJECT_STORE_ENDPOINT = 'http://127.0.0.1:9000';
+process.env.NATS_SERVER_URL = 'nats://127.0.0.1:4222';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
+
+const OBJECT_STORAGE_CLIENT = initS3Client();
+const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET')
+  .required()
+  .asString();
 
 describe('PoHTTP server', () => {
   beforeAll(async () => {
@@ -35,7 +41,28 @@ describe('PoHTTP server', () => {
   });
   afterAll(tearDownServices);
 
-  test('Valid parcel should be accepted', async () => {
+  // tslint:disable-next-line:no-let
+  let stanConnection: Stan;
+  beforeAll(
+    async () =>
+      new Promise(resolve => {
+        stanConnection = stanConnect(
+          getEnvVar('NATS_CLUSTER_ID')
+            .required()
+            .asString(),
+          'functional-tests',
+          {
+            url: getEnvVar('NATS_SERVER_URL')
+              .required()
+              .asString(),
+          },
+        );
+        stanConnection.on('connect', resolve);
+      }),
+  );
+  afterAll(async () => stanConnection.close());
+
+  test('Valid parcel should be accepted', async cb => {
     const pdaChain = await generatePdaChain();
     const parcel = new Parcel(
       await pdaChain.peerEndpointCertificate.calculateSubjectPrivateAddress(),
@@ -43,11 +70,28 @@ describe('PoHTTP server', () => {
       Buffer.from([]),
       { senderCaCertificateChain: pdaChain.chain },
     );
-    const parcelSerialized = await parcel.serialize(pdaChain.privateKey);
+    const parcelSerialized = Buffer.from(await parcel.serialize(pdaChain.privateKey));
 
+    // We should get a successful response
     await expect(deliverParcel(GW_POHTTP_URL, parcelSerialized)).toResolve();
 
-    // TODO: Check that parcel was actually stored
+    // The parcel should've been safely stored
+    const subscription = stanConnection.subscribe(
+      `pdc-parcel.${await pdaChain.privateGatewayCertificate.calculateSubjectPrivateAddress()}`,
+      'functional-tests',
+      stanConnection.subscriptionOptions().setDeliverAllAvailable(),
+    );
+    subscription.on('error', cb);
+    subscription.on('message', async (message: Message) => {
+      const objectKey = message.getData() as string;
+      await expect(
+        OBJECT_STORAGE_CLIENT.getObject({
+          Bucket: OBJECT_STORAGE_BUCKET,
+          Key: objectKey,
+        }).promise(),
+      ).resolves.toMatchObject({ Body: parcelSerialized });
+      cb();
+    });
   });
 
   test('Unauthorized parcel should be refused', async () => {
@@ -81,32 +125,13 @@ async function setUpServices(): Promise<void> {
     log: true,
   });
 
-  await configureMinio();
+  await bootstrapObjectStorage();
 }
 
-async function configureMinio(): Promise<void> {
-  const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
-    .required()
-    .asString();
-  const s3Cient = new S3({
-    accessKeyId: getEnvVar('OBJECT_STORE_ACCESS_KEY_ID')
-      .required()
-      .asString(),
-    endpoint,
-    s3ForcePathStyle: true,
-    secretAccessKey: getEnvVar('OBJECT_STORE_SECRET_KEY')
-      .required()
-      .asString(),
-    signatureVersion: 'v4',
-    sslEnabled: false,
-  });
-  await s3Cient
-    .createBucket({
-      Bucket: getEnvVar('OBJECT_STORE_BUCKET')
-        .required()
-        .asString(),
-    })
-    .promise();
+async function bootstrapObjectStorage(): Promise<void> {
+  await OBJECT_STORAGE_CLIENT.createBucket({
+    Bucket: OBJECT_STORAGE_BUCKET,
+  }).promise();
 }
 
 async function tearDownServices(): Promise<void> {
@@ -119,6 +144,7 @@ async function setUpGateway(): Promise<void> {
 
 async function generatePdaChain(): Promise<{
   readonly pda: Certificate;
+  readonly privateGatewayCertificate: Certificate;
   readonly peerEndpointCertificate: Certificate;
   readonly privateKey: CryptoKey;
   readonly chain: readonly Certificate[];
@@ -160,6 +186,7 @@ async function generatePdaChain(): Promise<{
     chain: [privateGatewayCertificate, peerEndpointCertificate],
     pda,
     peerEndpointCertificate,
+    privateGatewayCertificate,
     privateKey: pdaGranteeKeyPair.privateKey,
   };
 }

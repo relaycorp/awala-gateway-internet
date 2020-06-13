@@ -4,7 +4,7 @@ import { AxiosError } from 'axios';
 import { get as getEnvVar } from 'env-var';
 import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
-import { bootstrapData, setUpServices, tearDownServices } from './services';
+import { bootstrapServiceData, setUpServices, tearDownServices } from './services';
 import { generatePdaChain, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
@@ -15,7 +15,7 @@ describe('PoHTTP server', () => {
     await tearDownServices();
     await setUpServices(['pohttp', 'vault']);
     await sleep(2);
-    await bootstrapData();
+    await bootstrapServiceData();
   });
   afterAll(tearDownServices);
 
@@ -54,6 +54,7 @@ describe('PoHTTP server', () => {
     await expect(deliverParcel(GW_POHTTP_URL, parcelSerialized)).toResolve();
 
     // The parcel should've been safely stored
+    // TODO: Use the PoWebSockets interface instead once it's available
     const subscription = stanConnection.subscribe(
       `pdc-parcel.${await pdaChain.privateGatewayCertificate.calculateSubjectPrivateAddress()}`,
       'functional-tests',

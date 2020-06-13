@@ -10,8 +10,7 @@ const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
   .required()
   .asString();
 
-export async function bootstrapData(): Promise<void> {
-  // Configure Vault
+export async function bootstrapServiceData(): Promise<void> {
   await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
     commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
     log: true,

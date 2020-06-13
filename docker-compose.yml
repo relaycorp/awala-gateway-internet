@@ -52,6 +52,31 @@ services:
     volumes:
       - ./src:/opt/gw-dev/src:ro
 
+  pdc-outgoing-queue-worker:
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    image: relaynet-gw:local-dev
+    init: true
+    command: src/bin/pdc-outgoing-queue-worker.ts
+    environment:
+      POHTTP_ADDRESS: ${POHTTP_ADDRESS}
+      WORKER_ID: pdc-local
+      MONGO_URI: ${MONGO_URI}
+      NATS_SERVER_URL: ${NATS_SERVER_URL}
+      NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}
+      PARCEL_STORE_BUCKET: ${OBJECT_STORE_BUCKET}
+      OBJECT_STORE_ENDPOINT: ${OBJECT_STORE_ENDPOINT}
+      OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
+      OBJECT_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      OBJECT_STORE_TLS_ENABLED: ${OBJECT_STORE_TLS_ENABLED}
+    volumes:
+      - ./src:/opt/gw-dev/src:ro
+    links:
+      - mongodb
+      - nats
+      - object-store
+
   crc-queue-worker:
     build:
       dockerfile: Dockerfile.dev
@@ -60,7 +85,7 @@ services:
     init: true
     command: src/bin/crc-queue-worker.ts
     environment:
-      WORKER_ID: local
+      WORKER_ID: crc-local
       MONGO_URI: ${MONGO_URI}
       NATS_SERVER_URL: ${NATS_SERVER_URL}
       NATS_CLUSTER_ID: ${NATS_CLUSTER_ID}

@@ -39,7 +39,7 @@ describe('PoHTTP server', () => {
   beforeAll(async () => {
     jest.setTimeout(15_000);
     await tearDownServices();
-    await dockerCompose.upAll({ log: true });
+    await setUpServices(['pohttp', 'vault']);
     await sleep(2);
     await bootstrapData();
   });
@@ -130,7 +130,15 @@ async function bootstrapData(): Promise<void> {
     Bucket: OBJECT_STORAGE_BUCKET,
   }).promise();
 
-  await dockerCompose.exec('cogrpc', ['ts-node-dev', 'src/bin/generate-keypairs.ts']);
+  await dockerCompose.run('cogrpc', ['src/bin/generate-keypairs.ts'], {
+    commandOptions: ['--rm'],
+    log: true,
+  });
+}
+
+// tslint:disable-next-line:readonly-array
+async function setUpServices(services: string[]): Promise<void> {
+  await dockerCompose.upMany(services, { log: true });
 }
 
 async function tearDownServices(): Promise<void> {

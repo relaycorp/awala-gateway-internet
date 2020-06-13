@@ -10,9 +10,20 @@ const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
   .required()
   .asString();
 
+// tslint:disable-next-line:readonly-array
+const COMPOSE_OPTIONS = [
+  '--project-name',
+  'gw-functional-tests',
+  '--file',
+  'docker-compose.yml',
+  '--file',
+  'src/functional_tests/docker-compose.override.yml',
+];
+
 export async function bootstrapServiceData(): Promise<void> {
   await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
     commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
+    composeOptions: COMPOSE_OPTIONS,
     log: true,
   });
 
@@ -22,15 +33,20 @@ export async function bootstrapServiceData(): Promise<void> {
 
   await dockerCompose.run('cogrpc', ['src/bin/generate-keypairs.ts'], {
     commandOptions: ['--rm'],
+    composeOptions: COMPOSE_OPTIONS,
     log: true,
   });
 }
 
 // tslint:disable-next-line:readonly-array
 export async function setUpServices(services: string[]): Promise<void> {
-  await dockerCompose.upMany(services, { log: true });
+  await dockerCompose.upMany(services, { composeOptions: COMPOSE_OPTIONS, log: true });
 }
 
 export async function tearDownServices(): Promise<void> {
-  await dockerCompose.down({ commandOptions: ['--remove-orphans'], log: true });
+  await dockerCompose.down({
+    commandOptions: ['--remove-orphans'],
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
 }

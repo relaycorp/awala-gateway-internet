@@ -1,39 +1,13 @@
-import {
-  Certificate,
-  generateRSAKeyPair,
-  issueDeliveryAuthorization,
-  issueEndpointCertificate,
-  issueGatewayCertificate,
-  Parcel,
-} from '@relaycorp/relaynet-core';
+import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp/relaynet-core';
 import { deliverParcel, PoHTTPError } from '@relaycorp/relaynet-pohttp';
 import { AxiosError } from 'axios';
-import * as dockerCompose from 'docker-compose';
-import * as dotEnv from 'dotenv';
 import { get as getEnvVar } from 'env-var';
 import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
-import { initVaultKeyStore } from '../backingServices/privateKeyStore';
-import { initS3Client, sleep } from './utils';
-
-dotEnv.config();
-// tslint:disable-next-line:no-object-mutation
-Object.assign(process.env, {
-  NATS_SERVER_URL: 'nats://127.0.0.1:4222',
-  OBJECT_STORE_ENDPOINT: 'http://127.0.0.1:9000',
-  POHTTP_TLS_REQUIRED: 'false',
-  VAULT_URL: 'http://127.0.0.1:8200',
-});
-
-const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+import { bootstrapData, setUpServices, tearDownServices } from './services';
+import { generatePdaChain, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
-
-const OBJECT_STORAGE_CLIENT = initS3Client();
-const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET')
-  .required()
-  .asString();
 
 describe('PoHTTP server', () => {
   beforeAll(async () => {
@@ -100,10 +74,12 @@ describe('PoHTTP server', () => {
 
   test('Unauthorized parcel should be refused', async () => {
     const senderKeyPair = await generateRSAKeyPair();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
     const senderCertificate = await issueEndpointCertificate({
       issuerPrivateKey: senderKeyPair.privateKey,
       subjectPublicKey: senderKeyPair.publicKey,
-      validityEndDate: TOMORROW,
+      validityEndDate: tomorrow,
     });
 
     const parcel = new Parcel('0deadbeef', senderCertificate, Buffer.from([]));
@@ -118,78 +94,3 @@ describe('PoHTTP server', () => {
     });
   });
 });
-
-async function bootstrapData(): Promise<void> {
-  // Configure Vault
-  await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
-    commandOptions: ['--env', 'VAULT_ADDR=http://127.0.0.1:8200', '--env', 'VAULT_TOKEN=letmein'],
-    log: true,
-  });
-
-  await OBJECT_STORAGE_CLIENT.createBucket({
-    Bucket: OBJECT_STORAGE_BUCKET,
-  }).promise();
-
-  await dockerCompose.run('cogrpc', ['src/bin/generate-keypairs.ts'], {
-    commandOptions: ['--rm'],
-    log: true,
-  });
-}
-
-// tslint:disable-next-line:readonly-array
-async function setUpServices(services: string[]): Promise<void> {
-  await dockerCompose.upMany(services, { log: true });
-}
-
-async function tearDownServices(): Promise<void> {
-  await dockerCompose.down({ commandOptions: ['--remove-orphans'], log: true });
-}
-
-async function generatePdaChain(): Promise<{
-  readonly pda: Certificate;
-  readonly privateGatewayCertificate: Certificate;
-  readonly peerEndpointCertificate: Certificate;
-  readonly privateKey: CryptoKey;
-  readonly chain: readonly Certificate[];
-}> {
-  const privateKeyStore = initVaultKeyStore();
-  const publicGatewayKeyId = Buffer.from(
-    getEnvVar('GATEWAY_KEY_ID')
-      .required()
-      .asString(),
-    'base64',
-  );
-  const publicGatewayKeyPair = await privateKeyStore.fetchNodeKey(publicGatewayKeyId);
-
-  const privateGatewayKeyPair = await generateRSAKeyPair();
-  const privateGatewayCertificate = await issueGatewayCertificate({
-    issuerCertificate: publicGatewayKeyPair.certificate,
-    issuerPrivateKey: publicGatewayKeyPair.privateKey,
-    subjectPublicKey: privateGatewayKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
-
-  const peerEndpointKeyPair = await generateRSAKeyPair();
-  const peerEndpointCertificate = await issueEndpointCertificate({
-    issuerCertificate: privateGatewayCertificate,
-    issuerPrivateKey: privateGatewayKeyPair.privateKey,
-    subjectPublicKey: peerEndpointKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
-
-  const pdaGranteeKeyPair = await generateRSAKeyPair();
-  const pda = await issueDeliveryAuthorization({
-    issuerCertificate: peerEndpointCertificate,
-    issuerPrivateKey: peerEndpointKeyPair.privateKey,
-    subjectPublicKey: pdaGranteeKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
-
-  return {
-    chain: [privateGatewayCertificate, peerEndpointCertificate],
-    pda,
-    peerEndpointCertificate,
-    privateGatewayCertificate,
-    privateKey: pdaGranteeKeyPair.privateKey,
-  };
-}

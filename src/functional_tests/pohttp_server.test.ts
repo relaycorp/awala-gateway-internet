@@ -1,11 +1,16 @@
 import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp/relaynet-core';
 import { deliverParcel, PoHTTPError } from '@relaycorp/relaynet-pohttp';
 import { AxiosError } from 'axios';
-import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
+import { Message, Stan } from 'node-nats-streaming';
 
 import { bootstrapServiceData, setUpServices, tearDownServices } from './services';
-import { generatePdaChain, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
+import {
+  connectToNatsStreaming,
+  generatePdaChain,
+  OBJECT_STORAGE_BUCKET,
+  OBJECT_STORAGE_CLIENT,
+  sleep,
+} from './utils';
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
 
@@ -21,23 +26,7 @@ describe('PoHTTP server', () => {
 
   // tslint:disable-next-line:no-let
   let stanConnection: Stan;
-  beforeAll(
-    async () =>
-      new Promise(resolve => {
-        stanConnection = stanConnect(
-          getEnvVar('NATS_CLUSTER_ID')
-            .required()
-            .asString(),
-          'functional-tests',
-          {
-            url: getEnvVar('NATS_SERVER_URL')
-              .required()
-              .asString(),
-          },
-        );
-        stanConnection.on('connect', resolve);
-      }),
-  );
+  beforeAll(async () => (stanConnection = await connectToNatsStreaming()));
   afterAll(async () => stanConnection.close());
 
   test('Valid parcel should be accepted', async cb => {
@@ -48,7 +37,7 @@ describe('PoHTTP server', () => {
       Buffer.from([]),
       { senderCaCertificateChain: pdaChain.chain },
     );
-    const parcelSerialized = Buffer.from(await parcel.serialize(pdaChain.privateKey));
+    const parcelSerialized = await parcel.serialize(pdaChain.privateKey);
 
     // We should get a successful response
     await expect(deliverParcel(GW_POHTTP_URL, parcelSerialized)).toResolve();
@@ -68,7 +57,7 @@ describe('PoHTTP server', () => {
           Bucket: OBJECT_STORAGE_BUCKET,
           Key: objectKey,
         }).promise(),
-      ).resolves.toMatchObject({ Body: parcelSerialized });
+      ).resolves.toMatchObject({ Body: Buffer.from(parcelSerialized) });
       cb();
     });
   });

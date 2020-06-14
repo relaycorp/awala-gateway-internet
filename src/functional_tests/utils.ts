@@ -7,8 +7,12 @@ import {
 } from '@relaycorp/relaynet-core';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
+import { connect as stanConnect, Stan } from 'node-nats-streaming';
 
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
+
+const TOMORROW = new Date();
+TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const OBJECT_STORAGE_CLIENT = initS3Client();
 export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET')
@@ -39,8 +43,22 @@ export function initS3Client(): S3 {
   });
 }
 
-const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+export function connectToNatsStreaming(): Promise<Stan> {
+  return new Promise(resolve => {
+    const stanConnection = stanConnect(
+      getEnvVar('NATS_CLUSTER_ID')
+        .required()
+        .asString(),
+      'functional-tests',
+      {
+        url: getEnvVar('NATS_SERVER_URL')
+          .required()
+          .asString(),
+      },
+    );
+    stanConnection.on('connect', resolve);
+  });
+}
 
 export async function generatePdaChain(): Promise<{
   readonly pda: Certificate;

@@ -26,7 +26,11 @@ jobs:
 
       # Functional tests
       - run: docker-compose pull
+        env:
+          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
       - run: docker-compose build
+        env:
+          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
       - run: npm run test:functional
   release:
     name: Release

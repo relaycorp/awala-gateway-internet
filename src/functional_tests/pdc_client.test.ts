@@ -46,7 +46,7 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(5);
+    await sleep(2);
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 

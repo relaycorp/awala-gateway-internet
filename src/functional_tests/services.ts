@@ -26,7 +26,7 @@ export function configureServices(serviceUnderTest: string, includeVault = true)
     jest.setTimeout(15_000);
     await tearDownServices();
     await setUpServices(serviceUnderTest);
-    await sleep(5);
+    await sleep(1);
   });
   afterAll(tearDownServices);
 
@@ -34,7 +34,6 @@ export function configureServices(serviceUnderTest: string, includeVault = true)
     await clearServiceData(includeVault);
     await sleep(1);
     await bootstrapServiceData(includeVault);
-    await sleep(1);
   });
 }
 

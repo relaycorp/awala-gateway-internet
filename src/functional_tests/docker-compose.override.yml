@@ -3,8 +3,6 @@ services:
   pong:
     image: relaycorp/relaynet-pong:v1.3.1
     init: true
-    ports:
-      - '127.0.0.1:8082:8080'
     links:
       - redis
     environment:
@@ -20,3 +18,5 @@ services:
       - mongodb
       - nats
       - object-store
+    environment:
+      POHTTP_TLS_REQUIRED: 'false'

@@ -2,7 +2,7 @@ name: Run CI and potentially release
 on:
   pull_request:
   push:
-    branches-ignore: [gh-pages]
+    branches: [master]
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -23,7 +23,15 @@ jobs:
         run: npm ci
       - run: npm run static-checks
       - run: npm run test:ci:unit
+
+      # Functional tests
       - run: docker-compose pull
+        env:
+          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
+      - run: docker-compose build
+        env:
+          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
+      - run: npm run test:functional
   release:
     name: Release
     needs: ci

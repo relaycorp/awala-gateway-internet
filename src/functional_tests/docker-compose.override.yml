@@ -1,14 +1,29 @@
 version: '3.7'
 services:
-  gateway:
-    build:
-      dockerfile: Dockerfile.dev
-      context: .
-    image: relaynet-gw:development
+  pong:
+    image: relaycorp/relaynet-pong:v1.3.1
     init: true
-    entrypoint: ''
-    command: jest --config jest.config.functional.js
-    volumes:
-      - .:/opt/gw-dev
-      # Use `node_modules` from container; trailing slash is required.
-      - /opt/gw-dev/node_modules/
+    links:
+      - redis
+    environment:
+      REDIS_HOST: redis
+      POHTTP_TLS_REQUIRED: 'false'
+  redis:
+    image: redis:4.0-alpine
+    init: true
+
+  pohttp:
+    links:
+      - mongodb
+      - nats
+      - object-store
+      - vault
+
+  pdc-outgoing-queue-worker:
+    links:
+      - pong
+      - mongodb
+      - nats
+      - object-store
+    environment:
+      POHTTP_TLS_REQUIRED: 'false'

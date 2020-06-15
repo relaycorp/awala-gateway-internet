@@ -9,7 +9,7 @@ import {
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-import { bootstrapServiceData, setUpServices, tearDownServices } from './services';
+import { configureServices } from './services';
 import {
   connectToNatsStreaming,
   OBJECT_STORAGE_BUCKET,
@@ -19,14 +19,7 @@ import {
 
 const PONG_ENDPOINT_ADDRESS = 'http://pong:8080';
 
-beforeAll(async () => {
-  jest.setTimeout(15_000);
-  await tearDownServices();
-  await setUpServices(['pdc-outgoing-queue-worker']);
-  await sleep(2);
-  await bootstrapServiceData(false);
-});
-afterAll(tearDownServices);
+configureServices('pdc-outgoing-queue-worker', false);
 
 let senderPrivateKey: CryptoKey;
 let senderCertificate: Certificate;

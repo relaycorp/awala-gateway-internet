@@ -1,7 +1,7 @@
 import * as dockerCompose from 'docker-compose';
 import { get as getEnvVar } from 'env-var';
 
-import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT } from './utils';
+import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
 const VAULT_URL = getEnvVar('VAULT_URL')
   .required()
@@ -20,7 +20,18 @@ const COMPOSE_OPTIONS = [
   'src/functional_tests/docker-compose.override.yml',
 ];
 
-export async function bootstrapServiceData(includeVault = true): Promise<void> {
+export function configureServices(serviceUnderTest: string, includeVault = true): void {
+  beforeAll(async () => {
+    jest.setTimeout(15_000);
+    await tearDownServices();
+    await setUpServices(serviceUnderTest);
+    await sleep(2);
+    await bootstrapServiceData(includeVault);
+  });
+  afterAll(tearDownServices);
+}
+
+async function bootstrapServiceData(includeVault = true): Promise<void> {
   if (includeVault) {
     await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
       commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
@@ -40,12 +51,11 @@ export async function bootstrapServiceData(includeVault = true): Promise<void> {
   }).promise();
 }
 
-// tslint:disable-next-line:readonly-array
-export async function setUpServices(services: string[]): Promise<void> {
-  await dockerCompose.upMany(services, { composeOptions: COMPOSE_OPTIONS, log: true });
+async function setUpServices(service: string): Promise<void> {
+  await dockerCompose.upOne(service, { composeOptions: COMPOSE_OPTIONS, log: true });
 }
 
-export async function tearDownServices(): Promise<void> {
+async function tearDownServices(): Promise<void> {
   await dockerCompose.down({
     commandOptions: ['--remove-orphans'],
     composeOptions: COMPOSE_OPTIONS,

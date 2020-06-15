@@ -12,6 +12,13 @@ services:
     image: redis:4.0-alpine
     init: true
 
+  pohttp:
+    links:
+      - mongodb
+      - nats
+      - object-store
+      - vault
+
   pdc-outgoing-queue-worker:
     links:
       - pong

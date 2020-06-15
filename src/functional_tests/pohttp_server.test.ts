@@ -3,27 +3,19 @@ import { deliverParcel, PoHTTPError } from '@relaycorp/relaynet-pohttp';
 import { AxiosError } from 'axios';
 import { Message, Stan } from 'node-nats-streaming';
 
-import { bootstrapServiceData, setUpServices, tearDownServices } from './services';
+import { configureServices } from './services';
 import {
   connectToNatsStreaming,
   generatePdaChain,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
-  sleep,
 } from './utils';
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
 
-describe('PoHTTP server', () => {
-  beforeAll(async () => {
-    jest.setTimeout(15_000);
-    await tearDownServices();
-    await setUpServices(['pohttp', 'vault']);
-    await sleep(2);
-    await bootstrapServiceData();
-  });
-  afterAll(tearDownServices);
+configureServices('pohttp');
 
+describe('PoHTTP server', () => {
   // tslint:disable-next-line:no-let
   let stanConnection: Stan;
   beforeAll(async () => (stanConnection = await connectToNatsStreaming()));

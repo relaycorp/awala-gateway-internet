@@ -1,3 +1,4 @@
+/* tslint:disable:no-let */
 import * as dockerCompose from 'docker-compose';
 import { get as getEnvVar } from 'env-var';
 
@@ -25,10 +26,16 @@ export function configureServices(serviceUnderTest: string, includeVault = true)
     jest.setTimeout(15_000);
     await tearDownServices();
     await setUpServices(serviceUnderTest);
-    await sleep(2);
-    await bootstrapServiceData(includeVault);
+    await sleep(5);
   });
   afterAll(tearDownServices);
+
+  beforeEach(async () => {
+    await clearServiceData(includeVault);
+    await sleep(1);
+    await bootstrapServiceData(includeVault);
+    await sleep(1);
+  });
 }
 
 async function bootstrapServiceData(includeVault = true): Promise<void> {
@@ -45,14 +52,55 @@ async function bootstrapServiceData(includeVault = true): Promise<void> {
       log: true,
     });
   }
+}
 
-  await OBJECT_STORAGE_CLIENT.createBucket({
-    Bucket: OBJECT_STORAGE_BUCKET,
+export async function clearServiceData(includeVault = true): Promise<void> {
+  if (includeVault) {
+    await dockerCompose.exec('vault', ['vault', 'secrets', 'disable', 'gw-keys'], {
+      commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
+      composeOptions: COMPOSE_OPTIONS,
+      log: true,
+    });
+  }
+
+  await emptyBucket(OBJECT_STORAGE_BUCKET);
+
+  // We can't empty NATS Streaming so we'll have to restart it, which in turn requires restarting
+  // the processes with clients connected to NATS.
+  await restartAllServices();
+
+  // TODO: Remove Mongo collections
+}
+
+async function emptyBucket(bucket: string): Promise<void> {
+  // tslint:disable-next-line:readonly-array
+  let objectKeys: string[];
+  try {
+    const listedObjectsResult = await OBJECT_STORAGE_CLIENT.listObjectsV2({
+      Bucket: bucket,
+    }).promise();
+    // tslint:disable-next-line:readonly-array
+    objectKeys = (listedObjectsResult.Contents?.map(o => o.Key) as string[]) || [];
+  } catch (error) {
+    if (error.statusCode === 404) {
+      // Bucket doesn't exist
+      return;
+    }
+    throw error;
+  }
+
+  await OBJECT_STORAGE_CLIENT.deleteObjects({
+    Bucket: bucket,
+    Delete: { Objects: objectKeys.map(k => ({ Key: k })) },
   }).promise();
 }
 
 async function setUpServices(service: string): Promise<void> {
   await dockerCompose.upOne(service, { composeOptions: COMPOSE_OPTIONS, log: true });
+
+  await OBJECT_STORAGE_CLIENT.createBucket({
+    Bucket: OBJECT_STORAGE_BUCKET,
+  }).promise();
 }
 
 async function tearDownServices(): Promise<void> {
@@ -61,4 +109,22 @@ async function tearDownServices(): Promise<void> {
     composeOptions: COMPOSE_OPTIONS,
     log: true,
   });
+}
+
+export async function stopService(service: string): Promise<void> {
+  await dockerCompose.stopOne(service, {
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
+}
+
+export async function startService(service: string): Promise<void> {
+  await dockerCompose.restartOne(service, {
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
+}
+
+async function restartAllServices(): Promise<void> {
+  await dockerCompose.restartAll({ composeOptions: COMPOSE_OPTIONS, log: true });
 }

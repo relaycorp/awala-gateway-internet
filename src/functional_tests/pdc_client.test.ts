@@ -9,7 +9,7 @@ import {
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-import { configureServices } from './services';
+import { configureServices, startService, stopService } from './services';
 import {
   connectToNatsStreaming,
   OBJECT_STORAGE_BUCKET,
@@ -37,8 +37,8 @@ beforeAll(async () => {
 });
 
 let natsStreamingConnection: Stan;
-beforeAll(async () => (natsStreamingConnection = await connectToNatsStreaming()));
-afterAll(async () => natsStreamingConnection.close());
+beforeEach(async () => (natsStreamingConnection = await connectToNatsStreaming()));
+afterEach(async () => natsStreamingConnection.close());
 
 describe('PDC client', () => {
   test('Successfully delivered parcels should be taken off the queue', async () => {
@@ -46,13 +46,23 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(2);
+    await sleep(5);
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 
-  test.todo('Parcels refused as invalid should be taken off the queue');
+  test('Undelivered parcels should remain in the queue', async () => {
+    await stopService('pong');
+    try {
+      const parcel = new Parcel(PONG_ENDPOINT_ADDRESS, senderCertificate, Buffer.from([]));
 
-  test.todo('Unsuccessfully delivered parcels should remain in the queue');
+      await queueParcel(parcel);
+
+      await sleep(2);
+      await expect(isParcelInStore(parcel)).resolves.toBeTrue();
+    } finally {
+      await startService('pong');
+    }
+  });
 });
 
 async function queueParcel(parcel: Parcel): Promise<void> {

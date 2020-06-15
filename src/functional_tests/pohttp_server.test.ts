@@ -18,8 +18,8 @@ configureServices('pohttp');
 describe('PoHTTP server', () => {
   // tslint:disable-next-line:no-let
   let stanConnection: Stan;
-  beforeAll(async () => (stanConnection = await connectToNatsStreaming()));
-  afterAll(async () => stanConnection.close());
+  beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
+  afterEach(async () => stanConnection.close());
 
   test('Valid parcel should be accepted', async cb => {
     const pdaChain = await generatePdaChain();

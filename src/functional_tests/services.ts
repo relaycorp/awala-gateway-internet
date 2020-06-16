@@ -26,7 +26,6 @@ export function configureServices(serviceUnderTest: string, includeVault = true)
     jest.setTimeout(15_000);
     await tearDownServices();
     await setUpServices(serviceUnderTest);
-    await sleep(1);
   });
   afterAll(tearDownServices);
 
@@ -94,8 +93,10 @@ async function emptyBucket(bucket: string): Promise<void> {
   }).promise();
 }
 
-async function setUpServices(service: string): Promise<void> {
-  await dockerCompose.upOne(service, { composeOptions: COMPOSE_OPTIONS, log: true });
+async function setUpServices(mainService: string): Promise<void> {
+  await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
+
+  await sleep(1);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

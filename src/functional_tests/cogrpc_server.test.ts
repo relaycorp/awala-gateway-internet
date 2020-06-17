@@ -58,6 +58,8 @@ describe('Cargo collection', () => {
   test.todo('Authorized CCA should be accepted');
 
   test.todo('Unauthorized CCA should be refused');
+
+  test.todo('CCAs should not be reusable');
 });
 
 function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {

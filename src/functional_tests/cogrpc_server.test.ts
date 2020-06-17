@@ -1,10 +1,9 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
 import { Cargo, generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
-import { Message, Stan } from 'node-nats-streaming';
 
 import { asyncIterableToArray } from '../_test_utils';
 import { configureServices } from './services';
-import { connectToNatsStreaming, generatePdaChain } from './utils';
+import { generatePdaChain, getFirstQueueMessage } from './utils';
 
 const GW_GOGRPC_URL = 'http://127.0.0.1:8081';
 
@@ -12,10 +11,6 @@ const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 configureServices('cogrpc');
-// tslint:disable-next-line:no-let
-let stanConnection: Stan;
-beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
-afterEach(async () => stanConnection.close());
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
@@ -69,27 +64,4 @@ function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {
   for (const item of array) {
     yield item;
   }
-}
-
-async function getFirstQueueMessage(subject: string): Promise<Buffer | undefined> {
-  const subscription = stanConnection.subscribe(
-    subject,
-    'functional-tests',
-    stanConnection.subscriptionOptions().setDeliverAllAvailable(),
-  );
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      subscription.close();
-      resolve();
-    }, 3_000);
-    subscription.on('error', error => {
-      clearTimeout(timeout);
-      subscription.close();
-      reject(error);
-    });
-    subscription.on('message', (message: Message) => {
-      clearTimeout(timeout);
-      resolve(message.getRawData());
-    });
-  });
 }

@@ -96,7 +96,7 @@ async function emptyBucket(bucket: string): Promise<void> {
 async function setUpServices(mainService: string): Promise<void> {
   await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
 
-  await sleep(2);
+  await sleep(4);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

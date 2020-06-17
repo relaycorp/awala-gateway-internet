@@ -7,7 +7,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Stan } from 'node-nats-streaming';
+import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
@@ -57,6 +57,34 @@ export function connectToNatsStreaming(): Promise<Stan> {
       },
     );
     stanConnection.on('connect', resolve);
+  });
+}
+
+export async function getFirstQueueMessage(subject: string): Promise<Buffer | undefined> {
+  const stanConnection = await connectToNatsStreaming();
+  const subscription = stanConnection.subscribe(
+    subject,
+    'functional-tests',
+    stanConnection.subscriptionOptions().setDeliverAllAvailable(),
+  );
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      subscription.close();
+      stanConnection.close();
+      resolve();
+    }, 3_000);
+    subscription.on('error', error => {
+      clearTimeout(timeout);
+      subscription.close();
+      stanConnection.close();
+      reject(error);
+    });
+    subscription.on('message', (message: Message) => {
+      clearTimeout(timeout);
+      subscription.close();
+      stanConnection.close();
+      resolve(message.getRawData());
+    });
   });
 }
 

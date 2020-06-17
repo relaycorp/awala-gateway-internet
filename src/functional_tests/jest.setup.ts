@@ -4,6 +4,7 @@ dotEnv.config();
 
 // tslint:disable-next-line:no-object-mutation
 Object.assign(process.env, {
+  COGRPC_REQUIRE_TLS: 'false',
   NATS_SERVER_URL: 'nats://127.0.0.1:4222',
   OBJECT_STORE_ENDPOINT: 'http://127.0.0.1:9000',
   POHTTP_TLS_REQUIRED: 'false',

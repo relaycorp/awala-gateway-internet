@@ -52,6 +52,7 @@ services:
       - mongodb
       - nats
       - object-store
+      - vault
     volumes:
       - ./src:/opt/gw-dev/src:ro
 

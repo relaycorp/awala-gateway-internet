@@ -63,6 +63,7 @@ export function connectToNatsStreaming(): Promise<Stan> {
 export async function generatePdaChain(): Promise<{
   readonly pda: Certificate;
   readonly privateGatewayCertificate: Certificate;
+  readonly privateGatewayPrivateKey: CryptoKey;
   readonly peerEndpointCertificate: Certificate;
   readonly privateKey: CryptoKey;
   readonly chain: readonly Certificate[];
@@ -105,6 +106,7 @@ export async function generatePdaChain(): Promise<{
     pda,
     peerEndpointCertificate,
     privateGatewayCertificate,
+    privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     privateKey: pdaGranteeKeyPair.privateKey,
   };
 }

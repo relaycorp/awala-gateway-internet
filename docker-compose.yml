@@ -48,7 +48,10 @@ services:
       VAULT_KV_PREFIX: ${VAULT_KV_PREFIX}
     ports:
       - '127.0.0.1:8081:8080'
-    links: [nats, mongodb]
+    links:
+      - mongodb
+      - nats
+      - object-store
     volumes:
       - ./src:/opt/gw-dev/src:ro
 

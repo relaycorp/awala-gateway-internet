@@ -1,5 +1,5 @@
 // tslint:disable:no-let
-import { CogRPCClient } from '@relaycorp/cogrpc';
+import { CogRPCClient, CogRPCError } from '@relaycorp/cogrpc';
 import {
   Cargo,
   CargoCollectionAuthorization,
@@ -106,9 +106,40 @@ describe('Cargo collection', () => {
     await expect(Array.from(cargoMessageSet.messages)).toEqual([parcelSerialized]);
   });
 
-  test.todo('Unauthorized CCA should be refused');
+  test('Unauthorized CCA should return zero cargoes', async () => {
+    const unauthorizedSenderKeyPair = await generateRSAKeyPair();
+    const unauthorizedCertificate = await issueGatewayCertificate({
+      issuerPrivateKey: unauthorizedSenderKeyPair.privateKey,
+      subjectPublicKey: unauthorizedSenderKeyPair.publicKey,
+      validityEndDate: TOMORROW,
+    });
 
-  test.todo('CCAs should not be reusable');
+    const cca = new CargoCollectionAuthorization(
+      GW_GOGRPC_URL,
+      unauthorizedCertificate,
+      Buffer.from([]),
+    );
+    const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
+    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    await expect(
+      asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
+    ).resolves.toHaveLength(0);
+  });
+
+  test('CCAs should not be reusable', async () => {
+    const cca = new CargoCollectionAuthorization(
+      GW_GOGRPC_URL,
+      PDA_CHAIN.privateGatewayCert,
+      Buffer.from([]),
+    );
+    const ccaSerialized = Buffer.from(await cca.serialize(PDA_CHAIN.privateGatewayPrivateKey));
+
+    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
+    await expect(
+      asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
+    ).rejects.toBeInstanceOf(CogRPCError);
+  });
 });
 
 function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {

@@ -74,8 +74,8 @@ describe('Cargo collection', () => {
       PDA_CHAIN.pdaCert,
       Buffer.from([]),
     );
-    const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), OBJECT_STORAGE_BUCKET);
     const parcelSerialized = await parcel.serialize(PDA_CHAIN.pdaGranteePrivateKey);
+    const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), OBJECT_STORAGE_BUCKET);
     await parcelStore.storeGatewayBoundParcel(
       parcel,
       Buffer.from(parcelSerialized),

@@ -66,7 +66,7 @@ export interface PdaChain {
   readonly pdaGranteePrivateKey: CryptoKey;
 }
 
-export async function generateStubPdaChain(): Promise<PdaChain> {
+export async function generatePdaChain(): Promise<PdaChain> {
   const publicGatewayKeyPair = await generateRSAKeyPair();
   const publicGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({

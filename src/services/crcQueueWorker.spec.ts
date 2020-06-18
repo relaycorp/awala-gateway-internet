@@ -28,7 +28,7 @@ import * as privateKeyStore from '../backingServices/privateKeyStore';
 import {
   castMock,
   configureMockEnvVars,
-  generateStubPdaChain,
+  generatePdaChain,
   getMockInstance,
   mockStanMessage,
   PdaChain,
@@ -119,7 +119,7 @@ let CERT_CHAIN: PdaChain;
 let PUBLIC_GW_SESSION_KEY_PAIR: CryptoKeyPair;
 let PUBLIC_GW_SESSION_CERT: Certificate;
 beforeAll(async () => {
-  CERT_CHAIN = await generateStubPdaChain();
+  CERT_CHAIN = await generatePdaChain();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -308,7 +308,7 @@ describe('Parcel processing', () => {
   });
 
   test('Parcels from different gateway should be logged and ignored', async () => {
-    const differentPdaChain = await generateStubPdaChain();
+    const differentPdaChain = await generatePdaChain();
     const parcel = new Parcel('https://example.com', differentPdaChain.pdaCert, Buffer.from('hi'), {
       senderCaCertificateChain: [differentPdaChain.privateGatewayCert],
     });

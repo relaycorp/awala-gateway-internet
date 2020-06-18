@@ -9,9 +9,9 @@ import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
   configureMockEnvVars,
+  generatePdaChain,
   generateStubEndpointCertificate,
   generateStubParcel,
-  generateStubPdaChain,
   PdaChain,
   sha256Hex,
 } from '../_test_utils';
@@ -42,7 +42,7 @@ let stubPdaChain: PdaChain;
 
 let PARCEL: Parcel;
 beforeAll(async () => {
-  stubPdaChain = await generateStubPdaChain();
+  stubPdaChain = await generatePdaChain();
 
   PARCEL = await generateStubParcel({
     recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),

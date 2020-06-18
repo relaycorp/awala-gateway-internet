@@ -13,6 +13,8 @@ import envVar from 'env-var';
 import * as stan from 'node-nats-streaming';
 import * as pkijs from 'pkijs';
 
+import { PdaChain } from '../_test_utils';
+
 export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
@@ -54,16 +56,6 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
 
 export function castMock<T>(partialMock: Partial<T>): T {
   return (partialMock as unknown) as T;
-}
-
-export interface PdaChain {
-  readonly publicGatewayCert: Certificate;
-  readonly publicGatewayPrivateKey: CryptoKey;
-  readonly privateGatewayCert: Certificate;
-  readonly privateGatewayPrivateKey: CryptoKey;
-  readonly peerEndpointCert: Certificate;
-  readonly pdaCert: Certificate;
-  readonly pdaGranteePrivateKey: CryptoKey;
 }
 
 export async function generatePdaChain(): Promise<PdaChain> {

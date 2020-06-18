@@ -1,5 +1,4 @@
 import {
-  Certificate,
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
@@ -9,6 +8,7 @@ import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
 import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
+import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
 const TOMORROW = new Date();
@@ -88,14 +88,7 @@ export async function getFirstQueueMessage(subject: string): Promise<Buffer | un
   });
 }
 
-export async function generatePdaChain(): Promise<{
-  readonly pda: Certificate;
-  readonly privateGatewayCertificate: Certificate;
-  readonly privateGatewayPrivateKey: CryptoKey;
-  readonly peerEndpointCertificate: Certificate;
-  readonly privateKey: CryptoKey;
-  readonly chain: readonly Certificate[];
-}> {
+export async function generatePdaChain(): Promise<PdaChain> {
   const privateKeyStore = initVaultKeyStore();
   const publicGatewayKeyId = Buffer.from(
     getEnvVar('GATEWAY_KEY_ID')
@@ -130,11 +123,12 @@ export async function generatePdaChain(): Promise<{
   });
 
   return {
-    chain: [privateGatewayCertificate, peerEndpointCertificate],
-    pda,
-    peerEndpointCertificate,
-    privateGatewayCertificate,
+    pdaCert: pda,
+    pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
+    peerEndpointCert: peerEndpointCertificate,
+    privateGatewayCert: privateGatewayCertificate,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    privateKey: pdaGranteeKeyPair.privateKey,
+    publicGatewayCert: publicGatewayKeyPair.certificate,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
   };
 }

@@ -1,5 +1,11 @@
+// tslint:disable:no-let
 import { CogRPCClient } from '@relaycorp/cogrpc';
-import { Cargo, generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
+import {
+  Cargo,
+  Certificate,
+  generateRSAKeyPair,
+  issueGatewayCertificate,
+} from '@relaycorp/relaynet-core';
 
 import { asyncIterableToArray } from '../_test_utils';
 import { configureServices } from './services';
@@ -12,12 +18,18 @@ TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 configureServices('cogrpc');
 
+let PRIVATE_GATEWAY_PRIVATE_KEY: CryptoKey;
+let PRIVATE_GATEWAY_CERTIFICATE: Certificate;
+beforeEach(async () => {
+  const pdaChain = await generatePdaChain();
+  PRIVATE_GATEWAY_PRIVATE_KEY = pdaChain.privateGatewayPrivateKey;
+  PRIVATE_GATEWAY_CERTIFICATE = pdaChain.privateGatewayCert;
+});
+
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
-    const pdaChain = await generatePdaChain();
-
-    const cargo = new Cargo(GW_GOGRPC_URL, pdaChain.privateGatewayCertificate, Buffer.from([1]));
-    const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
+    const cargo = new Cargo(GW_GOGRPC_URL, PRIVATE_GATEWAY_CERTIFICATE, Buffer.from([]));
+    const cargoSerialized = Buffer.from(await cargo.serialize(PRIVATE_GATEWAY_PRIVATE_KEY));
 
     const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
     const deliveryId = 'random-delivery-id';

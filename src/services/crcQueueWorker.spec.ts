@@ -20,7 +20,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
-import { mockPino, mockSpy } from '../_test_utils';
+import { mockPino, mockSpy, PdaChain } from '../_test_utils';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
@@ -31,7 +31,6 @@ import {
   generatePdaChain,
   getMockInstance,
   mockStanMessage,
-  PdaChain,
 } from './_test_utils';
 import * as mongoPublicKeyStore from './MongoPublicKeyStore';
 import * as parcelCollection from './parcelCollection';

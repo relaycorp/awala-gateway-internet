@@ -4,7 +4,7 @@ import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
-import { mockSpy } from '../../_test_utils';
+import { mockSpy, PdaChain } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
@@ -12,7 +12,6 @@ import {
   generatePdaChain,
   generateStubEndpointCertificate,
   generateStubParcel,
-  PdaChain,
   sha256Hex,
 } from '../_test_utils';
 import * as certs from '../certs';

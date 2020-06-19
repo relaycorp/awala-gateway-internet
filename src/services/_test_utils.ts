@@ -102,10 +102,11 @@ export async function generatePdaChain(): Promise<PdaChain> {
     pdaCert: endpointPdaCert,
     pdaGranteePrivateKey: endpointKeyPair.privateKey,
     peerEndpointCert,
+    peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
     privateGatewayCert,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     publicGatewayCert,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey
   };
 }
 

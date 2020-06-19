@@ -29,6 +29,7 @@ import {
   castMock,
   configureMockEnvVars,
   generatePdaChain,
+  getMockContext,
   getMockInstance,
   mockStanMessage,
 } from './_test_utils';
@@ -96,6 +97,7 @@ const PARCEL_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
+mockSpy(jest.spyOn(ParcelStore.prototype, 'storeEndpointBoundParcel'), () => PARCEL.id);
 
 //region Parcel collection fixtures
 
@@ -256,16 +258,30 @@ test('Session keys of sender should be stored if present', async () => {
 });
 
 describe('Parcel processing', () => {
+  test('Parcels should be stored in the object store', async () => {
+    mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
+
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(ParcelStore.prototype.storeEndpointBoundParcel).toBeCalledTimes(1);
+    expect(ParcelStore.prototype.storeEndpointBoundParcel).toBeCalledWith(
+      Buffer.from(PARCEL_SERIALIZED),
+    );
+  });
+
   test('Parcels should be published on channel "crc-parcels"', async () => {
     mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
     expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
-    expect(mockNatsClient.publishMessage).toBeCalledWith(
-      Buffer.from(PARCEL_SERIALIZED),
-      'crc-parcels',
-    );
+    expect(mockNatsClient.publishMessage).toBeCalledWith(expect.anything(), 'crc-parcels');
+
+    const publishMessageArgs = getMockContext(mockNatsClient.publishMessage).calls[0];
+    const messageData = JSON.parse(publishMessageArgs[0].toString());
+    expect(messageData).toHaveProperty('parcelExpiryDate', PARCEL.expiryDate.toISOString());
+    expect(messageData).toHaveProperty('parcelRecipientAddress', PARCEL.recipientAddress);
+    expect(messageData).toHaveProperty('parcelObjectKey', PARCEL.id);
   });
 
   test('Parcels should have their collection recorded', async () => {

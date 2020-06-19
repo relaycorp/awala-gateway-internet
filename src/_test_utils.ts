@@ -52,6 +52,7 @@ export interface PdaChain {
   readonly privateGatewayCert: Certificate;
   readonly privateGatewayPrivateKey: CryptoKey;
   readonly peerEndpointCert: Certificate;
+  readonly peerEndpointPrivateKey: CryptoKey;
   readonly pdaCert: Certificate;
   readonly pdaGranteePrivateKey: CryptoKey;
 }

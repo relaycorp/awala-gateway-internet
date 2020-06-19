@@ -97,7 +97,13 @@ const PARCEL_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
-mockSpy(jest.spyOn(ParcelStore.prototype, 'storeEndpointBoundParcel'), () => PARCEL.id);
+mockSpy(
+  jest.spyOn(ParcelStore.prototype, 'storeEndpointBoundParcel'),
+  async (parcelSerialized: Buffer) => {
+    const parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
+    return parcel.id;
+  },
+);
 
 //region Parcel collection fixtures
 
@@ -394,7 +400,6 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
       senderCaCertificateChain: [CERT_CHAIN.peerEndpointCert, CERT_CHAIN.privateGatewayCert],
     },
   );
-  const stubParcel2Serialized = await additionalParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey);
   const stubCargo1Serialized = await generateCargoSerialized(
     Buffer.from('Not valid'),
     PARCEL_SERIALIZED,
@@ -402,14 +407,18 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
 
   mockQueueMessages = [
     mockStanMessage(await stubCargo1Serialized),
-    mockStanMessage(await generateCargoSerialized(stubParcel2Serialized)),
+    mockStanMessage(
+      await generateCargoSerialized(
+        await additionalParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey),
+      ),
+    ),
   ];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-  expect(mockPublishedMessages.map(bufferToArray)).toEqual([
-    PARCEL_SERIALIZED,
-    stubParcel2Serialized,
+  expect(mockPublishedMessages).toEqual([
+    expect.stringMatching(PARCEL.id),
+    expect.stringMatching(additionalParcel.id),
   ]);
 
   const cargoSenderAddress = await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();

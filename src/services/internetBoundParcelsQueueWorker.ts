@@ -61,21 +61,37 @@ export async function processInternetBoundParcels(
         parcelData.parcelObjectKey,
       );
 
+      // tslint:disable-next-line:no-let
+      let wasParcelDelivered = true;
       try {
         await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {
           gatewayAddress: ownPohttpAddress,
         });
       } catch (err) {
+        wasParcelDelivered = false;
         if (err instanceof PoHTTPInvalidParcelError) {
-          await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
-          parcelData.ack();
+          LOGGER.info(
+            { err, parcelObjectKey: parcelData.parcelObjectKey },
+            'Parcel was rejected as invalid',
+          );
         } else {
           LOGGER.warn(
             { err, parcelObjectKey: parcelData.parcelObjectKey },
             'Failed to deliver parcel',
           );
+          continue;
         }
       }
+
+      if (wasParcelDelivered) {
+        LOGGER.debug(
+          { parcelObjectKey: parcelData.parcelObjectKey },
+          'Parcel was successfully delivered',
+        );
+      }
+
+      await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+      parcelData.ack();
     }
   }
 

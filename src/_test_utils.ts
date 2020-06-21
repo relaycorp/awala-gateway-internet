@@ -1,3 +1,4 @@
+import { Certificate } from '@relaycorp/relaynet-core';
 import pino from 'pino';
 
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
@@ -18,7 +19,7 @@ export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promi
 // tslint:disable-next-line:readonly-array
 export function mockSpy<T, Y extends any[]>(
   spy: jest.MockInstance<T, Y>,
-  mockImplementation?: () => any,
+  mockImplementation?: (...args: readonly any[]) => any,
 ): jest.MockInstance<T, Y> {
   beforeEach(() => {
     spy.mockReset();
@@ -43,4 +44,15 @@ export function mockPino(): pino.Logger {
   };
   jest.mock('pino', () => jest.fn().mockImplementation(() => mockPinoLogger));
   return mockPinoLogger as any;
+}
+
+export interface PdaChain {
+  readonly publicGatewayCert: Certificate;
+  readonly publicGatewayPrivateKey: CryptoKey;
+  readonly privateGatewayCert: Certificate;
+  readonly privateGatewayPrivateKey: CryptoKey;
+  readonly peerEndpointCert: Certificate;
+  readonly peerEndpointPrivateKey: CryptoKey;
+  readonly pdaCert: Certificate;
+  readonly pdaGranteePrivateKey: CryptoKey;
 }

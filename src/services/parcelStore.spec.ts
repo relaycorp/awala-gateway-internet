@@ -1,16 +1,26 @@
+// tslint:disable:no-let
+import { Parcel } from '@relaycorp/relaynet-core';
+
 import { arrayToAsyncIterable, asyncIterableToArray, mockPino, mockSpy } from '../_test_utils';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
-import { sha256Hex } from './_test_utils';
+import { generatePdaChain, sha256Hex } from './_test_utils';
 
 const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
-const PARCEL_SERIALIZED = Buffer.from('The RAMF-serialized parcel');
+
+let PARCEL: Parcel;
+let PARCEL_SERIALIZED: Buffer;
+beforeAll(async () => {
+  const pdaChain = await generatePdaChain();
+  PARCEL = new Parcel('0deadbeef', pdaChain.pdaCert, Buffer.from([]));
+  PARCEL_SERIALIZED = Buffer.from(await PARCEL.serialize(pdaChain.pdaGranteePrivateKey));
+});
+
+const PRIVATE_GATEWAY_ADDRESS = '0beefdead';
 
 describe('retrieveActiveParcelsForGateway', () => {
-  const PEER_GATEWAY_ADDRESS = 'gateway-address';
-
   const mockGetObject = mockSpy(jest.fn());
   const mockListObjectKeys = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
   const mockObjectStoreClient: ObjectStoreClient = {
@@ -20,10 +30,10 @@ describe('retrieveActiveParcelsForGateway', () => {
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
   test('Parcels should be limited to those for the specified gateway', async () => {
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS));
+    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS));
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(
-      `parcels/gateway-bound/${PEER_GATEWAY_ADDRESS}/`,
+      `parcels/gateway-bound/${PRIVATE_GATEWAY_ADDRESS}/`,
       expect.anything(),
     );
   });
@@ -37,7 +47,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     };
     setMockParcelObjectStore(objectsByKey);
 
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS));
+    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS));
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
     expect(mockGetObject).toBeCalledTimes(1);
@@ -61,7 +71,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
     );
 
     expect(activeParcels).toEqual([
@@ -85,7 +95,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     });
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
@@ -110,7 +120,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
   });
@@ -130,7 +140,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
@@ -156,7 +166,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PEER_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
@@ -178,14 +188,64 @@ describe('retrieveActiveParcelsForGateway', () => {
     return date;
   }
 
-  function getTimestamp(date: Date): number {
-    return date.getTime() / 1_000;
-  }
-
   function getTimestampRelativeToNow(deltaSeconds: number): string {
     const date = getDateRelativeToNow(deltaSeconds);
     return getTimestamp(date).toString();
   }
+});
+
+describe('storeGatewayBoundParcel', () => {
+  const mockPutObject = mockSpy(jest.fn());
+  const mockObjectStoreClient: ObjectStoreClient = { putObject: mockPutObject } as any;
+  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+
+  test('Full object key should be output', async () => {
+    const objectKey = await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+    );
+
+    expect(mockPutObject).toBeCalledWith(expect.anything(), objectKey, expect.anything());
+    expect(objectKey).toEqual(
+      [
+        'parcels',
+        'gateway-bound',
+        PRIVATE_GATEWAY_ADDRESS,
+        PARCEL.recipientAddress,
+        await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+        sha256Hex(PARCEL.id),
+      ].join('/'),
+    );
+  });
+
+  test('Object should be put in the right bucket', async () => {
+    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+
+    expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
+  });
+
+  test('Parcel expiry date should be stored as object metadata', async () => {
+    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+
+    expect(mockPutObject).toBeCalledWith(
+      expect.objectContaining({
+        metadata: { ['parcel-expiry']: getTimestamp(PARCEL.expiryDate).toString() },
+      }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  test('Parcel serialization should be stored', async () => {
+    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+
+    expect(mockPutObject).toBeCalledWith(
+      expect.objectContaining({ body: PARCEL_SERIALIZED }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
 });
 
 describe('deleteGatewayBoundParcel', () => {
@@ -305,3 +365,7 @@ describe('deleteEndpointBoundParcel', () => {
     expect(mockDeleteObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
   });
 });
+
+function getTimestamp(date: Date): number {
+  return Math.floor(date.getTime() / 1_000);
+}

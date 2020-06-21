@@ -128,10 +128,7 @@ describe('processInternetBoundParcels', () => {
     );
   });
 
-  test('Parcel should be discarded when server refuses it invalid', async () => {
-    MOCK_DELIVER_PARCEL.mockRejectedValue(
-      new pohttp.PoHTTPInvalidParcelError('Parcel smells funny'),
-    );
+  test('Parcel should be deleted and taken off queue when successfully delivered', async () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
@@ -139,7 +136,26 @@ describe('processInternetBoundParcels', () => {
 
     expect(message.ack).toBeCalledTimes(1);
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
-    expect(MOCK_PINO.warn).not.toBeCalled();
+    expect(MOCK_PINO.debug).toBeCalledWith(
+      { parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey },
+      'Parcel was successfully delivered',
+    );
+  });
+
+  test('Parcel should be discarded when server refuses it invalid', async () => {
+    const err = new pohttp.PoHTTPInvalidParcelError('Parcel smells funny');
+    MOCK_DELIVER_PARCEL.mockRejectedValue(err);
+    const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(message.ack).toBeCalledTimes(1);
+    expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
+    expect(MOCK_PINO.info).toBeCalledWith(
+      { err, parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey },
+      'Parcel was rejected as invalid',
+    );
   });
 
   test('Parcel should be redelivered later if transient delivery error occurs', async () => {

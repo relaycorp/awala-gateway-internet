@@ -1,15 +1,16 @@
-import { CargoMessageStream } from '@relaycorp/relaynet-core';
+import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
 import { createHash } from 'crypto';
 import pino from 'pino';
 import uuid from 'uuid-random';
 
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
+import { convertDateToTimestamp } from '../utils';
 
 const LOGGER = pino();
 
-export const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
+const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
-export const EXPIRY_METADATA_KEY = 'parcel-expiry';
+const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
   constructor(protected objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
@@ -42,6 +43,28 @@ export class ParcelStore {
       }
       yield { expiryDate: parcelExpiryDate, message: parcelObject.body };
     }
+  }
+
+  public async storeGatewayBoundParcel(
+    parcel: Parcel,
+    parcelSerialized: Buffer,
+    privateGatewayAddress: string,
+  ): Promise<string> {
+    const key = calculatedGatewayBoundParcelObjectKey(
+      parcel.id,
+      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      parcel.recipientAddress,
+      privateGatewayAddress,
+    );
+    await this.objectStoreClient.putObject(
+      {
+        body: parcelSerialized,
+        metadata: { [EXPIRY_METADATA_KEY]: convertDateToTimestamp(parcel.expiryDate).toString() },
+      },
+      key,
+      this.bucket,
+    );
+    return key;
   }
 
   /**
@@ -107,7 +130,7 @@ function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-export function calculatedGatewayBoundParcelObjectKey(
+function calculatedGatewayBoundParcelObjectKey(
   parcelId: string,
   senderPrivateAddress: string,
   recipientAddress: string,
@@ -127,8 +150,3 @@ function sha256Hex(plaintext: string): string {
     .update(plaintext)
     .digest('hex');
 }
-
-// TODO: Move here
-// async function storeParcel(_parcel: Parcel, _parcelSerialized: Buffer): Promise<string> {
-//   throw new Error('Not implemented');
-// }

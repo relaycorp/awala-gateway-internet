@@ -1,5 +1,4 @@
 import {
-  Certificate,
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
@@ -7,11 +6,12 @@ import {
 } from '@relaycorp/relaynet-core';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Stan } from 'node-nats-streaming';
+import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
+import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
-const TOMORROW = new Date();
+export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const OBJECT_STORAGE_CLIENT = initS3Client();
@@ -23,7 +23,7 @@ export async function sleep(seconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, seconds * 1_000));
 }
 
-export function initS3Client(): S3 {
+function initS3Client(): S3 {
   const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
     .required()
     .asString();
@@ -60,13 +60,35 @@ export function connectToNatsStreaming(): Promise<Stan> {
   });
 }
 
-export async function generatePdaChain(): Promise<{
-  readonly pda: Certificate;
-  readonly privateGatewayCertificate: Certificate;
-  readonly peerEndpointCertificate: Certificate;
-  readonly privateKey: CryptoKey;
-  readonly chain: readonly Certificate[];
-}> {
+export async function getFirstQueueMessage(subject: string): Promise<Buffer | undefined> {
+  const stanConnection = await connectToNatsStreaming();
+  const subscription = stanConnection.subscribe(
+    subject,
+    'functional-tests',
+    stanConnection.subscriptionOptions().setDeliverAllAvailable(),
+  );
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      subscription.close();
+      stanConnection.close();
+      resolve();
+    }, 3_000);
+    subscription.on('error', error => {
+      clearTimeout(timeout);
+      subscription.close();
+      stanConnection.close();
+      reject(error);
+    });
+    subscription.on('message', (message: Message) => {
+      clearTimeout(timeout);
+      subscription.close();
+      stanConnection.close();
+      resolve(message.getRawData());
+    });
+  });
+}
+
+export async function generatePdaChain(): Promise<PdaChain> {
   const privateKeyStore = initVaultKeyStore();
   const publicGatewayKeyId = Buffer.from(
     getEnvVar('GATEWAY_KEY_ID')
@@ -101,10 +123,19 @@ export async function generatePdaChain(): Promise<{
   });
 
   return {
-    chain: [privateGatewayCertificate, peerEndpointCertificate],
-    pda,
-    peerEndpointCertificate,
-    privateGatewayCertificate,
-    privateKey: pdaGranteeKeyPair.privateKey,
+    pdaCert: pda,
+    pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
+    peerEndpointCert: peerEndpointCertificate,
+    peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
+    privateGatewayCert: privateGatewayCertificate,
+    privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
+    publicGatewayCert: publicGatewayKeyPair.certificate,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
   };
+}
+
+export function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {
+  for (const item of array) {
+    yield item;
+  }
 }

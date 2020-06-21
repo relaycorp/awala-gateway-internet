@@ -84,7 +84,7 @@ async function deliverCargo(
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
       try {
-        const cargo = await Cargo.deserialize(delivery.cargo);
+        const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
         await cargo.validate(trustedCerts);
       } catch (error) {
         // Acknowledge that we got it, not that it was accepted and stored. See:

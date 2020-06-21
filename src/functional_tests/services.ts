@@ -39,7 +39,7 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
     await tearDownServices();
     await setUpServices(serviceUnderTest);
   });
-  afterAll(tearDownServices);
+  // afterAll(tearDownServices);
 
   beforeEach(async () => {
     await clearServiceData(includeVault);
@@ -118,7 +118,7 @@ async function setUpServices(mainService?: string): Promise<void> {
     });
   }
 
-  await sleep(mainService === undefined ? 7 : 4);
+  await sleep(mainService === undefined ? 7 : 5);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

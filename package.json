@@ -79,7 +79,7 @@
     "grpc": "^1.24.2",
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
-    "mongoose": "^5.9.10",
+    "mongoose": "^5.9.19",
     "node-nats-streaming": "^0.2.6",
     "pino": "^5.16.0",
     "stream-to-it": "^0.2.0",

@@ -11,7 +11,7 @@ import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
-const TOMORROW = new Date();
+export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const OBJECT_STORAGE_CLIENT = initS3Client();
@@ -132,4 +132,10 @@ export async function generatePdaChain(): Promise<PdaChain> {
     publicGatewayCert: publicGatewayKeyPair.certificate,
     publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
   };
+}
+
+export function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {
+  for (const item of array) {
+    yield item;
+  }
 }

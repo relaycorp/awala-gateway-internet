@@ -1,8 +1,13 @@
 /* tslint:disable:no-let */
+
+import axios from 'axios';
 import * as dockerCompose from 'docker-compose';
 import { get as getEnvVar } from 'env-var';
 
 import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
+
+export const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
+export const PONG_ENDPOINT_ADDRESS = 'http://pong:8080/';
 
 const VAULT_URL = getEnvVar('VAULT_URL')
   .required()
@@ -10,6 +15,13 @@ const VAULT_URL = getEnvVar('VAULT_URL')
 const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
   .required()
   .asString();
+const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX')
+  .required()
+  .asString();
+const VAULT_CLIENT = axios.create({
+  baseURL: `${VAULT_URL}/v1`,
+  headers: { 'X-Vault-Token': VAULT_TOKEN },
+});
 
 // tslint:disable-next-line:readonly-array
 const COMPOSE_OPTIONS = [
@@ -21,7 +33,7 @@ const COMPOSE_OPTIONS = [
   'src/functional_tests/docker-compose.override.yml',
 ];
 
-export function configureServices(serviceUnderTest: string, includeVault = true): void {
+export function configureServices(serviceUnderTest?: string, includeVault = true): void {
   beforeAll(async () => {
     jest.setTimeout(15_000);
     await tearDownServices();
@@ -36,29 +48,32 @@ export function configureServices(serviceUnderTest: string, includeVault = true)
   });
 }
 
+export async function runServiceCommand(
+  serviceName: string,
+  // tslint:disable-next-line:readonly-array
+  command: string[],
+): Promise<string> {
+  const result = await dockerCompose.run(serviceName, command, {
+    commandOptions: ['--rm'],
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(`Command ${command} in ${serviceName} failed`);
+  }
+  return result.out;
+}
+
 async function bootstrapServiceData(includeVault = true): Promise<void> {
   if (includeVault) {
-    await dockerCompose.exec('vault', ['vault', 'secrets', 'enable', '-path=gw-keys', 'kv-v2'], {
-      commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
-
-    await dockerCompose.run('cogrpc', ['src/bin/generate-keypairs.ts'], {
-      commandOptions: ['--rm'],
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
+    await vaultEnableSecret(VAULT_KV_PREFIX);
+    await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
   }
 }
 
 export async function clearServiceData(includeVault = true): Promise<void> {
   if (includeVault) {
-    await dockerCompose.exec('vault', ['vault', 'secrets', 'disable', 'gw-keys'], {
-      commandOptions: ['--env', `VAULT_ADDR=${VAULT_URL}`, '--env', `VAULT_TOKEN=${VAULT_TOKEN}`],
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
+    await vaultDisableSecret(VAULT_KV_PREFIX);
   }
 
   await emptyBucket(OBJECT_STORAGE_BUCKET);
@@ -93,10 +108,17 @@ async function emptyBucket(bucket: string): Promise<void> {
   }).promise();
 }
 
-async function setUpServices(mainService: string): Promise<void> {
-  await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
+async function setUpServices(mainService?: string): Promise<void> {
+  if (mainService) {
+    await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
+  } else {
+    await dockerCompose.upAll({
+      composeOptions: COMPOSE_OPTIONS,
+      log: true,
+    });
+  }
 
-  await sleep(4);
+  await sleep(mainService === undefined ? 7 : 4);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,
@@ -127,4 +149,21 @@ export async function startService(service: string): Promise<void> {
 
 async function restartAllServices(): Promise<void> {
   await dockerCompose.restartAll({ composeOptions: COMPOSE_OPTIONS, log: true });
+}
+
+export async function vaultEnableSecret(kvPrefix: string): Promise<void> {
+  await VAULT_CLIENT.post(`/sys/mounts/${kvPrefix}`, {
+    options: { version: '2' },
+    type: 'kv',
+  });
+  await VAULT_CLIENT.put(`/sys/audit/${kvPrefix}`, {
+    options: {
+      file_path: `/tmp/${kvPrefix}.log`,
+    },
+    type: 'file',
+  });
+}
+
+export async function vaultDisableSecret(kvPrefix: string): Promise<void> {
+  await VAULT_CLIENT.delete(`/sys/mounts/${kvPrefix}`);
 }

@@ -12,10 +12,13 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { asyncIterableToArray, PdaChain } from '../_test_utils';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { ParcelStore } from '../services/parcelStore';
-import { configureServices } from './services';
-import { generatePdaChain, getFirstQueueMessage, OBJECT_STORAGE_BUCKET } from './utils';
-
-const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
+import { configureServices, GW_GOGRPC_URL } from './services';
+import {
+  arrayToIterable,
+  generatePdaChain,
+  getFirstQueueMessage,
+  OBJECT_STORAGE_BUCKET,
+} from './utils';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
@@ -141,9 +144,3 @@ describe('Cargo collection', () => {
     ).rejects.toBeInstanceOf(CogRPCError);
   });
 });
-
-function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {
-  for (const item of array) {
-    yield item;
-  }
-}

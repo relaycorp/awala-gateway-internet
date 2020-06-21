@@ -24,12 +24,12 @@ describe('PoHTTP server', () => {
   test('Valid parcel should be accepted', async cb => {
     const pdaChain = await generatePdaChain();
     const parcel = new Parcel(
-      await pdaChain.peerEndpointCertificate.calculateSubjectPrivateAddress(),
-      pdaChain.pda,
+      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+      pdaChain.pdaCert,
       Buffer.from([]),
-      { senderCaCertificateChain: pdaChain.chain },
+      { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
     );
-    const parcelSerialized = await parcel.serialize(pdaChain.privateKey);
+    const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     // We should get a successful response
     await expect(deliverParcel(GW_POHTTP_URL, parcelSerialized)).toResolve();
@@ -37,7 +37,7 @@ describe('PoHTTP server', () => {
     // The parcel should've been safely stored
     // TODO: Use the PoWebSockets interface instead once it's available
     const subscription = stanConnection.subscribe(
-      `pdc-parcel.${await pdaChain.privateGatewayCertificate.calculateSubjectPrivateAddress()}`,
+      `pdc-parcel.${await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
       'functional-tests',
       stanConnection.subscriptionOptions().setDeliverAllAvailable(),
     );

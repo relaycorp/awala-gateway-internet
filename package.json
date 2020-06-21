@@ -66,8 +66,8 @@
   "dependencies": {
     "@relaycorp/cogrpc": "^1.1.5",
     "@relaycorp/keystore-vault": "^1.1.2",
-    "@relaycorp/relaynet-core": "^1.28.0",
-    "@relaycorp/relaynet-pohttp": "^1.3.0",
+    "@relaycorp/relaynet-core": "^1.28.2",
+    "@relaycorp/relaynet-pohttp": "^1.5.0",
     "@typegoose/typegoose": "^6.2.2",
     "@types/pino": "^5.15.5",
     "aws-sdk": "^2.654.0",

@@ -9,15 +9,13 @@ import {
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-import { configureServices, startService, stopService } from './services';
+import { configureServices, PONG_ENDPOINT_ADDRESS, startService, stopService } from './services';
 import {
   connectToNatsStreaming,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
   sleep,
 } from './utils';
-
-const PONG_ENDPOINT_ADDRESS = 'http://pong:8080';
 
 configureServices('pdc-outgoing-queue-worker', false);
 

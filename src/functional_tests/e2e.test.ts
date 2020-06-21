@@ -23,7 +23,6 @@ import {
   PONG_ENDPOINT_ADDRESS,
   runServiceCommand,
   vaultDisableSecret,
-  // vaultDisableSecret,
   vaultEnableSecret,
 } from './services';
 import { arrayToIterable, generatePdaChain, sleep, TOMORROW } from './utils';

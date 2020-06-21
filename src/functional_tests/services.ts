@@ -39,7 +39,7 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
     await tearDownServices();
     await setUpServices(serviceUnderTest);
   });
-  // afterAll(tearDownServices);
+  afterAll(tearDownServices);
 
   beforeEach(async () => {
     await clearServiceData(includeVault);

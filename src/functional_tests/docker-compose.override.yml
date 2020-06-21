@@ -1,13 +1,32 @@
 version: '3.7'
 services:
   pong:
-    image: relaycorp/relaynet-pong:v1.3.1
+    image: relaycorp/relaynet-pong:v1.3.4
     init: true
     links:
       - redis
     environment:
       REDIS_HOST: redis
       POHTTP_TLS_REQUIRED: 'false'
+
+  pong-queue:
+    image: relaycorp/relaynet-pong:v1.3.4
+    init: true
+    command: node build/main/bin/background-queue.js
+    links:
+      - redis
+      - vault
+    environment:
+      POHTTP_TLS_REQUIRED: 'false'
+
+      REDIS_HOST: redis
+
+      VAULT_URL: ${VAULT_URL}
+      VAULT_TOKEN: ${VAULT_TOKEN}
+      VAULT_KV_PREFIX: pong-keys
+
+      ENDPOINT_KEY_ID: ${PONG_ENDPOINT_KEY_ID}
+
   redis:
     image: redis:4.0-alpine
     init: true
@@ -27,3 +46,7 @@ services:
       - object-store
     environment:
       POHTTP_TLS_REQUIRED: 'false'
+
+  cogrpc:
+    environment:
+      COGRPC_ADDRESS: http://127.0.0.1:8081/

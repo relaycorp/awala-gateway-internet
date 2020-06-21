@@ -7,7 +7,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
-import { calculatedGatewayBoundParcelObjectKey, EXPIRY_METADATA_KEY } from '../parcelStore';
+import { ParcelStore } from '../parcelStore';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -24,6 +24,7 @@ export default async function registerRoutes(
   const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET')
     .required()
     .asString();
+  const parcelStore = new ParcelStore(objectStoreClient, objectStoreBucket);
 
   fastify.route({
     method: ['PUT', 'DELETE', 'PATCH'],
@@ -88,13 +89,14 @@ export default async function registerRoutes(
       const recipientGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
 
       //region Save to object storage
-      const parcelObjectKey = await calculateParcelObjectKey(parcel, recipientGatewayAddress);
-      const parcelObject = {
-        body: request.body,
-        metadata: { [EXPIRY_METADATA_KEY]: convertDateToTimestamp(parcel.expiryDate).toString() },
-      };
+      // tslint:disable-next-line:no-let
+      let parcelObjectKey: string;
       try {
-        await objectStoreClient.putObject(parcelObject, parcelObjectKey, objectStoreBucket);
+        parcelObjectKey = await parcelStore.storeGatewayBoundParcel(
+          parcel,
+          request.body,
+          recipientGatewayAddress,
+        );
       } catch (error) {
         request.log.error({ err: error }, 'Failed to save parcel in object storage');
         return reply
@@ -125,21 +127,4 @@ export default async function registerRoutes(
       return reply.code(202).send({});
     },
   });
-}
-
-async function calculateParcelObjectKey(
-  parcel: Parcel,
-  recipientGatewayAddress: string,
-): Promise<string> {
-  const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-  return calculatedGatewayBoundParcelObjectKey(
-    parcel.id,
-    senderPrivateAddress,
-    parcel.recipientAddress,
-    recipientGatewayAddress,
-  );
-}
-
-function convertDateToTimestamp(expiryDate: Date): number {
-  return Math.floor(expiryDate.getTime() / 1_000);
 }

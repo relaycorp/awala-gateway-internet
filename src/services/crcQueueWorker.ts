@@ -18,6 +18,7 @@ import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
+import { QueuedInternetBoundParcelMessage } from './internetBoundParcelsQueueWorker';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
 import { ParcelStore } from './parcelStore';
@@ -75,6 +76,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
             item,
             itemSerialized,
             cargo,
+            parcelStore,
             mongooseConnection,
             natsStreamingClient,
             workerName,
@@ -125,6 +127,7 @@ async function processParcel(
   parcel: Parcel,
   parcelSerialized: ArrayBuffer,
   cargo: Cargo,
+  parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
   workerName: string,
@@ -153,6 +156,12 @@ async function processParcel(
     );
     return;
   }
-  await natsStreamingClient.publishMessage(Buffer.from(parcelSerialized), 'crc-parcels');
+  const parcelObjectKey = await parcelStore.storeEndpointBoundParcel(Buffer.from(parcelSerialized));
+  const messageData: QueuedInternetBoundParcelMessage = {
+    parcelExpiryDate: parcel.expiryDate,
+    parcelObjectKey,
+    parcelRecipientAddress: parcel.recipientAddress,
+  };
+  await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'crc-parcels');
   await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
 }

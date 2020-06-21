@@ -32,7 +32,7 @@
     "codecov": "^3.5.0",
     "docker-compose": "^0.23.4",
     "dotenv": "^8.2.0",
-    "fastify-plugin": "^1.6.0",
+    "fastify-plugin": "^1.6.1",
     "jest": "^25.1.0",
     "jest-extended": "^0.11.5",
     "npm-run-all": "^4.1.5",
@@ -40,7 +40,7 @@
     "prettier": "^1.19.1",
     "trash-cli": "^1.4.0",
     "ts-jest": "^25.2.1",
-    "ts-node": "^8.9.1",
+    "ts-node": "^8.10.2",
     "ts-node-dev": "^1.0.0-pre.44",
     "tslint": "^5.18.0",
     "typescript": "^3.8.3"
@@ -66,8 +66,8 @@
   "dependencies": {
     "@relaycorp/cogrpc": "^1.1.5",
     "@relaycorp/keystore-vault": "^1.1.2",
-    "@relaycorp/relaynet-core": "^1.28.0",
-    "@relaycorp/relaynet-pohttp": "^1.3.0",
+    "@relaycorp/relaynet-core": "^1.28.2",
+    "@relaycorp/relaynet-pohttp": "^1.5.0",
     "@typegoose/typegoose": "^6.2.2",
     "@types/pino": "^5.15.5",
     "aws-sdk": "^2.654.0",
@@ -79,9 +79,9 @@
     "grpc": "^1.24.2",
     "it-pipe": "^1.1.0",
     "make-promises-safe": "^5.1.0",
-    "mongoose": "^5.9.10",
+    "mongoose": "^5.9.19",
     "node-nats-streaming": "^0.2.6",
-    "pino": "^5.16.0",
+    "pino": "^6.3.2",
     "stream-to-it": "^0.2.0",
     "uuid-random": "^1.3.0"
   }

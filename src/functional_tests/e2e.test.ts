@@ -42,8 +42,6 @@ afterEach(async () => {
 });
 
 test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
-  jest.setTimeout(20_000);
-
   const pongEndpointSessionCertificate = await generatePongEndpointKeypairs();
 
   const pingId = Buffer.from(uuid());

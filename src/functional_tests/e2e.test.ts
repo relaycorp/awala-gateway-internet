@@ -61,7 +61,7 @@ test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
     ),
   );
 
-  await sleep(4);
+  await sleep(5);
 
   // Collect the pong message encapsulated in a cargo
   const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(await makeCCA()));

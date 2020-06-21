@@ -118,7 +118,7 @@ async function setUpServices(mainService?: string): Promise<void> {
     });
   }
 
-  await sleep(mainService === undefined ? 7 : 5);
+  await sleep(mainService === undefined ? 8 : 5);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

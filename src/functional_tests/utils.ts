@@ -11,6 +11,8 @@ import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 
+export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
+
 export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 

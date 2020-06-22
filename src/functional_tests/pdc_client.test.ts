@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import { configureServices, PONG_ENDPOINT_ADDRESS } from './services';
 import {
   connectToNatsStreaming,
+  IS_GITHUB,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
   sleep,
@@ -44,7 +45,7 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(3); // It takes forever in CI
+    await sleep(IS_GITHUB ? 5 : 3);
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 
@@ -53,7 +54,7 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(2);
+    await sleep(IS_GITHUB ? 5 : 2);
     await expect(isParcelInStore(parcel)).resolves.toBeTrue();
   });
 });

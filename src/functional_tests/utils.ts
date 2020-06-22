@@ -77,7 +77,7 @@ export async function getFirstQueueMessage(subject: string): Promise<Buffer | un
     }, 3_000);
     subscription.on('error', error => {
       clearTimeout(timeout);
-      subscription.close();
+      // Close the connection directly. Not the subscription because it probably wasn't created.
       stanConnection.close();
       reject(error);
     });

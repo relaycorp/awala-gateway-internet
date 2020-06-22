@@ -61,7 +61,7 @@ test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
     ),
   );
 
-  await sleep(6); // It takes forever in CI
+  await sleep(7); // It takes forever in CI
 
   // Collect the pong message encapsulated in a cargo
   const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(await makeCCA()));

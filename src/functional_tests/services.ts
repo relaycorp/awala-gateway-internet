@@ -79,6 +79,10 @@ async function bootstrapServiceData(includeVault = true): Promise<void> {
     await vaultEnableSecret(VAULT_KV_PREFIX);
     await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
   }
+
+  await OBJECT_STORAGE_CLIENT.createBucket({
+    Bucket: OBJECT_STORAGE_BUCKET,
+  }).promise();
 }
 
 async function setUpServices(mainService?: string): Promise<void> {
@@ -90,10 +94,6 @@ async function setUpServices(mainService?: string): Promise<void> {
       log: true,
     });
   }
-
-  await OBJECT_STORAGE_CLIENT.createBucket({
-    Bucket: OBJECT_STORAGE_BUCKET,
-  }).promise();
 }
 
 async function tearDownServices(): Promise<void> {

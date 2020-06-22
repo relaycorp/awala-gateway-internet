@@ -4,7 +4,7 @@ import axios from 'axios';
 import * as dockerCompose from 'docker-compose';
 import { get as getEnvVar } from 'env-var';
 
-import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT } from './utils';
+import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
 export const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
 export const PONG_ENDPOINT_ADDRESS = 'http://pong:8080/';
@@ -39,6 +39,10 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
 
     await tearDownServices();
     await setUpServices(serviceUnderTest);
+    if (getEnvVar('IS_GITHUB').asBool()) {
+      // GitHub is painfully slow
+      await sleep(10);
+    }
     await bootstrapServiceData(includeVault);
   });
 

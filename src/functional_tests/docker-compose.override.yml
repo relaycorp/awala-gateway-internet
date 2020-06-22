@@ -32,7 +32,6 @@ services:
     init: true
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      start_period: 6s
 
   pohttp:
     links:

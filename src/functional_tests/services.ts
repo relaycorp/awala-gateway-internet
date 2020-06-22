@@ -41,7 +41,7 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
     await setUpServices(serviceUnderTest);
     if (IS_GITHUB) {
       // GitHub is painfully slow
-      await sleep(10);
+      await sleep(2);
     }
     await bootstrapServiceData(includeVault);
   });

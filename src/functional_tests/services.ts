@@ -35,7 +35,7 @@ const COMPOSE_OPTIONS = [
 
 export function configureServices(serviceUnderTest?: string, includeVault = true): void {
   beforeEach(async () => {
-    jest.setTimeout(20_000);
+    jest.setTimeout(30_000);
 
     await tearDownServices();
     await setUpServices(serviceUnderTest);

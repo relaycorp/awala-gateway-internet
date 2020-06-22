@@ -44,7 +44,7 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(2);
+    await sleep(3); // It takes forever in CI
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 

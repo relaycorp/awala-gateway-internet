@@ -28,9 +28,6 @@ jobs:
       - run: docker-compose pull
         env:
           COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
-      - run: docker-compose build
-        env:
-          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'

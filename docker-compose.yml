@@ -2,11 +2,11 @@ version: '3.7'
 services:
   pohttp:
     build:
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
       context: .
-    image: relaynet-gw:local-dev
+    image: relaynet-gw:local
+    command: build/main/bin/pohttp-server.js
     init: true
-    command: src/bin/pohttp-server.ts
     environment:
       MONGO_URI: ${MONGO_URI}
       NATS_SERVER_URL: ${NATS_SERVER_URL}
@@ -16,22 +16,15 @@ services:
       OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
       OBJECT_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
       OBJECT_STORE_TLS_ENABLED: ${OBJECT_STORE_TLS_ENABLED}
-    ports:
-      - '127.0.0.1:8080:8080'
-    volumes:
-      - ./src:/opt/gw-dev/src:ro
     links:
       - mongodb
       - nats
       - object-store
 
   cogrpc:
-    build:
-      dockerfile: Dockerfile.dev
-      context: .
-    image: relaynet-gw:local-dev
+    image: relaynet-gw:local
     init: true
-    command: src/bin/cogrpc-server.ts
+    command: build/main/bin/cogrpc-server.js
     environment:
       GATEWAY_KEY_ID: ${GATEWAY_KEY_ID}
       COGRPC_ADDRESS: https://cogrpc.example.com/
@@ -46,23 +39,16 @@ services:
       VAULT_URL: ${VAULT_URL}
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_KV_PREFIX: ${VAULT_KV_PREFIX}
-    ports:
-      - '127.0.0.1:8081:8080'
     links:
       - mongodb
       - nats
       - object-store
       - vault
-    volumes:
-      - ./src:/opt/gw-dev/src:ro
 
   pdc-outgoing-queue-worker:
-    build:
-      dockerfile: Dockerfile.dev
-      context: .
-    image: relaynet-gw:local-dev
+    image: relaynet-gw:local
     init: true
-    command: src/bin/pdc-outgoing-queue-worker.ts
+    command: build/main/bin/pdc-outgoing-queue-worker.js
     environment:
       POHTTP_ADDRESS: ${POHTTP_ADDRESS}
       WORKER_ID: pdc-local
@@ -74,20 +60,16 @@ services:
       OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
       OBJECT_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
       OBJECT_STORE_TLS_ENABLED: ${OBJECT_STORE_TLS_ENABLED}
-    volumes:
-      - ./src:/opt/gw-dev/src:ro
+      POHTTP_TLS_REQUIRED: 'false'
     links:
       - mongodb
       - nats
       - object-store
 
   crc-queue-worker:
-    build:
-      dockerfile: Dockerfile.dev
-      context: .
-    image: relaynet-gw:local-dev
+    image: relaynet-gw:local
     init: true
-    command: src/bin/crc-queue-worker.ts
+    command: build/main/bin/crc-queue-worker.js
     environment:
       WORKER_ID: crc-local
       MONGO_URI: ${MONGO_URI}
@@ -102,8 +84,6 @@ services:
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_KV_PREFIX: ${VAULT_KV_PREFIX}
     links: [nats, vault]
-    volumes:
-      - ./src:/opt/gw-dev/src:ro
 
   mongodb:
     image: mongo:4.0

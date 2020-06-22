@@ -107,11 +107,16 @@ services:
 
   mongodb:
     image: mongo:4.0
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
     ports:
       - '127.0.0.1:27017:27017'
 
   nats:
     image: nats-streaming:0.17.0
+    command: ['-m', '8222']
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8222/streaming/channelsz"]
     ports:
       - '127.0.0.1:4222:4222'
 
@@ -121,6 +126,9 @@ services:
     environment:
       VAULT_DEV_ROOT_TOKEN_ID: letmein
     cap_add: ['IPC_LOCK']
+    healthcheck:
+      test: ["CMD", "vault", "status", "-tls-skip-verify"]
+      start_period: 8s
     ports:
       - '127.0.0.1:8200:8200'
 
@@ -131,5 +139,9 @@ services:
     environment:
       MINIO_ACCESS_KEY: ${OBJECT_STORE_ACCESS_KEY_ID}
       MINIO_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      MINIO_API_READY_DEADLINE: 5s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/ready"]
+      start_period: 6s
     ports:
       - '127.0.0.1:9000:9000'

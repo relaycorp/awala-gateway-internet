@@ -30,6 +30,9 @@ services:
   redis:
     image: redis:4.0-alpine
     init: true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      start_period: 5s
 
   pohttp:
     links:

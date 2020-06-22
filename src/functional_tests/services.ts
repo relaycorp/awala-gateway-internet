@@ -43,7 +43,6 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
 
   beforeEach(async () => {
     await clearServiceData(includeVault);
-    await sleep(1);
     await bootstrapServiceData(includeVault);
   });
 }
@@ -81,6 +80,7 @@ export async function clearServiceData(includeVault = true): Promise<void> {
   // We can't empty NATS Streaming so we'll have to restart it, which in turn requires restarting
   // the processes with clients connected to NATS.
   await restartAllServices();
+  await sleep(1);
 
   // TODO: Remove Mongo collections
 }
@@ -117,8 +117,6 @@ async function setUpServices(mainService?: string): Promise<void> {
       log: true,
     });
   }
-
-  await sleep(mainService === undefined ? 8 : 5);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

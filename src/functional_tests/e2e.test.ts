@@ -25,7 +25,7 @@ import {
   vaultDisableSecret,
   vaultEnableSecret,
 } from './services';
-import { arrayToIterable, generatePdaChain, sleep, TOMORROW } from './utils';
+import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep, TOMORROW } from './utils';
 
 configureServices();
 
@@ -61,7 +61,7 @@ test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
     ),
   );
 
-  await sleep(8); // It takes forever in CI
+  await sleep(IS_GITHUB ? 8 : 5);
 
   // Collect the pong message encapsulated in a cargo
   const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(await makeCCA()));

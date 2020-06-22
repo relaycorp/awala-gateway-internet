@@ -128,7 +128,7 @@ services:
     cap_add: ['IPC_LOCK']
     healthcheck:
       test: ["CMD", "vault", "status", "-tls-skip-verify"]
-      start_period: 8s
+      start_period: 10s
     ports:
       - '127.0.0.1:8200:8200'
 

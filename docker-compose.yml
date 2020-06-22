@@ -128,7 +128,7 @@ services:
     cap_add: ['IPC_LOCK']
     healthcheck:
       test: ["CMD", "vault", "status", "-tls-skip-verify"]
-      start_period: 5s
+      start_period: 6s
     ports:
       - '127.0.0.1:8200:8200'
 
@@ -142,6 +142,6 @@ services:
       MINIO_API_READY_DEADLINE: 5s
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/ready"]
-      start_period: 5s
+      start_period: 6s
     ports:
       - '127.0.0.1:9000:9000'

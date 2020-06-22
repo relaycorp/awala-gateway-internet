@@ -10,7 +10,7 @@
     "fix:tslint": "tslint --fix --project .",
     "test": "run-s static-checks test:unit",
     "test:unit": "jest --coverage",
-    "test:functional": "jest --config jest.config.functional.js --runInBand",
+    "test:functional": "jest --config jest.config.functional.js --runInBand --verbose",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",

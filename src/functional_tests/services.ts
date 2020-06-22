@@ -95,20 +95,6 @@ async function tearDownServices(): Promise<void> {
   });
 }
 
-export async function stopService(service: string): Promise<void> {
-  await dockerCompose.stopOne(service, {
-    composeOptions: COMPOSE_OPTIONS,
-    log: true,
-  });
-}
-
-export async function startService(service: string): Promise<void> {
-  await dockerCompose.restartOne(service, {
-    composeOptions: COMPOSE_OPTIONS,
-    log: true,
-  });
-}
-
 export async function vaultEnableSecret(kvPrefix: string): Promise<void> {
   await VAULT_CLIENT.post(`/sys/mounts/${kvPrefix}`, {
     options: { version: '2' },

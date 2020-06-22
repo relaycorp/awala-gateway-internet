@@ -142,6 +142,6 @@ services:
       MINIO_API_READY_DEADLINE: 5s
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/ready"]
-      start_period: 6s
+      start_period: 10s
     ports:
       - '127.0.0.1:9000:9000'

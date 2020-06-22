@@ -46,6 +46,15 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
     await bootstrapServiceData(includeVault);
   });
 
+  // TODO: Remove
+  afterEach(async () => {
+    const result = await dockerCompose.logs([], { composeOptions: COMPOSE_OPTIONS });
+    // tslint:disable-next-line:no-console
+    console.log('STDOUT', result.out);
+    // tslint:disable-next-line:no-console
+    console.log('STDERR', result.err);
+  });
+
   afterAll(tearDownServices);
 }
 

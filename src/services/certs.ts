@@ -12,5 +12,5 @@ export async function retrieveOwnCertificates(
   const findOne = ownCertificateModel.find({});
   const ownCerts = (await findOne.exec()) as readonly OwnCertificate[];
 
-  return ownCerts.map(c => Certificate.deserialize(bufferToArray(c.serializationDer)));
+  return ownCerts.map((c) => Certificate.deserialize(bufferToArray(c.serializationDer)));
 }

@@ -84,7 +84,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     const parcelObjectKey = 'prefix/active.parcel';
     const deletedObjectKey = 'prefix/deleted.parcel';
     mockListObjectKeys.mockReturnValue(arrayToAsyncIterable([deletedObjectKey, parcelObjectKey]));
-    mockGetObject.mockImplementation(objectKey => {
+    mockGetObject.mockImplementation((objectKey) => {
       if (objectKey !== parcelObjectKey) {
         throw new Error('That was deleted');
       }
@@ -179,7 +179,7 @@ describe('retrieveActiveParcelsForGateway', () => {
 
   function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
     mockListObjectKeys.mockReturnValue(arrayToAsyncIterable(Object.keys(objectsByKey)));
-    mockGetObject.mockImplementation(objectKey => objectsByKey[objectKey]);
+    mockGetObject.mockImplementation((objectKey) => objectsByKey[objectKey]);
   }
 
   function getDateRelativeToNow(deltaSeconds: number): Date {

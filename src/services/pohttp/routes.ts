@@ -13,27 +13,18 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: any,
 ): Promise<void> {
-  const natsServerUrl = getEnvVar('NATS_SERVER_URL')
-    .required()
-    .asString();
-  const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
-    .required()
-    .asString();
+  const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
+  const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
 
   const objectStoreClient = ObjectStoreClient.initFromEnv();
-  const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET')
-    .required()
-    .asString();
+  const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(objectStoreClient, objectStoreBucket);
 
   fastify.route({
     method: ['PUT', 'DELETE', 'PATCH'],
     url: '/',
     async handler(_req, reply): Promise<void> {
-      reply
-        .code(405)
-        .header('Allow', 'HEAD, GET, POST')
-        .send();
+      reply.code(405).header('Allow', 'HEAD, GET, POST').send();
     },
   });
 

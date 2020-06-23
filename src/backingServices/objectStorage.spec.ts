@@ -198,7 +198,7 @@ describe('ObjectStore', () => {
       mockS3Client.listObjectsV2.mockReturnValue({
         promise: () =>
           Promise.resolve({
-            Contents: objectKeys.map(k => ({ Key: k })),
+            Contents: objectKeys.map((k) => ({ Key: k })),
             IsTruncated: false,
           }),
       });
@@ -214,7 +214,7 @@ describe('ObjectStore', () => {
       mockS3Client.listObjectsV2.mockReturnValueOnce({
         promise: () =>
           Promise.resolve({
-            Contents: objectKeys1.map(k => ({ Key: k })),
+            Contents: objectKeys1.map((k) => ({ Key: k })),
             ContinuationToken: continuationToken,
             IsTruncated: true,
           }),
@@ -223,7 +223,7 @@ describe('ObjectStore', () => {
       mockS3Client.listObjectsV2.mockReturnValueOnce({
         promise: () =>
           Promise.resolve({
-            Contents: objectKeys2.map(k => ({ Key: k })),
+            Contents: objectKeys2.map((k) => ({ Key: k })),
             IsTruncated: false,
           }),
       });

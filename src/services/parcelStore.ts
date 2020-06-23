@@ -146,7 +146,5 @@ function calculatedGatewayBoundParcelObjectKey(
 }
 
 function sha256Hex(plaintext: string): string {
-  return createHash('sha256')
-    .update(plaintext)
-    .digest('hex');
+  return createHash('sha256').update(plaintext).digest('hex');
 }

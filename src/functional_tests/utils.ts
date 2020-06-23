@@ -98,7 +98,11 @@ export async function generatePdaChain(): Promise<PdaChain> {
       .asString(),
     'base64',
   );
+  // tslint:disable-next-line:no-console
+  console.log('BADGER, before fetchNodeKey');
   const publicGatewayKeyPair = await privateKeyStore.fetchNodeKey(publicGatewayKeyId);
+  // tslint:disable-next-line:no-console
+  console.log('BADGER, after fetchNodeKey');
 
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const privateGatewayCertificate = await issueGatewayCertificate({

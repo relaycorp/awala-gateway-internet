@@ -37,7 +37,7 @@ export function configureServices(): void {
     await setUpServices();
     if (IS_GITHUB) {
       // GitHub is painfully slow
-      await sleep(2);
+      await sleep(3);
     }
     await bootstrapServiceData();
   });

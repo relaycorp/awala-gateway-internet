@@ -72,6 +72,6 @@ jobs:
           username: github-actions
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Release
-        uses: codfish/semantic-release-action@v1
+        run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

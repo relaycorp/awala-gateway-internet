@@ -1,0 +1,10 @@
+branch: master
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - - "@semantic-release/npm"
+    - npmPublish: false
+  - - "@semantic-release/exec"
+    - prepareCmd: docker load -i /tmp/docker-image docker.pkg.github.com/relaycorp/relaynet-internet-gateway/main:${nextRelease.version}
+      publishCmd: docker push docker.pkg.github.com/relaycorp/relaynet-internet-gateway/main:${nextRelease.version}
+  - "@semantic-release/github"

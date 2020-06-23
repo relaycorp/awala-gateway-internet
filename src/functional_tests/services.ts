@@ -57,7 +57,7 @@ export async function runServiceCommand(
 
 async function bootstrapServiceData(): Promise<void> {
   await vaultEnableSecret(VAULT_KV_PREFIX);
-  await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
+  await runServiceCommand('cogrpc', ['build/main/bin/generate-keypairs.js']);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,

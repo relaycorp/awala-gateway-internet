@@ -8,5 +8,6 @@ WORKDIR /opt/gw
 COPY --from=build /tmp/gw ./
 RUN groupadd -r relaynet-gw && useradd -r -g relaynet-gw relaynet-gw
 USER relaynet-gw
-CMD ["node", "build/main/bin/pohttp-server.js"]
+CMD ["build/main/bin/pohttp-server.js"]
+ENTRYPOINT ["node"]
 EXPOSE 8080

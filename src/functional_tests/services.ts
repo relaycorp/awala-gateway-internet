@@ -9,15 +9,9 @@ import { IS_GITHUB, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from '
 export const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
 export const PONG_ENDPOINT_ADDRESS = 'http://pong:8080/';
 
-const VAULT_URL = getEnvVar('VAULT_URL')
-  .required()
-  .asString();
-const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
-  .required()
-  .asString();
-const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX')
-  .required()
-  .asString();
+const VAULT_URL = getEnvVar('VAULT_URL').required().asString();
+const VAULT_TOKEN = getEnvVar('VAULT_TOKEN').required().asString();
+const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX').required().asString();
 
 // tslint:disable-next-line:readonly-array
 const COMPOSE_OPTIONS = [

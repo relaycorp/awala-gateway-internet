@@ -56,7 +56,7 @@ const MOCK_DELETE_INTERNET_PARCEL = mockSpy(
 );
 
 describe('processInternetBoundParcels', () => {
-  test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async envVar => {
+  test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
     MOCK_ENV_VARS({ ...ENV_VARS, [envVar]: undefined });
 
     await expect(

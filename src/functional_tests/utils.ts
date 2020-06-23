@@ -17,24 +17,16 @@ export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const OBJECT_STORAGE_CLIENT = initS3Client();
-export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET')
-  .required()
-  .asString();
+export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
 
 export async function sleep(seconds: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, seconds * 1_000));
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1_000));
 }
 
 function initS3Client(): S3 {
-  const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
-    .required()
-    .asString();
-  const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID')
-    .required()
-    .asString();
-  const secretAccessKey = getEnvVar('OBJECT_STORE_SECRET_KEY')
-    .required()
-    .asString();
+  const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT').required().asString();
+  const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID').required().asString();
+  const secretAccessKey = getEnvVar('OBJECT_STORE_SECRET_KEY').required().asString();
   return new S3({
     accessKeyId,
     endpoint,
@@ -46,16 +38,12 @@ function initS3Client(): S3 {
 }
 
 export function connectToNatsStreaming(): Promise<Stan> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const stanConnection = stanConnect(
-      getEnvVar('NATS_CLUSTER_ID')
-        .required()
-        .asString(),
+      getEnvVar('NATS_CLUSTER_ID').required().asString(),
       'functional-tests',
       {
-        url: getEnvVar('NATS_SERVER_URL')
-          .required()
-          .asString(),
+        url: getEnvVar('NATS_SERVER_URL').required().asString(),
       },
     );
     stanConnection.on('connect', resolve);
@@ -75,7 +63,7 @@ export async function getFirstQueueMessage(subject: string): Promise<Buffer | un
       stanConnection.close();
       resolve();
     }, 3_000);
-    subscription.on('error', error => {
+    subscription.on('error', (error) => {
       clearTimeout(timeout);
       // Close the connection directly. Not the subscription because it probably wasn't created.
       stanConnection.close();
@@ -93,9 +81,7 @@ export async function getFirstQueueMessage(subject: string): Promise<Buffer | un
 export async function generatePdaChain(): Promise<PdaChain> {
   const privateKeyStore = initVaultKeyStore();
   const publicGatewayKeyId = Buffer.from(
-    getEnvVar('GATEWAY_KEY_ID')
-      .required()
-      .asString(),
+    getEnvVar('GATEWAY_KEY_ID').required().asString(),
     'base64',
   );
   const publicGatewayKeyPair = await privateKeyStore.fetchNodeKey(publicGatewayKeyId);

@@ -11,12 +11,8 @@ export interface PublisherMessage {
 
 export class NatsStreamingClient {
   public static initFromEnv(clientId: string): NatsStreamingClient {
-    const natsServerUrl = getEnvVar('NATS_SERVER_URL')
-      .required()
-      .asString();
-    const natsClusterId = getEnvVar('NATS_CLUSTER_ID')
-      .required()
-      .asString();
+    const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
+    const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
     return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
   }
 
@@ -35,7 +31,7 @@ export class NatsStreamingClient {
     messages: AsyncIterable<PublisherMessage> | readonly PublisherMessage[],
   ) => AsyncIterable<string> {
     const promisedConnection = this.connect();
-    return async function*(messages): AsyncIterable<string> {
+    return async function* (messages): AsyncIterable<string> {
       const connection = await promisedConnection;
       const publishPromisified = promisify(connection.publish).bind(connection);
 
@@ -78,8 +74,8 @@ export class NatsStreamingClient {
     let subscription;
     try {
       subscription = connection.subscribe(channel, queue, subscriptionOptions);
-      subscription.on('error', error => sourceStream.destroy(error));
-      subscription.on('message', msg => sourceStream.write(msg));
+      subscription.on('error', (error) => sourceStream.destroy(error));
+      subscription.on('message', (msg) => sourceStream.write(msg));
       for await (const msg of streamToIt.source(sourceStream)) {
         yield msg;
       }

@@ -21,7 +21,7 @@ describe('PoHTTP server', () => {
   beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
   afterEach(async () => stanConnection.close());
 
-  test('Valid parcel should be accepted', async cb => {
+  test('Valid parcel should be accepted', async (cb) => {
     const pdaChain = await generatePdaChain();
     const parcel = new Parcel(
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),

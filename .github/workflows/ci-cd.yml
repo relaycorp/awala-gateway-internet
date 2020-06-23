@@ -60,8 +60,17 @@ jobs:
             ${{ runner.os }}-node-
       - name: Install dependencies
         run: npm ci
-      - name: Build
-        run: npm run build
+      - name: Retrieve tested Docker image
+        uses: actions/download-artifact@v2
+        with:
+          name: docker-image
+          path: /tmp/docker-image
+      - name: Log in to GitHub Packages
+        uses: azure/docker-login@v1
+        with:
+          login-server: docker.pkg.github.com
+          username: github-actions
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Release
         uses: codfish/semantic-release-action@v1
         env:

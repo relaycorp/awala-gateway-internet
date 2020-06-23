@@ -1,6 +1,6 @@
 # Relaynet-Internet Gateway
 
-(This README is just a placeholder for the time being)
+This README is just a placeholder for the time being
 
 ## NATS Streaming Channels
 

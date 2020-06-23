@@ -31,6 +31,14 @@ jobs:
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
+
+      # Export Docker image so it can be published
+      - run: docker save -o /tmp/docker-image relaynet-gw:local
+      - uses: actions/upload-artifact@v2
+        with:
+          name: docker-image
+          path: /tmp/docker-image
+
   release:
     name: Release
     needs: ci

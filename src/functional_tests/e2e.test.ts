@@ -22,7 +22,6 @@ import {
   GW_GOGRPC_URL,
   PONG_ENDPOINT_ADDRESS,
   runServiceCommand,
-  vaultDisableSecret,
   vaultEnableSecret,
 } from './services';
 import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep, TOMORROW } from './utils';
@@ -36,9 +35,6 @@ beforeEach(async () => {
 
 beforeEach(async () => {
   await vaultEnableSecret('pong-keys');
-});
-afterEach(async () => {
-  await vaultDisableSecret('pong-keys');
 });
 
 test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {

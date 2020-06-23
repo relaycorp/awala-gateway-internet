@@ -118,7 +118,3 @@ export async function vaultEnableSecret(kvPrefix: string): Promise<void> {
     type: 'file',
   });
 }
-
-export async function vaultDisableSecret(kvPrefix: string): Promise<void> {
-  await VAULT_CLIENT.delete(`/sys/mounts/${kvPrefix}`);
-}

@@ -18,10 +18,6 @@ const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
 const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX')
   .required()
   .asString();
-const VAULT_CLIENT = axios.create({
-  baseURL: `${VAULT_URL}/v1`,
-  headers: { 'X-Vault-Token': VAULT_TOKEN },
-});
 
 // tslint:disable-next-line:readonly-array
 const COMPOSE_OPTIONS = [
@@ -33,17 +29,17 @@ const COMPOSE_OPTIONS = [
   'src/functional_tests/docker-compose.override.yml',
 ];
 
-export function configureServices(serviceUnderTest?: string, includeVault = true): void {
+export function configureServices(): void {
   beforeEach(async () => {
     jest.setTimeout(30_000);
 
     await tearDownServices();
-    await setUpServices(serviceUnderTest);
+    await setUpServices();
     if (IS_GITHUB) {
       // GitHub is painfully slow
-      await sleep(2);
+      await sleep(3);
     }
-    await bootstrapServiceData(includeVault);
+    await bootstrapServiceData();
   });
 
   afterAll(tearDownServices);
@@ -65,49 +61,43 @@ export async function runServiceCommand(
   return result.out;
 }
 
-async function bootstrapServiceData(includeVault = true): Promise<void> {
-  if (includeVault) {
-    await vaultEnableSecret(VAULT_KV_PREFIX);
-    await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
-  }
+async function bootstrapServiceData(): Promise<void> {
+  await vaultEnableSecret(VAULT_KV_PREFIX);
+  await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,
   }).promise();
 }
 
-async function setUpServices(mainService?: string): Promise<void> {
-  if (mainService) {
-    await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
-  } else {
-    await dockerCompose.upAll({
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
-  }
+async function setUpServices(): Promise<void> {
+  await dockerCompose.upAll({
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
 }
 
 async function tearDownServices(): Promise<void> {
   await dockerCompose.down({
-    commandOptions: ['--remove-orphans'],
+    commandOptions: ['--remove-orphans', '--volumes'],
     composeOptions: COMPOSE_OPTIONS,
     log: true,
   });
 }
 
 export async function vaultEnableSecret(kvPrefix: string): Promise<void> {
-  await VAULT_CLIENT.post(`/sys/mounts/${kvPrefix}`, {
+  const vaultClient = axios.create({
+    baseURL: `${VAULT_URL}/v1`,
+    headers: { 'X-Vault-Token': VAULT_TOKEN },
+  });
+  await vaultClient.post(`/sys/mounts/${kvPrefix}`, {
     options: { version: '2' },
     type: 'kv',
   });
-  await VAULT_CLIENT.put(`/sys/audit/${kvPrefix}`, {
+  await vaultClient.put(`/sys/audit/${kvPrefix}`, {
     options: {
       file_path: `/tmp/${kvPrefix}.log`,
     },
     type: 'file',
   });
-}
-
-export async function vaultDisableSecret(kvPrefix: string): Promise<void> {
-  await VAULT_CLIENT.delete(`/sys/mounts/${kvPrefix}`);
 }

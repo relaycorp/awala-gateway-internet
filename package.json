@@ -14,10 +14,9 @@
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",
-    "test:ci:unit": "run-s build test:ci:unit:jest cov:send",
+    "test:ci:unit": "run-s build test:ci:unit:jest",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "cov:send": "codecov",
     "clean": "trash build test"
   },
   "engines": {
@@ -29,7 +28,6 @@
     "@types/mongoose": "^5.7.27",
     "@types/pkijs": "0.0.2",
     "@types/verror": "^1.10.3",
-    "codecov": "^3.5.0",
     "docker-compose": "^0.23.4",
     "dotenv": "^8.2.0",
     "fastify-plugin": "^1.6.1",

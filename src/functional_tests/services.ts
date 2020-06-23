@@ -42,17 +42,6 @@ export function configureServices(): void {
     await bootstrapServiceData();
   });
 
-  // TODO: REMOVE
-  afterEach(async () => {
-    const result = await dockerCompose.logs(['vault'], {
-      composeOptions: COMPOSE_OPTIONS,
-    });
-    // tslint:disable-next-line:no-console
-    console.log('Vault stdout', result.out);
-    // tslint:disable-next-line:no-console
-    console.log('Vault stderr', result.err);
-  });
-
   afterAll(tearDownServices);
 }
 

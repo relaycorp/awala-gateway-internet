@@ -55,13 +55,11 @@ describe('Cargo delivery', () => {
     );
 
     const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
-    await expect(
-      asyncIterableToArray(
-        await cogRPCClient.deliverCargo(
-          arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
-        ),
+    await asyncIterableToArray(
+      await cogRPCClient.deliverCargo(
+        arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
       ),
-    ).toResolve();
+    );
     await expect(getFirstQueueMessage('crc-cargo')).resolves.toBeUndefined();
   });
 });

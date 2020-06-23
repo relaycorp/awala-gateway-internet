@@ -18,10 +18,6 @@ const VAULT_TOKEN = getEnvVar('VAULT_TOKEN')
 const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX')
   .required()
   .asString();
-const VAULT_CLIENT = axios.create({
-  baseURL: `${VAULT_URL}/v1`,
-  headers: { 'X-Vault-Token': VAULT_TOKEN },
-});
 
 // tslint:disable-next-line:readonly-array
 const COMPOSE_OPTIONS = [
@@ -107,11 +103,15 @@ async function tearDownServices(): Promise<void> {
 }
 
 export async function vaultEnableSecret(kvPrefix: string): Promise<void> {
-  await VAULT_CLIENT.post(`/sys/mounts/${kvPrefix}`, {
+  const vaultClient = axios.create({
+    baseURL: `${VAULT_URL}/v1`,
+    headers: { 'X-Vault-Token': VAULT_TOKEN },
+  });
+  await vaultClient.post(`/sys/mounts/${kvPrefix}`, {
     options: { version: '2' },
     type: 'kv',
   });
-  await VAULT_CLIENT.put(`/sys/audit/${kvPrefix}`, {
+  await vaultClient.put(`/sys/audit/${kvPrefix}`, {
     options: {
       file_path: `/tmp/${kvPrefix}.log`,
     },

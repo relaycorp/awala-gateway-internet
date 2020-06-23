@@ -13,7 +13,7 @@ import {
 
 const GW_POHTTP_URL = 'http://127.0.0.1:8080';
 
-configureServices('pohttp');
+configureServices();
 
 describe('PoHTTP server', () => {
   // tslint:disable-next-line:no-let

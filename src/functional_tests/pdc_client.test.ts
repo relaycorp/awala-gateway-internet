@@ -18,7 +18,7 @@ import {
   sleep,
 } from './utils';
 
-configureServices('pdc-outgoing-queue-worker', false);
+configureServices();
 
 let senderPrivateKey: CryptoKey;
 let senderCertificate: Certificate;

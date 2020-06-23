@@ -29,17 +29,17 @@ const COMPOSE_OPTIONS = [
   'src/functional_tests/docker-compose.override.yml',
 ];
 
-export function configureServices(serviceUnderTest?: string, includeVault = true): void {
+export function configureServices(): void {
   beforeEach(async () => {
     jest.setTimeout(30_000);
 
     await tearDownServices();
-    await setUpServices(serviceUnderTest);
+    await setUpServices();
     if (IS_GITHUB) {
       // GitHub is painfully slow
       await sleep(2);
     }
-    await bootstrapServiceData(includeVault);
+    await bootstrapServiceData();
   });
 
   // TODO: REMOVE
@@ -72,26 +72,20 @@ export async function runServiceCommand(
   return result.out;
 }
 
-async function bootstrapServiceData(includeVault = true): Promise<void> {
-  if (includeVault) {
-    await vaultEnableSecret(VAULT_KV_PREFIX);
-    await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
-  }
+async function bootstrapServiceData(): Promise<void> {
+  await vaultEnableSecret(VAULT_KV_PREFIX);
+  await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
 
   await OBJECT_STORAGE_CLIENT.createBucket({
     Bucket: OBJECT_STORAGE_BUCKET,
   }).promise();
 }
 
-async function setUpServices(mainService?: string): Promise<void> {
-  if (mainService) {
-    await dockerCompose.upOne(mainService, { composeOptions: COMPOSE_OPTIONS, log: true });
-  } else {
-    await dockerCompose.upAll({
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
-  }
+async function setUpServices(): Promise<void> {
+  await dockerCompose.upAll({
+    composeOptions: COMPOSE_OPTIONS,
+    log: true,
+  });
 }
 
 async function tearDownServices(): Promise<void> {

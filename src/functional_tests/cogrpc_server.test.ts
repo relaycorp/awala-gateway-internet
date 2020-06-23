@@ -23,7 +23,7 @@ import {
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
-configureServices('cogrpc');
+configureServices();
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {

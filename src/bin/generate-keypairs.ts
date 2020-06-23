@@ -21,9 +21,7 @@ import { OwnCertificate } from '../services/models';
 const NODE_CERTIFICATE_TTL_DAYS = 180;
 const SESSION_CERTIFICATE_TTL_DAYS = 60;
 
-const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID')
-  .required()
-  .asString();
+const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
 
 const sessionStore = initVaultKeyStore();
 

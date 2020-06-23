@@ -95,7 +95,9 @@ describe('generatePCAs', () => {
     };
   });
 
-  const MOCK_MONGOOSE_FIND = mockSpy(jest.fn(), async function*(): AsyncIterable<ParcelCollection> {
+  const MOCK_MONGOOSE_FIND = mockSpy(jest.fn(), async function* (): AsyncIterable<
+    ParcelCollection
+  > {
     yield* arrayToAsyncIterable([]);
   });
   beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ find: MOCK_MONGOOSE_FIND }));

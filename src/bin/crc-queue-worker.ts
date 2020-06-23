@@ -5,9 +5,7 @@ import { get as getEnvVar } from 'env-var';
 
 import { processIncomingCrcCargo } from '../services/crcQueueWorker';
 
-const WORKER_ID = getEnvVar('WORKER_ID')
-  .required()
-  .asString();
+const WORKER_ID = getEnvVar('WORKER_ID').required().asString();
 processIncomingCrcCargo(WORKER_ID);
 
 // tslint:disable-next-line:no-console

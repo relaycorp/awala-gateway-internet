@@ -17,15 +17,9 @@ export interface StoreObject {
  */
 export class ObjectStoreClient {
   public static initFromEnv(): ObjectStoreClient {
-    const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT')
-      .required()
-      .asString();
-    const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID')
-      .required()
-      .asString();
-    const secretKey = getEnvVar('OBJECT_STORE_SECRET_KEY')
-      .required()
-      .asString();
+    const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT').required().asString();
+    const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID').required().asString();
+    const secretKey = getEnvVar('OBJECT_STORE_SECRET_KEY').required().asString();
     const tlsEnabled = getEnvVar('OBJECT_STORE_TLS_ENABLED').asBool();
     return new ObjectStoreClient(endpoint, accessKeyId, secretKey, tlsEnabled);
   }

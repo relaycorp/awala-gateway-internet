@@ -45,7 +45,7 @@ export async function makeServiceImplementation(
   const vaultKeyStore = initVaultKeyStore();
 
   const mongooseConnection = await createMongooseConnectionFromEnv();
-  mongooseConnection.on('error', err => LOGGER.error({ err }, 'Mongoose connection error'));
+  mongooseConnection.on('error', (err) => LOGGER.error({ err }, 'Mongoose connection error'));
 
   return {
     async deliverCargo(

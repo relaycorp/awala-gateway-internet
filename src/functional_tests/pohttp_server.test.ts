@@ -32,7 +32,7 @@ describe('PoHTTP server', () => {
     const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     // We should get a successful response
-    await expect(deliverParcel(GW_POHTTP_URL, parcelSerialized)).toResolve();
+    await deliverParcel(GW_POHTTP_URL, parcelSerialized);
 
     // The parcel should've been safely stored
     // TODO: Use the PoWebSockets interface instead once it's available

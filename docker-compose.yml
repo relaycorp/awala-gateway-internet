@@ -16,6 +16,8 @@ services:
       OBJECT_STORE_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY_ID}
       OBJECT_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
       OBJECT_STORE_TLS_ENABLED: ${OBJECT_STORE_TLS_ENABLED}
+    ports:
+      - '127.0.0.1:8080:8080'
     links:
       - mongodb
       - nats
@@ -42,6 +44,8 @@ services:
       VAULT_URL: ${VAULT_URL}
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_KV_PREFIX: ${VAULT_KV_PREFIX}
+    ports:
+      - '127.0.0.1:8081:8080'
     links:
       - mongodb
       - nats

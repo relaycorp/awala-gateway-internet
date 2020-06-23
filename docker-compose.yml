@@ -22,6 +22,9 @@ services:
       - object-store
 
   cogrpc:
+    build:
+      dockerfile: Dockerfile
+      context: .
     image: relaynet-gw:local
     init: true
     command: build/main/bin/cogrpc-server.js
@@ -46,6 +49,9 @@ services:
       - vault
 
   pdc-outgoing-queue-worker:
+    build:
+      dockerfile: Dockerfile
+      context: .
     image: relaynet-gw:local
     init: true
     command: build/main/bin/pdc-outgoing-queue-worker.js
@@ -67,6 +73,9 @@ services:
       - object-store
 
   crc-queue-worker:
+    build:
+      dockerfile: Dockerfile
+      context: .
     image: relaynet-gw:local
     init: true
     command: build/main/bin/crc-queue-worker.js

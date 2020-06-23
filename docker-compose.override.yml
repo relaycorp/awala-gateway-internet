@@ -3,7 +3,6 @@ services:
   pohttp:
     build:
       dockerfile: Dockerfile.dev
-      context: .
     image: relaynet-gw:local-dev
     command: src/bin/pohttp-server.ts
     ports:
@@ -12,6 +11,8 @@ services:
       - ./src:/opt/gw-dev/src:ro
 
   cogrpc:
+    build:
+      dockerfile: Dockerfile.dev
     image: relaynet-gw:local-dev
     command: src/bin/cogrpc-server.ts
     ports:
@@ -20,12 +21,16 @@ services:
       - ./src:/opt/gw-dev/src:ro
 
   pdc-outgoing-queue-worker:
+    build:
+      dockerfile: Dockerfile.dev
     image: relaynet-gw:local-dev
     command: src/bin/pdc-outgoing-queue-worker.ts
     volumes:
       - ./src:/opt/gw-dev/src:ro
 
   crc-queue-worker:
+    build:
+      dockerfile: Dockerfile.dev
     image: relaynet-gw:local-dev
     command: src/bin/crc-queue-worker.ts
     volumes:

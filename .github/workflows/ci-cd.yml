@@ -32,6 +32,8 @@ jobs:
         env:
           COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
       - run: npm run test:functional
+        env:
+          IS_GITHUB: 'true'
   release:
     name: Release
     needs: ci

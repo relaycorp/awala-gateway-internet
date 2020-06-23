@@ -9,9 +9,10 @@ import {
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-import { configureServices, PONG_ENDPOINT_ADDRESS, startService, stopService } from './services';
+import { configureServices, PONG_ENDPOINT_ADDRESS } from './services';
 import {
   connectToNatsStreaming,
+  IS_GITHUB,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
   sleep,
@@ -44,22 +45,17 @@ describe('PDC client', () => {
 
     await queueParcel(parcel);
 
-    await sleep(2);
+    await sleep(IS_GITHUB ? 5 : 3);
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 
   test('Undelivered parcels should remain in the queue', async () => {
-    await stopService('pong');
-    try {
-      const parcel = new Parcel(PONG_ENDPOINT_ADDRESS, senderCertificate, Buffer.from([]));
+    const parcel = new Parcel('https://relaynet.local', senderCertificate, Buffer.from([]));
 
-      await queueParcel(parcel);
+    await queueParcel(parcel);
 
-      await sleep(2);
-      await expect(isParcelInStore(parcel)).resolves.toBeTrue();
-    } finally {
-      await startService('pong');
-    }
+    await sleep(IS_GITHUB ? 5 : 2);
+    await expect(isParcelInStore(parcel)).resolves.toBeTrue();
   });
 });
 

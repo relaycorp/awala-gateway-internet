@@ -48,7 +48,9 @@ export function configureServices(serviceUnderTest?: string, includeVault = true
 
   // TODO: REMOVE
   afterEach(async () => {
-    const result = await dockerCompose.logs(['vault']);
+    const result = await dockerCompose.logs(['vault'], {
+      composeOptions: COMPOSE_OPTIONS,
+    });
     // tslint:disable-next-line:no-console
     console.log('Vault stdout', result.out);
     // tslint:disable-next-line:no-console

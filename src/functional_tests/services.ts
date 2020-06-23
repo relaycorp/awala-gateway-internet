@@ -4,7 +4,7 @@ import axios from 'axios';
 import * as dockerCompose from 'docker-compose';
 import { get as getEnvVar } from 'env-var';
 
-import { OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
+import { IS_GITHUB, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
 export const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
 export const PONG_ENDPOINT_ADDRESS = 'http://pong:8080/';
@@ -34,18 +34,19 @@ const COMPOSE_OPTIONS = [
 ];
 
 export function configureServices(serviceUnderTest?: string, includeVault = true): void {
-  beforeAll(async () => {
-    jest.setTimeout(20_000);
+  beforeEach(async () => {
+    jest.setTimeout(30_000);
+
     await tearDownServices();
     await setUpServices(serviceUnderTest);
-  });
-  afterAll(tearDownServices);
-
-  beforeEach(async () => {
-    await clearServiceData(includeVault);
-    await sleep(1);
+    if (IS_GITHUB) {
+      // GitHub is painfully slow
+      await sleep(2);
+    }
     await bootstrapServiceData(includeVault);
   });
+
+  afterAll(tearDownServices);
 }
 
 export async function runServiceCommand(
@@ -69,42 +70,9 @@ async function bootstrapServiceData(includeVault = true): Promise<void> {
     await vaultEnableSecret(VAULT_KV_PREFIX);
     await runServiceCommand('cogrpc', ['src/bin/generate-keypairs.ts']);
   }
-}
 
-export async function clearServiceData(includeVault = true): Promise<void> {
-  if (includeVault) {
-    await vaultDisableSecret(VAULT_KV_PREFIX);
-  }
-
-  await emptyBucket(OBJECT_STORAGE_BUCKET);
-
-  // We can't empty NATS Streaming so we'll have to restart it, which in turn requires restarting
-  // the processes with clients connected to NATS.
-  await restartAllServices();
-
-  // TODO: Remove Mongo collections
-}
-
-async function emptyBucket(bucket: string): Promise<void> {
-  // tslint:disable-next-line:readonly-array
-  let objectKeys: string[];
-  try {
-    const listedObjectsResult = await OBJECT_STORAGE_CLIENT.listObjectsV2({
-      Bucket: bucket,
-    }).promise();
-    // tslint:disable-next-line:readonly-array
-    objectKeys = (listedObjectsResult.Contents?.map(o => o.Key) as string[]) || [];
-  } catch (error) {
-    if (error.statusCode === 404) {
-      // Bucket doesn't exist
-      return;
-    }
-    throw error;
-  }
-
-  await OBJECT_STORAGE_CLIENT.deleteObjects({
-    Bucket: bucket,
-    Delete: { Objects: objectKeys.map(k => ({ Key: k })) },
+  await OBJECT_STORAGE_CLIENT.createBucket({
+    Bucket: OBJECT_STORAGE_BUCKET,
   }).promise();
 }
 
@@ -117,12 +85,6 @@ async function setUpServices(mainService?: string): Promise<void> {
       log: true,
     });
   }
-
-  await sleep(mainService === undefined ? 8 : 5);
-
-  await OBJECT_STORAGE_CLIENT.createBucket({
-    Bucket: OBJECT_STORAGE_BUCKET,
-  }).promise();
 }
 
 async function tearDownServices(): Promise<void> {
@@ -131,24 +93,6 @@ async function tearDownServices(): Promise<void> {
     composeOptions: COMPOSE_OPTIONS,
     log: true,
   });
-}
-
-export async function stopService(service: string): Promise<void> {
-  await dockerCompose.stopOne(service, {
-    composeOptions: COMPOSE_OPTIONS,
-    log: true,
-  });
-}
-
-export async function startService(service: string): Promise<void> {
-  await dockerCompose.restartOne(service, {
-    composeOptions: COMPOSE_OPTIONS,
-    log: true,
-  });
-}
-
-async function restartAllServices(): Promise<void> {
-  await dockerCompose.restartAll({ composeOptions: COMPOSE_OPTIONS, log: true });
 }
 
 export async function vaultEnableSecret(kvPrefix: string): Promise<void> {

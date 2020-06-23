@@ -19,7 +19,9 @@ const SERVER_HOST = '0.0.0.0';
 export async function makeServer(): Promise<FastifyInstance> {
   const server = fastify({
     logger: true,
-    requestIdHeader: getEnvVar('REQUEST_ID_HEADER', DEFAULT_REQUEST_ID_HEADER).asString(),
+    requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
+      .default(DEFAULT_REQUEST_ID_HEADER)
+      .asString(),
   });
 
   server.register(routes);

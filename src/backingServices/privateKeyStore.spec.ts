@@ -15,7 +15,7 @@ const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 describe('initVaultKeyStore', () => {
   test.each(['VAULT_URL', 'VAULT_TOKEN', 'VAULT_KV_PREFIX'])(
     'Environment variable %s should be present',
-    envVar => {
+    (envVar) => {
       mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
       expect(initVaultKeyStore).toThrow(new RegExp(envVar));

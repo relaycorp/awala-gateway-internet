@@ -30,9 +30,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   const privateKeyStore = initVaultKeyStore();
 
   const objectStoreClient = ObjectStoreClient.initFromEnv();
-  const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET')
-    .required()
-    .asString();
+  const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(objectStoreClient, parcelStoreBucket);
 
   const mongooseConnection = await createMongooseConnectionFromEnv();

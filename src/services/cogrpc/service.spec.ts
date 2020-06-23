@@ -103,12 +103,12 @@ describe('makeServiceImplementation', () => {
       );
     });
 
-    test('Errors after establishing connection should be logged', async cb => {
+    test('Errors after establishing connection should be logged', async (cb) => {
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
       const error = new Error('Database credentials are wrong');
 
-      MOCK_MONGOOSE_CONNECTION.on('error', err => {
+      MOCK_MONGOOSE_CONNECTION.on('error', (err) => {
         expect(MOCK_PINO.error).toBeCalledWith({ err }, 'Mongoose connection error');
         cb();
       });
@@ -361,7 +361,7 @@ describe('collectCargo', () => {
   );
   const MOCK_GENERATE_PCAS = mockSpy(
     jest.spyOn(parcelCollectionAck, 'generatePCAs'),
-    async function*(): CargoMessageStream {
+    async function* (): CargoMessageStream {
       yield* arrayToAsyncIterable([]);
     },
   );
@@ -416,8 +416,8 @@ describe('collectCargo', () => {
   });
 
   describe('CCA validation', () => {
-    test('UNAUTHENTICATED should be returned if Authorization is missing', async cb => {
-      CALL.on('error', error => {
+    test('UNAUTHENTICATED should be returned if Authorization is missing', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
           message: 'Authorization metadata should be specified exactly once',
@@ -429,8 +429,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('UNAUTHENTICATED should be returned if Authorization is duplicated', async cb => {
-      CALL.on('error', error => {
+    test('UNAUTHENTICATED should be returned if Authorization is duplicated', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
           message: 'Authorization metadata should be specified exactly once',
@@ -444,8 +444,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('UNAUTHENTICATED should be returned if Authorization type is invalid', async cb => {
-      CALL.on('error', error => {
+    test('UNAUTHENTICATED should be returned if Authorization type is invalid', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
           message: 'Authorization type should be Relaynet-CCA',
@@ -459,8 +459,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('UNAUTHENTICATED should be returned if Authorization value is missing', async cb => {
-      CALL.on('error', error => {
+    test('UNAUTHENTICATED should be returned if Authorization value is missing', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
           message: 'Authorization value should be set to the CCA',
@@ -474,8 +474,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('UNAUTHENTICATED should be returned if CCA is malformed', async cb => {
-      CALL.on('error', error => {
+    test('UNAUTHENTICATED should be returned if CCA is malformed', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
           message: 'CCA is malformed',
@@ -490,8 +490,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async cb => {
-      CALL.on('error', error => {
+    test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.INVALID_ARGUMENT,
           message: 'CCA recipient is a different gateway',
@@ -511,8 +511,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async cb => {
-      CALL.on('error', error => {
+    test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async (cb) => {
+      CALL.on('error', (error) => {
         expect(error).toEqual({
           code: grpc.status.PERMISSION_DENIED,
           message: 'CCA was already fulfilled',
@@ -634,12 +634,12 @@ describe('collectCargo', () => {
     );
   });
 
-  test('Errors while generating cargo should be logged and end the call', async cb => {
+  test('Errors while generating cargo should be logged and end the call', async (cb) => {
     const err = new Error('Whoops');
     MOCK_FETCH_NODE_KEY.mockRejectedValue(err);
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
-    CALL.on('error', async callError => {
+    CALL.on('error', async (callError) => {
       expect(MOCK_PINO.error).toBeCalledWith(
         { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
         'Failed to send cargo',
@@ -665,7 +665,7 @@ describe('collectCargo', () => {
       CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
     });
 
-    test('Error should be logged and end the call', async cb => {
+    test('Error should be logged and end the call', async (cb) => {
       CALL.on('error', async () => {
         expect(MOCK_PINO.error).toBeCalledWith(
           { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
@@ -677,8 +677,8 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('Call should end with an error for the client', async cb => {
-      CALL.on('error', callError => {
+    test('Call should end with an error for the client', async (cb) => {
+      CALL.on('error', (callError) => {
         expect(callError).toEqual({
           code: grpc.status.UNAVAILABLE,
           message: 'Internal server error; please try again later',
@@ -690,7 +690,7 @@ describe('collectCargo', () => {
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
-    test('CCA should not be marked as fulfilled', async cb => {
+    test('CCA should not be marked as fulfilled', async (cb) => {
       CALL.on('error', () => {
         expect(MOCK_RECORD_CCA_FULFILLMENT).not.toBeCalled();
         cb();
@@ -708,10 +708,10 @@ describe('collectCargo', () => {
 
     expect(cargoDelivery).toHaveProperty('cargo');
     const cargoMessageSet = await unwrapCargoMessages(cargoDelivery.cargo);
-    const cargoMessages = Array.from(cargoMessageSet.messages).map(m => Buffer.from(m));
+    const cargoMessages = Array.from(cargoMessageSet.messages).map((m) => Buffer.from(m));
     expect(cargoMessages).toHaveLength(expectedMessagesSerialized.length);
     for (const expectedMessageSerialized of expectedMessagesSerialized) {
-      const matchingMessages = cargoMessages.filter(m => m.equals(expectedMessageSerialized));
+      const matchingMessages = cargoMessages.filter((m) => m.equals(expectedMessageSerialized));
       expect(matchingMessages).toHaveLength(1);
     }
   }

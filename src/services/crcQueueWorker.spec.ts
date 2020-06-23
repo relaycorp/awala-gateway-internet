@@ -455,7 +455,7 @@ test('NATS connection should be closed upon successful completion', async () => 
 
 test('NATS connection should be closed upon error', async () => {
   const error = new Error('Not on my watch');
-  getMockInstance(mockNatsClient.makeQueueConsumer).mockImplementation(function*(): Iterable<any> {
+  getMockInstance(mockNatsClient.makeQueueConsumer).mockImplementation(function* (): Iterable<any> {
     throw error;
   });
 

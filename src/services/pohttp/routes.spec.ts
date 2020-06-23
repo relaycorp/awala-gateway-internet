@@ -100,7 +100,7 @@ describe('receiveParcel', () => {
 
   test.each(['PUT', 'PATCH', 'DELETE'] as readonly HTTPMethod[])(
     '%s requests should be refused',
-    async method => {
+    async (method) => {
       const response = await serverInstance.inject({
         ...validRequestOptions,
         method,

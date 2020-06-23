@@ -41,7 +41,7 @@ describe('runServer', () => {
     'NATS_CLUSTER_ID',
     'COGRPC_ADDRESS',
     'PARCEL_STORE_BUCKET',
-  ])('Environment variable %s should be present', async envVar => {
+  ])('Environment variable %s should be present', async (envVar) => {
     mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
     await expect(runServer).rejects.toMatchObject(new RegExp(envVar));

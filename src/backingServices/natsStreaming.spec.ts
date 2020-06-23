@@ -11,7 +11,7 @@ class MockNatsSubscription extends EventEmitter {
 }
 
 class MockNatsConnection extends EventEmitter {
-  public readonly close = jest.fn().mockImplementation(function(this: MockNatsConnection): void {
+  public readonly close = jest.fn().mockImplementation(function (this: MockNatsConnection): void {
     this.emit('close');
   });
 
@@ -96,7 +96,7 @@ describe('NatsStreamingClient', () => {
       expect(mockNatsConnect).toBeCalledWith(expect.anything(), STUB_CLIENT_ID, expect.anything());
     });
 
-    test('Publishing should only be done once the connection has been established', async done => {
+    test('Publishing should only be done once the connection has been established', async (done) => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => {
         // "connect" event was never emitted, so no message should've been published
@@ -285,7 +285,7 @@ describe('NatsStreamingClient', () => {
     });
 
     describe('Subscription creation', () => {
-      test('Subscription should start once the connection has been established', async done => {
+      test('Subscription should start once the connection has been established', async (done) => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
         setImmediate(() => {
           // "connect" event was never emitted, so no message should've been published
@@ -400,7 +400,7 @@ describe('NatsStreamingClient', () => {
 
     test.each(['SIGINT', 'SIGTERM'])(
       '%s should close the subscription and end the process',
-      async signal => {
+      async (signal) => {
         const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
         setImmediate(() => mockConnection.emit('connect'));
         setImmediate(() => {
@@ -470,7 +470,7 @@ describe('NatsStreamingClient', () => {
 
     test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
       'Environment variable %s should be present',
-      envVar => {
+      (envVar) => {
         mockEnvVars({ ...ENV_VARS, [envVar]: undefined });
 
         expect(() => NatsStreamingClient.initFromEnv(CLIENT_ID)).toThrow(new RegExp(envVar));

@@ -100,7 +100,7 @@ async function setUpServices(mainService?: string): Promise<void> {
 
 async function tearDownServices(): Promise<void> {
   await dockerCompose.down({
-    commandOptions: ['--remove-orphans'],
+    commandOptions: ['--remove-orphans', '--volumes'],
     composeOptions: COMPOSE_OPTIONS,
     log: true,
   });

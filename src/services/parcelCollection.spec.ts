@@ -23,7 +23,9 @@ beforeAll(async () => {
 
 describe('wasParcelCollected', () => {
   const MOCK_MONGOOSE_EXISTS = mockSpy(jest.fn());
-  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS }));
+  beforeEach(() =>
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS } as any),
+  );
 
   test('Lookup should use parcel id, sender, recipient and peer GW address', async () => {
     await wasParcelCollected(PARCEL, PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION);
@@ -62,7 +64,7 @@ describe('recordParcelCollection', () => {
     setOptions: MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS,
   }));
   beforeEach(() =>
-    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE }),
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE } as any),
   );
 
   test('Parcel metadata should be upserted', async () => {
@@ -100,7 +102,7 @@ describe('generatePCAs', () => {
   > {
     yield* arrayToAsyncIterable([]);
   });
-  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ find: MOCK_MONGOOSE_FIND }));
+  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ find: MOCK_MONGOOSE_FIND } as any));
 
   test('Existing connection should be used', async () => {
     await asyncIterableToArray(generatePCAs(PEER_GATEWAY_PRIVATE_ADDRESS, MOCK_CONNECTION));

@@ -31,7 +31,9 @@ beforeAll(async () => {
 
 describe('wasCCAFulfilled', () => {
   const MOCK_MONGOOSE_EXISTS = mockSpy(jest.fn());
-  beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS }));
+  beforeEach(() =>
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ exists: MOCK_MONGOOSE_EXISTS } as any),
+  );
 
   test('Existing connection should be used', async () => {
     await wasCCAFulfilled(CCA, MOCK_CONNECTION);
@@ -78,7 +80,7 @@ describe('recordCCAFulfillment', () => {
     setOptions: MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS,
   }));
   beforeEach(() =>
-    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE }),
+    MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ replaceOne: MOCK_MONGOOSE_REPLACE_ONE } as any),
   );
 
   test('Existing connection should be used', async () => {

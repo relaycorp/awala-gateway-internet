@@ -46,7 +46,7 @@ const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 describe('fetchKey', () => {
   const stubModelExec = mockSpy(jest.fn(), async () => PEER_PUBLIC_KEY_DATA);
   const stubFindOne = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
-  beforeEach(() => stubGetModelForClass.mockReturnValue({ findOne: stubFindOne }));
+  beforeEach(() => stubGetModelForClass.mockReturnValue({ findOne: stubFindOne } as any));
 
   test('Existing connection should be used', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
@@ -92,7 +92,9 @@ describe('fetchKey', () => {
 describe('saveKey', () => {
   const stubModelExec = mockSpy(jest.fn());
   const stubFindOneAndUpdate = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
-  beforeEach(() => stubGetModelForClass.mockReturnValue({ updateOne: stubFindOneAndUpdate }));
+  beforeEach(() =>
+    stubGetModelForClass.mockReturnValue({ updateOne: stubFindOneAndUpdate } as any),
+  );
 
   let PEER_SESSION_KEY: OriginatorSessionKey;
   beforeAll(() => {

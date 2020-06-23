@@ -63,11 +63,11 @@
   "homepage": "https://docs.relaycorp.tech/relaynet-internet-gateway/",
   "dependencies": {
     "@relaycorp/cogrpc": "^1.1.5",
-    "@relaycorp/keystore-vault": "^1.1.2",
+    "@relaycorp/keystore-vault": "^1.1.4",
     "@relaycorp/relaynet-core": "^1.28.2",
     "@relaycorp/relaynet-pohttp": "^1.5.0",
     "@typegoose/typegoose": "^6.2.2",
-    "@types/pino": "^5.15.5",
+    "@types/pino": "^6.3.0",
     "aws-sdk": "^2.654.0",
     "axios": "^0.19.1",
     "buffer-to-arraybuffer": "0.0.5",

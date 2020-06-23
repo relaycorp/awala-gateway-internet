@@ -9,7 +9,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 
-import { asyncIterableToArray, PdaChain } from '../_test_utils';
+import { asyncIterableToArray } from '../_test_utils';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { ParcelStore } from '../services/parcelStore';
 import { configureServices, GW_GOGRPC_URL } from './services';
@@ -25,15 +25,11 @@ TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 configureServices('cogrpc');
 
-let PDA_CHAIN: PdaChain;
-beforeEach(async () => {
-  PDA_CHAIN = await generatePdaChain();
-});
-
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
-    const cargo = new Cargo(GW_GOGRPC_URL, PDA_CHAIN.privateGatewayCert, Buffer.from([]));
-    const cargoSerialized = Buffer.from(await cargo.serialize(PDA_CHAIN.privateGatewayPrivateKey));
+    const pdaChain = await generatePdaChain();
+    const cargo = new Cargo(GW_GOGRPC_URL, pdaChain.privateGatewayCert, Buffer.from([]));
+    const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
     const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
     const deliveryId = 'random-delivery-id';
@@ -72,28 +68,29 @@ describe('Cargo delivery', () => {
 
 describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
+    const pdaChain = await generatePdaChain();
     const parcel = new Parcel(
-      await PDA_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
-      PDA_CHAIN.pdaCert,
+      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+      pdaChain.pdaCert,
       Buffer.from([]),
     );
-    const parcelSerialized = await parcel.serialize(PDA_CHAIN.pdaGranteePrivateKey);
+    const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
     const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), OBJECT_STORAGE_BUCKET);
     await parcelStore.storeGatewayBoundParcel(
       parcel,
       Buffer.from(parcelSerialized),
-      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
 
     const cca = new CargoCollectionAuthorization(
       GW_GOGRPC_URL,
-      PDA_CHAIN.privateGatewayCert,
+      pdaChain.privateGatewayCert,
       Buffer.from([]),
     );
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
     const collectedCargoes = await asyncIterableToArray(
       cogrpcClient.collectCargo(
-        Buffer.from(await cca.serialize(PDA_CHAIN.privateGatewayPrivateKey)),
+        Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey)),
       ),
     );
 
@@ -101,10 +98,10 @@ describe('Cargo collection', () => {
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
     expect(cargo.recipientAddress).toEqual(
-      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
     const { payload: cargoMessageSet } = await cargo.unwrapPayload(
-      PDA_CHAIN.privateGatewayPrivateKey,
+      pdaChain.privateGatewayPrivateKey,
     );
     await expect(Array.from(cargoMessageSet.messages)).toEqual([parcelSerialized]);
   });
@@ -130,12 +127,13 @@ describe('Cargo collection', () => {
   });
 
   test('CCAs should not be reusable', async () => {
+    const pdaChain = await generatePdaChain();
     const cca = new CargoCollectionAuthorization(
       GW_GOGRPC_URL,
-      PDA_CHAIN.privateGatewayCert,
+      pdaChain.privateGatewayCert,
       Buffer.from([]),
     );
-    const ccaSerialized = Buffer.from(await cca.serialize(PDA_CHAIN.privateGatewayPrivateKey));
+    const ccaSerialized = Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey));
 
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
     await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();

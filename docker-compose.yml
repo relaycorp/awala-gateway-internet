@@ -99,7 +99,7 @@ services:
     links: [nats, vault]
 
   mongodb:
-    image: mongo:4.0
+    image: mongo:4.2
     healthcheck:
       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
     ports:

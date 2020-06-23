@@ -11,7 +11,7 @@ tsconfig*.json
 tslint.json
 .prettierignore
 .editorconfig
-.releaserc.js
+.releaserc.yml
 
 .vscode/
 .idea/

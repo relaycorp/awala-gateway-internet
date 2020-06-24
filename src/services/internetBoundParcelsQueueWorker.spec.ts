@@ -29,7 +29,7 @@ const MOCK_NATS_CLIENT_INIT = mockSpy(
 );
 
 const ENV_VARS = {
-  PARCEL_STORE_BUCKET: 'the-bucket',
+  OBJECT_STORE_BUCKET: 'the-bucket',
 };
 const MOCK_ENV_VARS = configureMockEnvVars(ENV_VARS);
 
@@ -108,7 +108,7 @@ describe('processInternetBoundParcels', () => {
 
     expect(MOCK_RETRIEVE_INTERNET_PARCEL.mock.instances[0]).toHaveProperty(
       'bucket',
-      ENV_VARS.PARCEL_STORE_BUCKET,
+      ENV_VARS.OBJECT_STORE_BUCKET,
     );
   });
 

@@ -27,7 +27,7 @@ export async function processInternetBoundParcels(
   workerName: string,
   ownPohttpAddress: string,
 ): Promise<void> {
-  const parcelStoreBucket = getEnvVar('PARCEL_STORE_BUCKET').required().asString();
+  const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), parcelStoreBucket);
 
   async function* parseMessages(

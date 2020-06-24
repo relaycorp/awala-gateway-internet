@@ -93,7 +93,7 @@ mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeySt
 mockSpy(jest.spyOn(mongoPublicKeyStore, 'MongoPublicKeyStore'), () => mockPublicKeyStore);
 
 //region Parcel store-related fixtures
-const PARCEL_STORE_BUCKET = 'the-bucket';
+const OBJECT_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
@@ -115,7 +115,7 @@ mockSpy(jest.spyOn(parcelCollection, 'recordParcelCollection'), () => undefined)
 const BASE_ENV_VARS = {
   NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
   NATS_SERVER_URL: STUB_NATS_SERVER,
-  PARCEL_STORE_BUCKET,
+  OBJECT_STORE_BUCKET,
   VAULT_KV_PREFIX: STUB_VAULT_KV_PREFIX,
   VAULT_TOKEN: STUB_VAULT_TOKEN,
   VAULT_URL: STUB_VAULT_URL,

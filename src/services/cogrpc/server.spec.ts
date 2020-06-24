@@ -30,7 +30,7 @@ const BASE_ENV_VARS = {
   GATEWAY_KEY_ID: 'base64-encoded key id',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
-  PARCEL_STORE_BUCKET: 'bucket-name',
+  OBJECT_STORE_BUCKET: 'bucket-name',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
@@ -40,7 +40,7 @@ describe('runServer', () => {
     'NATS_SERVER_URL',
     'NATS_CLUSTER_ID',
     'COGRPC_ADDRESS',
-    'PARCEL_STORE_BUCKET',
+    'OBJECT_STORE_BUCKET',
   ])('Environment variable %s should be present', async (envVar) => {
     mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
@@ -106,7 +106,7 @@ describe('runServer', () => {
       gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
-      parcelStoreBucket: BASE_ENV_VARS.PARCEL_STORE_BUCKET,
+      parcelStoreBucket: BASE_ENV_VARS.OBJECT_STORE_BUCKET,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

@@ -39,7 +39,7 @@ import { makeServiceImplementation } from './service';
 
 const COGRPC_ADDRESS = 'https://cogrpc.example.com/';
 const GATEWAY_KEY_ID_BASE64 = 'MTM1Nzkk';
-const PARCEL_STORE_BUCKET = 'parcels-bucket';
+const OBJECT_STORE_BUCKET = 'parcels-bucket';
 const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
 
@@ -79,7 +79,7 @@ const SERVICE_IMPLEMENTATION_OPTIONS = {
   gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
   natsClusterId: NATS_CLUSTER_ID,
   natsServerUrl: NATS_SERVER_URL,
-  parcelStoreBucket: PARCEL_STORE_BUCKET,
+  parcelStoreBucket: OBJECT_STORE_BUCKET,
 };
 
 //endregion
@@ -535,7 +535,7 @@ describe('collectCargo', () => {
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS.mock.instances[0]).toHaveProperty(
       'bucket',
-      PARCEL_STORE_BUCKET,
+      OBJECT_STORE_BUCKET,
     );
   });
 

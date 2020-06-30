@@ -2,6 +2,7 @@
 
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpc from 'grpc';
+import * as grpcHealthCheck from 'grpc-health-check';
 
 import { mockSpy } from '../../_test_utils';
 import { configureMockEnvVars } from '../_test_utils';
@@ -110,8 +111,25 @@ describe('runServer', () => {
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 
-    expect(mockServer.addService).toBeCalledTimes(1);
     expect(mockServer.addService).toBeCalledWith(CargoRelayService, serviceImplementation);
+  });
+
+  test('Health check service should be added', async () => {
+    await runServer();
+
+    expect(mockServer.addService).toBeCalledWith(
+      grpcHealthCheck.service,
+      expect.any(grpcHealthCheck.Implementation),
+    );
+    expect(mockServer.addService).toBeCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        statusMap: {
+          '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+          CargoRelay: grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+        },
+      }),
+    );
   });
 
   test('Server should listen on 0.0.0.0:8080', async () => {

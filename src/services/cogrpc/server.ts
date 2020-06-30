@@ -1,6 +1,7 @@
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
 import { Server, ServerCredentials } from 'grpc';
+import grpcHealthCheck from 'grpc-health-check';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { makeServiceImplementation } from './service';
@@ -37,6 +38,14 @@ export async function runServer(): Promise<void> {
     parcelStoreBucket,
   });
   server.addService(CargoRelayService, serviceImplementation);
+
+  // TODO: Health checks should be probing backing services
+  const healthCheckService = new grpcHealthCheck.Implementation({
+    '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+    CargoRelay: grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+  });
+  server.addService(grpcHealthCheck.service, healthCheckService);
+
   const bindResult = server.bind(NETLOC, ServerCredentials.createInsecure());
   if (bindResult < 0) {
     throw new Error(`Failed to listen on ${NETLOC}`);

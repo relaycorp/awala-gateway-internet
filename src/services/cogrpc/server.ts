@@ -42,7 +42,8 @@ export async function runServer(): Promise<void> {
   // TODO: Health checks should be probing backing services
   const healthCheckService = new grpcHealthCheck.Implementation({
     '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
-    CargoRelay: grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+    'relaynet.cogrpc.CargoRelay':
+      grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
   });
   server.addService(grpcHealthCheck.service, healthCheckService);
 

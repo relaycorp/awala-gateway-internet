@@ -126,7 +126,8 @@ describe('runServer', () => {
       expect.objectContaining({
         statusMap: {
           '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
-          CargoRelay: grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+          'relaynet.cogrpc.CargoRelay':
+            grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
         },
       }),
     );

@@ -148,7 +148,7 @@ async function deserializePong(
 }
 
 async function encapsulateParcelsInCargo(parcels: readonly ArrayBuffer[]): Promise<Buffer> {
-  const messageSet = new CargoMessageSet(new Set(parcels));
+  const messageSet = new CargoMessageSet(parcels);
   const messageSetCiphertext = await SessionlessEnvelopedData.encrypt(
     messageSet.serialize(),
     GW_PDA_CHAIN.publicGatewayCert,

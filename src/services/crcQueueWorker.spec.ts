@@ -234,7 +234,7 @@ test('Keystore errors should be propagated and cargo should remain in the queue'
 });
 
 test('Session keys of sender should be stored if present', async () => {
-  const cargoMessageSet = new CargoMessageSet(new Set([]));
+  const cargoMessageSet = new CargoMessageSet([]);
   const { envelopedData } = await SessionEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
     PUBLIC_GW_SESSION_CERT,
@@ -466,7 +466,7 @@ test('NATS connection should be closed upon error', async () => {
 });
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {
-  const cargoMessageSet = new CargoMessageSet(new Set(items));
+  const cargoMessageSet = new CargoMessageSet(items);
   const payload = await SessionlessEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
     CERT_CHAIN.publicGatewayCert,

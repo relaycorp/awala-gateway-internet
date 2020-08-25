@@ -41,7 +41,7 @@
     "prettier": "^2.0.5",
     "trash-cli": "^3.1.0",
     "ts-jest": "^25.5.1",
-    "ts-node": "^8.10.2",
+    "ts-node": "^9.0.0",
     "ts-node-dev": "^1.0.0-pre.57",
     "tslint": "^5.18.0",
     "typescript": "^3.9.7"
@@ -72,7 +72,7 @@
     "@typegoose/typegoose": "^7.3.3",
     "@types/pino": "^6.3.0",
     "aws-sdk": "^2.735.0",
-    "axios": "^0.19.1",
+    "axios": "^0.20.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",
     "fastify": "^2.15.1",

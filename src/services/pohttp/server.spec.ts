@@ -1,16 +1,17 @@
 import { EnvVarError } from 'env-var';
-import fastify = require('fastify');
+import { fastify } from 'fastify';
 
 import { configureMockEnvVars, getMockContext } from '../_test_utils';
 import * as server from './server';
 
 const mockFastify = {
-  addContentTypeParser: jest.fn(),
   listen: jest.fn(),
   ready: jest.fn(),
   register: jest.fn(),
 };
-jest.mock('fastify', () => jest.fn().mockImplementation(() => mockFastify));
+jest.mock('fastify', () => {
+  return { fastify: jest.fn().mockImplementation(() => mockFastify) };
+});
 
 afterAll(() => {
   jest.restoreAllMocks();
@@ -42,20 +43,6 @@ describe('makeServer', () => {
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader);
-  });
-
-  test('Content-Type application/vnd.relaynet.parcel should be supported', async () => {
-    await server.makeServer();
-
-    expect(mockFastify.addContentTypeParser).toBeCalledTimes(1);
-    const addContentTypeParserCallArgs = getMockContext(mockFastify.addContentTypeParser).calls[0];
-    expect(addContentTypeParserCallArgs[0]).toEqual('application/vnd.relaynet.parcel');
-    expect(addContentTypeParserCallArgs[1]).toEqual({ parseAs: 'buffer' });
-
-    // It shouldn't actually parse the body just yet:
-    const parser = addContentTypeParserCallArgs[2];
-    const stubBody = {};
-    expect(parser({}, stubBody)).resolves.toBe(stubBody);
   });
 
   test('Routes should be loaded', () => {

@@ -1,8 +1,9 @@
 /* tslint:disable:no-let */
 
 import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
-import { FastifyInstance, HTTPInjectOptions, HTTPMethod } from 'fastify';
+import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
+import { InjectOptions } from 'light-my-request';
 
 import { mockSpy, PdaChain } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
@@ -29,7 +30,7 @@ jest.mock('fastify-mongoose', () => {
 });
 
 const gatewayAddress = 'gw.relaycorp.tech:8000';
-const validRequestOptions: HTTPInjectOptions = {
+const validRequestOptions: InjectOptions = {
   headers: {
     'Content-Type': 'application/vnd.relaynet.parcel',
     Host: gatewayAddress,
@@ -98,7 +99,7 @@ describe('receiveParcel', () => {
     serverInstance = await makeServer();
   });
 
-  test.each(['PUT', 'PATCH', 'DELETE'] as readonly HTTPMethod[])(
+  test.each(['PUT', 'PATCH', 'DELETE'] as readonly HTTPMethods[])(
     '%s requests should be refused',
     async (method) => {
       const response = await serverInstance.inject({

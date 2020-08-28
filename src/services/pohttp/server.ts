@@ -1,11 +1,7 @@
 import { get as getEnvVar } from 'env-var';
-import { FastifyInstance } from 'fastify';
+import { fastify, FastifyInstance } from 'fastify';
 
 import routes from './routes';
-
-// I wish I could just do `import * as fastify from 'fastify'` or `import fastify from 'fastify'`
-// but neither worked regardless of the values set in esModuleInterop/allowSyntheticDefaultImports
-import fastify = require('fastify');
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
@@ -26,12 +22,6 @@ export async function makeServer(): Promise<FastifyInstance> {
 
   const mongoUri = getEnvVar('MONGO_URI').required().asString();
   await server.register(require('fastify-mongoose'), { uri: mongoUri });
-
-  server.addContentTypeParser(
-    'application/vnd.relaynet.parcel',
-    { parseAs: 'buffer' },
-    async (_req: any, rawBody: Buffer) => rawBody,
-  );
 
   await server.ready();
 

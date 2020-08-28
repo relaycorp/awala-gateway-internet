@@ -20,6 +20,12 @@ export default async function registerRoutes(
   const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(objectStoreClient, objectStoreBucket);
 
+  fastify.addContentTypeParser(
+    'application/vnd.relaynet.parcel',
+    { parseAs: 'buffer' },
+    async (_req: any, rawBody: Buffer) => rawBody,
+  );
+
   fastify.route({
     method: ['PUT', 'DELETE', 'PATCH'],
     url: '/',
@@ -39,7 +45,7 @@ export default async function registerRoutes(
     },
   });
 
-  fastify.route({
+  fastify.route<{ readonly Body: Buffer }>({
     method: 'POST',
     url: '/',
     async handler(request, reply): Promise<FastifyReply<any>> {

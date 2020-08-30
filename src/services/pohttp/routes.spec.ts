@@ -29,11 +29,10 @@ jest.mock('fastify-mongoose', () => {
   return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
 });
 
-const gatewayAddress = 'gw.relaycorp.tech:8000';
 const validRequestOptions: InjectOptions = {
   headers: {
     'Content-Type': 'application/vnd.relaynet.parcel',
-    Host: gatewayAddress,
+    Host: 'gw.relaycorp.tech:8000',
   },
   method: 'POST',
   url: '/',

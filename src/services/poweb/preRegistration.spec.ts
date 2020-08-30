@@ -17,11 +17,12 @@ import { makeServer } from './server';
 
 const endpointURL = '/v1/pre-registrations';
 
+const mockFastifyPlugin = fastifyPlugin;
 jest.mock('fastify-mongoose', () => {
   function mockFunc(_fastify: FastifyInstance, _options: any, next: () => void): void {
     next();
   }
-  return fastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
+  return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
 });
 
 let gatewayPrivateKey: CryptoKey;

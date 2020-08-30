@@ -112,7 +112,7 @@ export default async function registerRoutes(
       try {
         await natsClient.publishMessage(parcelObjectKey, `pdc-parcel.${recipientGatewayAddress}`);
       } catch (error) {
-        request.log.error({ err: error }, 'Failed to queue ping message');
+        request.log.error({ err: error }, 'Failed to queue parcel');
         return reply
           .code(500)
           .send({ message: 'Parcel could not be stored; please try again later' });

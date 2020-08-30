@@ -273,7 +273,7 @@ describe('receiveParcel', () => {
       );
     });
 
-    test('Failing to queue the ping message should result in a 500 response', async () => {
+    test('Failing to queue the parcel should result in a 500 response', async () => {
       const error = new Error('Oops');
       ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
       ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
@@ -286,7 +286,7 @@ describe('receiveParcel', () => {
       });
 
       // TODO: Find a way to spy on the error logger
-      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
+      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue parcel', { err: error });
     });
 
     test('NATS connection should be closed upon successful completion', async () => {

@@ -52,7 +52,7 @@ describe('configureFastify', () => {
   test('Routes should be loaded', async () => {
     await configureFastify([dummyRoutes]);
 
-    expect(mockFastify.register).toBeCalledWith(dummyRoutes);
+    expect(mockFastify.register).toBeCalledWith(dummyRoutes, undefined);
   });
 
   test('Routes should be "awaited" for', async () => {
@@ -64,6 +64,14 @@ describe('configureFastify', () => {
     });
 
     await expect(configureFastify([dummyRoutes])).rejects.toEqual(error);
+  });
+
+  test('Any route options should be passed when registering the route', async () => {
+    const options = { foo: 'oof' };
+
+    await configureFastify([dummyRoutes], options);
+
+    expect(mockFastify.register).toBeCalledWith(dummyRoutes, options);
   });
 
   test('The env var MONGO_URI should be set', async () => {

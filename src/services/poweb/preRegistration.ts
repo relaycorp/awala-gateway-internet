@@ -1,17 +1,17 @@
 import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
+import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/pre-registrations';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
-  _options: any,
+  options: RouteOptions,
 ): Promise<void> {
-  const ownPrivateKey = await retrieveOwnPrivateKey();
+  const unboundKeyPair = await options.privateKeyStore.fetchNodeKey(options.gatewayKeyId);
+  const ownPrivateKey = unboundKeyPair.privateKey;
 
   fastify.route({
     method: ['HEAD', 'GET', 'PUT', 'DELETE', 'PATCH'],
@@ -42,14 +42,6 @@ export default async function registerRoutes(
         .send(authorizationSerialized);
     },
   });
-}
-
-async function retrieveOwnPrivateKey(): Promise<CryptoKey> {
-  const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
-  const gatewayKeyId = Buffer.from(gatewayKeyIdBase64, 'base64');
-  const privateKeyStore = initVaultKeyStore();
-  const unboundKeyPair = await privateKeyStore.fetchNodeKey(gatewayKeyId);
-  return unboundKeyPair.privateKey;
 }
 
 async function generateAuthorization(

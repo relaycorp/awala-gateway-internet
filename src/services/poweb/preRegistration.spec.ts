@@ -6,7 +6,6 @@ import {
   PrivateNodeRegistrationAuthorization,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { EnvVarError } from 'env-var';
 import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 
@@ -53,12 +52,6 @@ beforeEach(() => {
 
 let fastify: FastifyInstance;
 beforeEach(async () => (fastify = await makeServer()));
-
-test('Environment variable GATEWAY_KEY_ID should be present', async () => {
-  mockEnvVars({ ...BASE_ENV_VARS, GATEWAY_KEY_ID: undefined });
-
-  await expect(makeServer()).rejects.toBeInstanceOf(EnvVarError);
-});
 
 test.each(['HEAD', 'GET', 'PUT', 'PATCH', 'DELETE'] as readonly HTTPMethods[])(
   '%s requests should be refused',

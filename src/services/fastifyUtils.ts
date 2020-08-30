@@ -10,13 +10,15 @@ const SERVER_HOST = '0.0.0.0';
  *
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
-export async function configureFastify(routes: FastifyPluginCallback): Promise<FastifyInstance> {
+export async function configureFastify(
+  routes: readonly FastifyPluginCallback[],
+): Promise<FastifyInstance> {
   const server = fastify({
     logger: true,
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER').default(DEFAULT_REQUEST_ID_HEADER).asString(),
   });
 
-  server.register(routes);
+  await Promise.all(routes.map((route) => server.register(route)));
 
   const mongoUri = getEnvVar('MONGO_URI').required().asString();
   await server.register(require('fastify-mongoose'), { uri: mongoUri });

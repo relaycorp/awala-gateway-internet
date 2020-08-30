@@ -13,7 +13,7 @@ describe('makeServer', () => {
     await makeServer();
 
     expect(mockConfigureFastify).toBeCalledTimes(1);
-    expect(mockConfigureFastify).toBeCalledWith(require('./preRegistration').default);
+    expect(mockConfigureFastify).toBeCalledWith([require('./preRegistration').default]);
   });
 
   test('Fastify instance should be returned', async () => {

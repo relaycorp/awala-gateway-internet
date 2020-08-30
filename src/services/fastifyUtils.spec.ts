@@ -1,13 +1,15 @@
+/* tslint:disable:no-let */
 import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 
+import { mockSpy } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
 import { configureFastify, runFastify } from './fastifyUtils';
 
 const mockFastify: FastifyInstance = {
-  listen: jest.fn(),
-  ready: jest.fn(),
-  register: jest.fn(),
+  listen: mockSpy(jest.fn()),
+  ready: mockSpy(jest.fn()),
+  register: mockSpy(jest.fn()),
 } as any;
 jest.mock('fastify', () => {
   return { fastify: jest.fn().mockImplementation(() => mockFastify) };
@@ -24,14 +26,14 @@ const dummyRoutes: FastifyPluginCallback = () => null;
 
 describe('configureFastify', () => {
   test('Logger should be enabled', () => {
-    configureFastify(dummyRoutes);
+    configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('logger', true);
   });
 
   test('X-Request-Id should be the default request id header', () => {
-    configureFastify(dummyRoutes);
+    configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', 'X-Request-Id');
@@ -41,26 +43,37 @@ describe('configureFastify', () => {
     const requestIdHeader = 'X-Id';
     mockEnvVars({ MONGO_URI: stubMongoUri, REQUEST_ID_HEADER: requestIdHeader });
 
-    configureFastify(dummyRoutes);
+    configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader);
   });
 
-  test('Routes should be loaded', () => {
-    configureFastify(dummyRoutes);
+  test('Routes should be loaded', async () => {
+    await configureFastify([dummyRoutes]);
 
     expect(mockFastify.register).toBeCalledWith(dummyRoutes);
+  });
+
+  test('Routes should be "awaited" for', async () => {
+    const error = new Error('Denied');
+    getMockInstance(mockFastify.register).mockImplementation((plugin) => {
+      if (plugin === dummyRoutes) {
+        throw error;
+      }
+    });
+
+    await expect(configureFastify([dummyRoutes])).rejects.toEqual(error);
   });
 
   test('The env var MONGO_URI should be set', async () => {
     mockEnvVars({ MONGO_URI: undefined });
 
-    await expect(configureFastify(dummyRoutes)).rejects.toBeInstanceOf(EnvVarError);
+    await expect(configureFastify([dummyRoutes])).rejects.toBeInstanceOf(EnvVarError);
   });
 
   test('The fastify-mongoose plugin should be configured', async () => {
-    await configureFastify(dummyRoutes);
+    await configureFastify([dummyRoutes]);
 
     expect(mockFastify.register).toBeCalledWith(require('fastify-mongoose'), {
       uri: stubMongoUri,
@@ -68,13 +81,13 @@ describe('configureFastify', () => {
   });
 
   test('It should wait for the Fastify server to be ready', async () => {
-    await configureFastify(dummyRoutes);
+    await configureFastify([dummyRoutes]);
 
     expect(mockFastify.ready).toBeCalledTimes(1);
   });
 
   test('Server instance should be returned', async () => {
-    const serverInstance = await configureFastify(dummyRoutes);
+    const serverInstance = await configureFastify([dummyRoutes]);
 
     expect(serverInstance).toBe(mockFastify);
   });

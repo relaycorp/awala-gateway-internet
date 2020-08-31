@@ -1,10 +1,9 @@
 import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
-import { createHash } from 'crypto';
 import pino from 'pino';
 import uuid from 'uuid-random';
 
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
-import { convertDateToTimestamp } from '../utils';
+import { convertDateToTimestamp, sha256Hex } from '../utils';
 
 const LOGGER = pino();
 
@@ -143,8 +142,4 @@ function calculatedGatewayBoundParcelObjectKey(
     senderPrivateAddress,
     sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
   ].join('/');
-}
-
-function sha256Hex(plaintext: string): string {
-  return createHash('sha256').update(plaintext).digest('hex');
 }

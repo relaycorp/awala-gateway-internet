@@ -15,16 +15,6 @@ const mockConfigureFastify = mockSpy(
 );
 
 describe('makeServer', () => {
-  test('Routes should be loaded', async () => {
-    await makeServer();
-
-    expect(mockConfigureFastify).toBeCalledTimes(1);
-    expect(mockConfigureFastify).toBeCalledWith(
-      [require('./preRegistration').default],
-      expect.anything(),
-    );
-  });
-
   test('Private key should be loaded and added to the options', async () => {
     await makeServer();
 

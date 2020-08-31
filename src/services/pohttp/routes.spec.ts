@@ -5,7 +5,7 @@ import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, PdaChain } from '../../_test_utils';
+import { mockSpy, PdaChain, sha256Hex } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
@@ -13,7 +13,6 @@ import {
   generatePdaChain,
   generateStubEndpointCertificate,
   generateStubParcel,
-  sha256Hex,
 } from '../_test_utils';
 import * as certs from '../certs';
 import { makeServer } from './server';

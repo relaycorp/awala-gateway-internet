@@ -1,4 +1,5 @@
 import { Certificate } from '@relaycorp/relaynet-core';
+import { BinaryLike, createHash, Hash } from 'crypto';
 import pino from 'pino';
 
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
@@ -55,4 +56,16 @@ export interface PdaChain {
   readonly peerEndpointPrivateKey: CryptoKey;
   readonly pdaCert: Certificate;
   readonly pdaGranteePrivateKey: CryptoKey;
+}
+
+function makeSHA256Hash(plaintext: BinaryLike): Hash {
+  return createHash('sha256').update(plaintext);
+}
+
+export function sha256Hex(plaintext: string): string {
+  return makeSHA256Hash(plaintext).digest('hex');
+}
+
+export function sha256(plaintext: BinaryLike): Buffer {
+  return makeSHA256Hash(plaintext).digest();
 }

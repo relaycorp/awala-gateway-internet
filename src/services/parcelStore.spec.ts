@@ -1,9 +1,15 @@
 // tslint:disable:no-let
 import { Parcel } from '@relaycorp/relaynet-core';
 
-import { arrayToAsyncIterable, asyncIterableToArray, mockPino, mockSpy } from '../_test_utils';
+import {
+  arrayToAsyncIterable,
+  asyncIterableToArray,
+  mockPino,
+  mockSpy,
+  sha256Hex,
+} from '../_test_utils';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
-import { generatePdaChain, sha256Hex } from './_test_utils';
+import { generatePdaChain } from './_test_utils';
 
 const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';

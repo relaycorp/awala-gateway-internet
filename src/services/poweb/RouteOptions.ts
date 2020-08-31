@@ -1,6 +1,6 @@
-import { PrivateKeyStore } from '@relaycorp/relaynet-core';
+import { Certificate } from '@relaycorp/relaynet-core';
 
 export default interface RouteOptions {
-  readonly gatewayKeyId: Buffer;
-  readonly privateKeyStore: PrivateKeyStore;
+  readonly publicGatewayPrivateKey: CryptoKey;
+  readonly publicGatewayCertificate: Certificate;
 }

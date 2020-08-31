@@ -4,6 +4,7 @@ import { FastifyInstance } from 'fastify';
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { configureFastify } from '../fastifyUtils';
 import preRegistrationRoutes from './preRegistration';
+import RouteOptions from './RouteOptions';
 
 /**
  * Initialize a Fastify server instance.
@@ -14,6 +15,10 @@ export async function makeServer(): Promise<FastifyInstance> {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
   const gatewayKeyId = Buffer.from(gatewayKeyIdBase64, 'base64');
   const privateKeyStore = initVaultKeyStore();
-  const routeOptions = { gatewayKeyId, privateKeyStore };
+  const publicGatewayKeyPair = await privateKeyStore.fetchNodeKey(gatewayKeyId);
+  const routeOptions: RouteOptions = {
+    publicGatewayCertificate: publicGatewayKeyPair.certificate,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+  };
   return configureFastify([preRegistrationRoutes], routeOptions);
 }

@@ -11,9 +11,6 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   options: RouteOptions,
 ): Promise<void> {
-  const unboundKeyPair = await options.privateKeyStore.fetchNodeKey(options.gatewayKeyId);
-  const ownPrivateKey = unboundKeyPair.privateKey;
-
   fastify.route({
     method: ['HEAD', 'GET', 'PUT', 'DELETE', 'PATCH'],
     url: ENDPOINT_URL,
@@ -36,7 +33,7 @@ export default async function registerRoutes(
       }
       const authorizationSerialized = await generateAuthorization(
         privateGatewayPublicKeyDigest,
-        ownPrivateKey,
+        options.publicGatewayPrivateKey,
       );
       return reply.header('Content-Type', PNRA_CONTENT_TYPE).send(authorizationSerialized);
     },

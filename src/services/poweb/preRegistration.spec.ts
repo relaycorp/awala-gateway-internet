@@ -1,55 +1,16 @@
 // tslint:disable:no-let
 
-import {
-  Certificate,
-  MockPrivateKeyStore,
-  PrivateNodeRegistrationAuthorization,
-} from '@relaycorp/relaynet-core';
+import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, HTTPMethods } from 'fastify';
-import fastifyPlugin from 'fastify-plugin';
 
-import { mockSpy } from '../../_test_utils';
-import * as privateKeyStore from '../../backingServices/privateKeyStore';
-import { configureMockEnvVars, generatePdaChain } from '../_test_utils';
+import { setUpCommonFixtures } from './_test_utils';
 import { PNRA_CONTENT_TYPE } from './contentTypes';
 import { makeServer } from './server';
 
 const endpointURL = '/v1/pre-registrations';
 
-const mockFastifyPlugin = fastifyPlugin;
-jest.mock('fastify-mongoose', () => {
-  function mockFunc(_fastify: FastifyInstance, _options: any, next: () => void): void {
-    next();
-  }
-  return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
-});
-
-let gatewayPrivateKey: CryptoKey;
-let gatewayPublicKey: CryptoKey;
-let gatewayCertificate: Certificate;
-beforeAll(async () => {
-  const chain = await generatePdaChain();
-  gatewayPrivateKey = chain.privateGatewayPrivateKey;
-  gatewayCertificate = chain.privateGatewayCert;
-  gatewayPublicKey = await gatewayCertificate.getPublicKey();
-});
-
-let mockPrivateKeyStore: MockPrivateKeyStore;
-beforeEach(async () => {
-  mockPrivateKeyStore = new MockPrivateKeyStore();
-  await mockPrivateKeyStore.registerNodeKey(gatewayPrivateKey, gatewayCertificate);
-});
-mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
-
-const BASE_ENV_VARS = { MONGO_URI: 'mongodb://example.com' };
-const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
-beforeEach(() => {
-  mockEnvVars({
-    ...BASE_ENV_VARS,
-    GATEWAY_KEY_ID: gatewayCertificate.getSerialNumber().toString('base64'),
-  });
-});
+const getFixtures = setUpCommonFixtures();
 
 let fastify: FastifyInstance;
 beforeEach(async () => (fastify = await makeServer()));
@@ -106,7 +67,7 @@ test('A valid authorization should be issued if the request if valid', async () 
 
   const authorization = await PrivateNodeRegistrationAuthorization.deserialize(
     bufferToArray(response.rawPayload),
-    gatewayPublicKey,
+    await getFixtures().publicGatewayCert.getPublicKey(),
   );
   const now = new Date();
   expect(authorization.expiryDate.getTime()).toBeGreaterThan(now.getTime() + 8_000);

@@ -12,6 +12,7 @@ import fastifyPlugin from 'fastify-plugin';
 import { mockSpy } from '../../_test_utils';
 import * as privateKeyStore from '../../backingServices/privateKeyStore';
 import { configureMockEnvVars, generatePdaChain } from '../_test_utils';
+import { PNRA_CONTENT_TYPE } from './contentTypes';
 import { makeServer } from './server';
 
 const endpointURL = '/v1/pre-registrations';
@@ -101,9 +102,7 @@ test('A valid authorization should be issued if the request if valid', async () 
   });
 
   expect(response).toHaveProperty('statusCode', 200);
-  expect(response.headers['content-type']).toEqual(
-    'application/vnd.relaynet.node-registration.authorization',
-  );
+  expect(response.headers['content-type']).toEqual(PNRA_CONTENT_TYPE);
 
   const authorization = await PrivateNodeRegistrationAuthorization.deserialize(
     bufferToArray(response.rawPayload),

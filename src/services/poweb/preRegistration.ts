@@ -2,6 +2,7 @@ import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
+import { PNRA_CONTENT_TYPE } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/pre-registrations';
@@ -37,9 +38,7 @@ export default async function registerRoutes(
         privateGatewayPublicKeyDigest,
         ownPrivateKey,
       );
-      return reply
-        .header('Content-Type', 'application/vnd.relaynet.node-registration.authorization')
-        .send(authorizationSerialized);
+      return reply.header('Content-Type', PNRA_CONTENT_TYPE).send(authorizationSerialized);
     },
   });
 }

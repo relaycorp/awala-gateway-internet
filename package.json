@@ -76,7 +76,7 @@
     "axios": "^0.20.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",
-    "fastify": "^3.2.1",
+    "fastify": "^3.3.0",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.3",
     "grpc-health-check": "^1.8.0",

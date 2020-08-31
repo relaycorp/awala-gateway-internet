@@ -28,7 +28,7 @@
     "@relaycorp/shared-config": "^1.4.1",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.10",
-    "@types/mongoose": "^5.7.31",
+    "@types/mongoose": "^5.7.36",
     "@types/pkijs": "0.0.4",
     "@types/verror": "^1.10.4",
     "docker-compose": "^0.23.5",

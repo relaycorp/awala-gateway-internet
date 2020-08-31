@@ -5,7 +5,7 @@ import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, PdaChain } from '../../_test_utils';
+import { mockSpy, PdaChain, sha256Hex } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
@@ -13,7 +13,6 @@ import {
   generatePdaChain,
   generateStubEndpointCertificate,
   generateStubParcel,
-  sha256Hex,
 } from '../_test_utils';
 import * as certs from '../certs';
 import { makeServer } from './server';
@@ -29,11 +28,10 @@ jest.mock('fastify-mongoose', () => {
   return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
 });
 
-const gatewayAddress = 'gw.relaycorp.tech:8000';
 const validRequestOptions: InjectOptions = {
   headers: {
     'Content-Type': 'application/vnd.relaynet.parcel',
-    Host: gatewayAddress,
+    Host: 'gw.relaycorp.tech:8000',
   },
   method: 'POST',
   url: '/',
@@ -273,7 +271,7 @@ describe('receiveParcel', () => {
       );
     });
 
-    test('Failing to queue the ping message should result in a 500 response', async () => {
+    test('Failing to queue the parcel should result in a 500 response', async () => {
       const error = new Error('Oops');
       ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
       ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
@@ -286,7 +284,7 @@ describe('receiveParcel', () => {
       });
 
       // TODO: Find a way to spy on the error logger
-      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
+      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue parcel', { err: error });
     });
 
     test('NATS connection should be closed upon successful completion', async () => {

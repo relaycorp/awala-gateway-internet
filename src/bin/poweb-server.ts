@@ -2,6 +2,6 @@
 require('make-promises-safe');
 
 import { runFastify } from '../services/fastifyUtils';
-import { makeServer } from '../services/pohttp/server';
+import { makeServer } from '../services/poweb/server';
 
 makeServer().then(runFastify);

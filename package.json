@@ -72,7 +72,7 @@
     "@relaycorp/relaynet-pohttp": "^1.5.0",
     "@typegoose/typegoose": "^7.3.4",
     "@types/pino": "^6.3.0",
-    "aws-sdk": "^2.739.0",
+    "aws-sdk": "^2.743.0",
     "axios": "^0.20.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",

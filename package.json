@@ -70,7 +70,7 @@
     "@relaycorp/keystore-vault": "^1.1.4",
     "@relaycorp/relaynet-core": "^1.30.0",
     "@relaycorp/relaynet-pohttp": "^1.5.0",
-    "@typegoose/typegoose": "^7.3.4",
+    "@typegoose/typegoose": "^7.3.5",
     "@types/pino": "^6.3.0",
     "aws-sdk": "^2.743.0",
     "axios": "^0.20.0",

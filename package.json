@@ -27,7 +27,7 @@
   "devDependencies": {
     "@relaycorp/shared-config": "^1.4.1",
     "@semantic-release/exec": "^5.0.0",
-    "@types/jest": "^26.0.10",
+    "@types/jest": "^26.0.12",
     "@types/mongoose": "^5.7.36",
     "@types/pkijs": "0.0.4",
     "@types/verror": "^1.10.4",
@@ -76,7 +76,7 @@
     "axios": "^0.20.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",
-    "fastify": "^3.2.1",
+    "fastify": "^3.3.0",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.3",
     "grpc-health-check": "^1.8.0",

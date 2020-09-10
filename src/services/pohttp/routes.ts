@@ -1,4 +1,4 @@
-import { Parcel } from '@relaycorp/relaynet-core';
+import { Certificate, Parcel } from '@relaycorp/relaynet-core';
 import { mongoose } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -67,8 +67,10 @@ export default async function registerRoutes(
       // @ts-ignore
       const mongooseConnection = (fastify.mongo as unknown) as { readonly db: mongoose.Connection };
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection.db);
+      // tslint:disable-next-line:no-let
+      let certificationPath: readonly Certificate[];
       try {
-        await parcel.validate(trustedCertificates);
+        certificationPath = (await parcel.validate(trustedCertificates))!!;
       } catch (error) {
         // TODO: Log this
         return reply.code(400).send({ message: 'Parcel sender is not authorized' });
@@ -76,8 +78,7 @@ export default async function registerRoutes(
 
       //endregion
 
-      const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-      const recipientGatewayCert = certificatePath[certificatePath.length - 2];
+      const recipientGatewayCert = certificationPath[certificationPath.length - 2];
       const recipientGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
 
       //region Save to object storage

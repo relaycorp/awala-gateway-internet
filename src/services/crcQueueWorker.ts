@@ -132,6 +132,8 @@ async function processParcel(
 ): Promise<void> {
   const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
   try {
+    // Don't require the sender to be on a valid path from the current public gateway: Doing so
+    // would only work if the recipient is also served by this gateway.
     await parcel.validate();
   } catch (err) {
     logger.info(

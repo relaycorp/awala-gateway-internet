@@ -7,9 +7,10 @@ import {
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { FastifyInstance, HTTPMethods } from 'fastify';
+import { FastifyInstance } from 'fastify';
 
 import { sha256 } from '../../_test_utils';
+import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { PNR_CONTENT_TYPE, PNRR_CONTENT_TYPE } from './contentTypes';
 import { makeServer } from './server';
@@ -21,18 +22,7 @@ const getFixtures = setUpCommonFixtures();
 let fastify: FastifyInstance;
 beforeEach(async () => (fastify = await makeServer()));
 
-test.each(['HEAD', 'GET', 'PUT', 'PATCH', 'DELETE'] as readonly HTTPMethods[])(
-  '%s requests should be refused',
-  async (method) => {
-    const response = await fastify.inject({
-      method,
-      url: ENDPOINT_URL,
-    });
-
-    expect(response).toHaveProperty('statusCode', 405);
-    expect(response).toHaveProperty('headers.allow', 'POST');
-  },
-);
+testDisallowedMethods(['POST'], ENDPOINT_URL, makeServer);
 
 test('HTTP 415 should be returned if the request Content-Type is not a PNRR', async () => {
   const response = await fastify.inject({

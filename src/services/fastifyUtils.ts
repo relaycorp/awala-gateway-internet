@@ -1,9 +1,44 @@
 import { get as getEnvVar } from 'env-var';
-import { fastify, FastifyInstance, FastifyPluginCallback, FastifyPluginOptions } from 'fastify';
+import {
+  fastify,
+  FastifyInstance,
+  FastifyPluginCallback,
+  FastifyPluginOptions,
+  HTTPMethods,
+} from 'fastify';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
 const SERVER_HOST = '0.0.0.0';
+
+export const HTTP_METHODS: readonly HTTPMethods[] = [
+  'POST',
+  'DELETE',
+  'GET',
+  'HEAD',
+  'PATCH',
+  'PUT',
+  'OPTIONS',
+];
+
+export function registerDisallowedMethods(
+  allowedMethods: readonly HTTPMethods[],
+  endpointURL: string,
+  fastifyInstance: FastifyInstance,
+): void {
+  const allowedMethodsString = allowedMethods.join(', ');
+
+  const methods = HTTP_METHODS.filter((m) => !allowedMethods.includes(m));
+
+  fastifyInstance.route({
+    method: methods,
+    url: endpointURL,
+    async handler(req, reply): Promise<void> {
+      const statusCode = req.method === 'OPTIONS' ? 204 : 405;
+      reply.code(statusCode).header('Allow', allowedMethodsString).send();
+    },
+  });
+}
 
 /**
  * Initialize a Fastify server instance.

@@ -1,7 +1,7 @@
 /* tslint:disable:no-let */
 
 import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
-import { FastifyInstance, HTTPMethods } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
@@ -13,6 +13,7 @@ import {
   generatePdaChain,
   generateStubEndpointCertificate,
   generateStubParcel,
+  testDisallowedMethods,
 } from '../_test_utils';
 import * as certs from '../certs';
 import { makeServer } from './server';
@@ -97,18 +98,7 @@ describe('receiveParcel', () => {
     serverInstance = await makeServer();
   });
 
-  test.each(['PUT', 'PATCH', 'DELETE'] as readonly HTTPMethods[])(
-    '%s requests should be refused',
-    async (method) => {
-      const response = await serverInstance.inject({
-        ...validRequestOptions,
-        method,
-      });
-
-      expect(response).toHaveProperty('statusCode', 405);
-      expect(response).toHaveProperty('headers.allow', 'HEAD, GET, POST');
-    },
-  );
+  testDisallowedMethods(['HEAD', 'GET', 'POST'], '/', makeServer);
 
   test('A plain simple HEAD request should provide some diagnostic information', async () => {
     const response = await serverInstance.inject({ method: 'HEAD', url: '/' });

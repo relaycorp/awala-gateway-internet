@@ -7,6 +7,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
 import { retrieveOwnCertificates } from '../certs';
+import { registerDisallowedMethods } from '../fastifyUtils';
 import { ParcelStore } from '../parcelStore';
 
 export default async function registerRoutes(
@@ -26,13 +27,7 @@ export default async function registerRoutes(
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  fastify.route({
-    method: ['PUT', 'DELETE', 'PATCH'],
-    url: '/',
-    async handler(_req, reply): Promise<void> {
-      reply.code(405).header('Allow', 'HEAD, GET, POST').send();
-    },
-  });
+  registerDisallowedMethods(['HEAD', 'GET', 'POST'], '/', fastify);
 
   fastify.route({
     method: ['HEAD', 'GET'],

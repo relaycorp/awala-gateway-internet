@@ -207,7 +207,7 @@ describe('deliverCargo', () => {
       // The invalid message is followed by a valid one to check that processing continues
       cargoValidateSpy.mockReset();
       cargoValidateSpy.mockRejectedValueOnce(new Error('Denied'));
-      cargoValidateSpy.mockResolvedValueOnce(undefined);
+      cargoValidateSpy.mockResolvedValueOnce(null);
       const invalidDeliveryId = 'invalid';
       CALL.output.push(
         { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },

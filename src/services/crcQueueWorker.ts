@@ -132,11 +132,11 @@ async function processParcel(
 ): Promise<void> {
   const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
   try {
-    await parcel.validate([cargo.senderCertificate]);
+    await parcel.validate();
   } catch (err) {
     logger.info(
       { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
-      'Parcel is invalid and/or did not originate in the gateway that created the cargo',
+      'Parcel is invalid',
     );
     return;
   }

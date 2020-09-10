@@ -328,14 +328,19 @@ describe('Parcel processing', () => {
     );
   });
 
-  test('Parcels from different gateway should be logged and ignored', async () => {
-    const differentPdaChain = await generatePdaChain();
-    const parcel = new Parcel('https://example.com', differentPdaChain.pdaCert, Buffer.from('hi'), {
-      senderCaCertificateChain: [differentPdaChain.privateGatewayCert],
-    });
-    const stubParcelSerialized = await parcel.serialize(differentPdaChain.pdaGranteePrivateKey);
+  test('Well-formed yet invalid parcels should be logged and ignored', async () => {
+    const expiredParcel = new Parcel(
+      await CERT_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
+      CERT_CHAIN.pdaCert,
+      Buffer.from('hi'),
+      {
+        creationDate: CERT_CHAIN.pdaCert.expiryDate,
+        ttl: 0,
+      },
+    );
+    const expiredParcelSerialized = await expiredParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey);
 
-    const cargo = await generateCargo(stubParcelSerialized);
+    const cargo = await generateCargo(expiredParcelSerialized);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
     ];
@@ -351,7 +356,7 @@ describe('Parcel processing', () => {
         peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
-      'Parcel is invalid and/or did not originate in the gateway that created the cargo',
+      'Parcel is invalid',
     );
   });
 });

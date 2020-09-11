@@ -1,9 +1,13 @@
 import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
+import { get as getEnvVar } from 'env-var';
+import { Connection } from 'mongoose';
 import pino from 'pino';
 import uuid from 'uuid-random';
 
+import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
 import { convertDateToTimestamp, sha256Hex } from '../utils';
+import { retrieveOwnCertificates } from './certs';
 
 const LOGGER = pino();
 
@@ -12,7 +16,13 @@ const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export class ParcelStore {
-  constructor(protected objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
+  public static initFromEnv(): ParcelStore {
+    const objectStoreClient = ObjectStoreClient.initFromEnv();
+    const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
+    return new ParcelStore(objectStoreClient, objectStoreBucket);
+  }
+
+  constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
   public async *retrieveActiveParcelsForGateway(gatewayAddress: string): CargoMessageStream {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
@@ -44,17 +54,42 @@ export class ParcelStore {
     }
   }
 
+  // public async storeParcel(
+  //   _parcel: Parcel,
+  //   _parcelSerialized: Buffer,
+  //   _mongooseConnection: Connection,
+  //   _natsStreamingConnection: NatsStreamingClient,
+  // ): Promise<void> {
+  //   throw new Error('implement!');
+  // }
+
+  /**
+   * Store the `parcel`.
+   *
+   * @param parcel
+   * @param parcelSerialized
+   * @param mongooseConnection
+   * @param natsStreamingClient
+   * @throws InvalidMessageError if the parcel is invalid or its sender is not trusted/authorized
+   */
   public async storeGatewayBoundParcel(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    privateGatewayAddress: string,
-  ): Promise<string> {
+    mongooseConnection: Connection,
+    natsStreamingClient: NatsStreamingClient,
+  ): Promise<void> {
+    const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+    const certificationPath = (await parcel.validate(trustedCertificates))!!;
+
+    const recipientGatewayCert = certificationPath[certificationPath.length - 2];
+    const privateGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
     const key = calculatedGatewayBoundParcelObjectKey(
       parcel.id,
       await parcel.senderCertificate.calculateSubjectPrivateAddress(),
       parcel.recipientAddress,
       privateGatewayAddress,
     );
+
     await this.objectStoreClient.putObject(
       {
         body: parcelSerialized,
@@ -63,7 +98,8 @@ export class ParcelStore {
       key,
       this.bucket,
     );
-    return key;
+
+    await natsStreamingClient.publishMessage(key, `pdc-parcel.${privateGatewayAddress}`);
   }
 
   /**

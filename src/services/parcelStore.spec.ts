@@ -1,30 +1,45 @@
 // tslint:disable:no-let
-import { Parcel } from '@relaycorp/relaynet-core';
+
+import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
+import { EnvVarError } from 'env-var';
+import { Connection } from 'mongoose';
 
 import {
   arrayToAsyncIterable,
   asyncIterableToArray,
   mockPino,
   mockSpy,
+  PdaChain,
   sha256Hex,
 } from '../_test_utils';
+import * as natsStreaming from '../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
-import { generatePdaChain } from './_test_utils';
+import { configureMockEnvVars, generatePdaChain } from './_test_utils';
+import * as certs from './certs';
 
 const mockLogger = mockPino();
 import { ParcelStore } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
 
+let PDA_CHAIN: PdaChain;
+let PRIVATE_GATEWAY_ADDRESS: string;
+beforeAll(async () => {
+  PDA_CHAIN = await generatePdaChain();
+  PRIVATE_GATEWAY_ADDRESS = await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
+});
+
 let PARCEL: Parcel;
 let PARCEL_SERIALIZED: Buffer;
 beforeAll(async () => {
-  const pdaChain = await generatePdaChain();
-  PARCEL = new Parcel('0deadbeef', pdaChain.pdaCert, Buffer.from([]));
-  PARCEL_SERIALIZED = Buffer.from(await PARCEL.serialize(pdaChain.pdaGranteePrivateKey));
+  PARCEL = new Parcel(
+    await PDA_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
+    PDA_CHAIN.pdaCert,
+    Buffer.from([]),
+    { senderCaCertificateChain: [PDA_CHAIN.peerEndpointCert, PDA_CHAIN.privateGatewayCert] },
+  );
+  PARCEL_SERIALIZED = Buffer.from(await PARCEL.serialize(PDA_CHAIN.pdaGranteePrivateKey));
 });
-
-const PRIVATE_GATEWAY_ADDRESS = '0beefdead';
 
 describe('retrieveActiveParcelsForGateway', () => {
   const mockGetObject = mockSpy(jest.fn());
@@ -205,34 +220,61 @@ describe('storeGatewayBoundParcel', () => {
   const mockObjectStoreClient: ObjectStoreClient = { putObject: mockPutObject } as any;
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
-  test('Full object key should be output', async () => {
-    const objectKey = await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
-    );
+  const mockMongooseConnection: Connection = mockSpy(jest.fn()) as any;
+  const mockRetrieveOwnCertificates = mockSpy(
+    jest.spyOn(certs, 'retrieveOwnCertificates'),
+    async () => [PDA_CHAIN.publicGatewayCert],
+  );
 
-    expect(mockPutObject).toBeCalledWith(expect.anything(), objectKey, expect.anything());
-    expect(objectKey).toEqual(
-      [
-        'parcels',
-        'gateway-bound',
-        PRIVATE_GATEWAY_ADDRESS,
-        PARCEL.recipientAddress,
-        await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
-        sha256Hex(PARCEL.id),
-      ].join('/'),
-    );
+  const mockNatsClient: natsStreaming.NatsStreamingClient = {
+    publishMessage: mockSpy(jest.fn()),
+  } as any;
+
+  let expectedObjectKey: string;
+  beforeAll(async () => {
+    expectedObjectKey = [
+      'parcels',
+      'gateway-bound',
+      PRIVATE_GATEWAY_ADDRESS,
+      PARCEL.recipientAddress,
+      await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+      sha256Hex(PARCEL.id),
+    ].join('/');
   });
 
-  test('Object should be put in the right bucket', async () => {
-    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+  test('Parcel should be refused if sender is not trusted', async () => {
+    const differentPDAChain = await generatePdaChain();
+    mockRetrieveOwnCertificates.mockResolvedValue([differentPDAChain.publicGatewayCert]);
+
+    await expect(
+      store.storeGatewayBoundParcel(
+        PARCEL,
+        PARCEL_SERIALIZED,
+        mockMongooseConnection,
+        mockNatsClient,
+      ),
+    ).rejects.toBeInstanceOf(InvalidMessageError);
+    expect(mockPutObject).not.toBeCalled();
+  });
+
+  test('Parcel should be put in the right bucket', async () => {
+    await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
   });
 
   test('Parcel expiry date should be stored as object metadata', async () => {
-    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+    await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(
       expect.objectContaining({
@@ -244,12 +286,43 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    await store.storeGatewayBoundParcel(PARCEL, PARCEL_SERIALIZED, PRIVATE_GATEWAY_ADDRESS);
+    await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(
       expect.objectContaining({ body: PARCEL_SERIALIZED }),
       expect.anything(),
       expect.anything(),
+    );
+  });
+
+  test('Parcel object key should be unique for the parcel, sender and recipient', async () => {
+    await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
+
+    expect(mockPutObject).toBeCalledWith(expect.anything(), expectedObjectKey, expect.anything());
+  });
+
+  test('Parcel object key should be published to right NATS Streaming channel', async () => {
+    await store.storeGatewayBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
+
+    expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
+    expect(mockNatsClient.publishMessage).toBeCalledWith(
+      expectedObjectKey,
+      `pdc-parcel.${await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress()}`,
     );
   });
 });
@@ -369,6 +442,29 @@ describe('deleteEndpointBoundParcel', () => {
     await store.deleteEndpointBoundParcel(key);
 
     expect(mockDeleteObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
+  });
+});
+
+describe('initFromEnv', () => {
+  const requiredEnvVars = {
+    OBJECT_STORE_BUCKET: 'the-bucket',
+  };
+  const mockEnvVars = configureMockEnvVars(requiredEnvVars);
+
+  const mockObjectStoreClient = {};
+  jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(mockObjectStoreClient as any);
+
+  test('OBJECT_STORE_BUCKET should be required', () => {
+    mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });
+
+    expect(() => ParcelStore.initFromEnv()).toThrowWithMessage(EnvVarError, /OBJECT_STORE_BUCKET/);
+  });
+
+  test('Parcel store should be returned', () => {
+    const store = ParcelStore.initFromEnv();
+
+    expect(store.bucket).toEqual(requiredEnvVars.OBJECT_STORE_BUCKET);
+    expect(store.objectStoreClient).toBe(mockObjectStoreClient);
   });
 });
 

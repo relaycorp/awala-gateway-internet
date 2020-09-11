@@ -1,21 +1,20 @@
 /* tslint:disable:no-let */
 
-import { generateRSAKeyPair, Parcel } from '@relaycorp/relaynet-core';
+import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, PdaChain, sha256Hex } from '../../_test_utils';
+import { mockSpy, PdaChain } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import { ObjectStoreClient, StoreObject } from '../../backingServices/objectStorage';
 import {
   configureMockEnvVars,
   generatePdaChain,
-  generateStubEndpointCertificate,
   generateStubParcel,
+  getMockInstance,
   testDisallowedMethods,
 } from '../_test_utils';
-import * as certs from '../certs';
+import { ParcelStore } from '../parcelStore';
 import { makeServer } from './server';
 
 const mockFastifyPlugin = fastifyPlugin;
@@ -59,38 +58,24 @@ beforeAll(async () => {
 
 const STUB_NATS_SERVER_URL = 'nats://example.com';
 const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
-let mockNatsClient: natsStreaming.NatsStreamingClient;
-beforeEach(() => {
-  mockNatsClient = ({
-    disconnect: jest.fn(),
-    publishMessage: jest.fn(),
-  } as unknown) as natsStreaming.NatsStreamingClient;
-});
+const mockNatsClient: natsStreaming.NatsStreamingClient = {
+  disconnect: mockSpy(jest.fn()),
+} as any;
 const mockNatsClientClass = mockSpy(
   jest.spyOn(natsStreaming, 'NatsStreamingClient'),
   () => mockNatsClient,
 );
 
-const mockRetrieveOwnCertificates = mockSpy(
-  jest.spyOn(certs, 'retrieveOwnCertificates'),
-  async () => [stubPdaChain.publicGatewayCert],
-);
-
-const mockObjectStoreClient = {
-  putObject: mockSpy(jest.fn()),
-};
-jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(
-  // @ts-ignore
-  mockObjectStoreClient,
-);
-const OBJECT_STORE_BUCKET = 'the-bucket';
+const mockParcelStore: ParcelStore = {
+  storeGatewayBoundParcel: mockSpy(jest.fn(), async () => undefined),
+} as any;
+jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 
 describe('receiveParcel', () => {
   configureMockEnvVars({
     MONGO_URI: 'uri',
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
-    OBJECT_STORE_BUCKET,
   });
 
   let serverInstance: FastifyInstance;
@@ -145,30 +130,6 @@ describe('receiveParcel', () => {
     );
   });
 
-  test('Parcel should be refused if sender certification path is not trusted', async () => {
-    const unauthorizedSenderKeyPair = await generateRSAKeyPair();
-    const unauthorizedCert = await generateStubEndpointCertificate(unauthorizedSenderKeyPair);
-    const parcel = await generateStubParcel({
-      recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
-      senderCertificate: unauthorizedCert,
-      senderCertificateChain: [stubPdaChain.privateGatewayCert],
-    });
-    const payload = Buffer.from(await parcel.serialize(unauthorizedSenderKeyPair.privateKey));
-    const response = await serverInstance.inject({
-      ...validRequestOptions,
-      headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
-      payload,
-    });
-
-    expect(response).toHaveProperty('statusCode', 400);
-    expect(JSON.parse(response.payload)).toHaveProperty(
-      'message',
-      'Parcel sender is not authorized',
-    );
-
-    expect(mockNatsClient.publishMessage).not.toBeCalled();
-  });
-
   test('Parcel should be refused if recipient address is not private', async () => {
     const parcel = await generateStubParcel({
       recipientAddress: 'https://public.address/',
@@ -187,110 +148,80 @@ describe('receiveParcel', () => {
       'Parcel recipient should be specified as a private address',
     );
 
-    expect(mockRetrieveOwnCertificates).not.toBeCalled();
-    expect(mockNatsClient.publishMessage).not.toBeCalled();
+    expect(mockParcelStore.storeGatewayBoundParcel).not.toBeCalled();
   });
 
-  describe('Valid parcel delivery', () => {
-    let expectedObjectKey: string;
-    beforeAll(async () => {
-      expectedObjectKey = [
-        'parcels',
-        'gateway-bound',
-        await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-        await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
-        await stubPdaChain.pdaCert.calculateSubjectPrivateAddress(),
-        sha256Hex(PARCEL.id),
-      ].join('/');
+  test('HTTP 403 should be returned if the parcel is well-formed but invalid', async () => {
+    const error = new InvalidMessageError('Oops');
+    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockReset();
+    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValueOnce(error);
+
+    const response = await serverInstance.inject(validRequestOptions);
+
+    expect(response).toHaveProperty('statusCode', 403);
+    expect(JSON.parse(response.payload)).toEqual({
+      message: 'The parcel is invalid',
     });
 
-    test('202 response should be returned', async () => {
-      const response = await serverInstance.inject(validRequestOptions);
+    // TODO: Find a way to spy on the error logger
+    // expect(pinoErrorLogSpy).toBeCalledWith('The parcel is invalid', { err: error });
+  });
 
-      expect(response).toHaveProperty('statusCode', 202);
-      expect(JSON.parse(response.payload)).toEqual({});
+  test('Failing to save parcel in object store should result in a 500 response', async () => {
+    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValue(new Error('Oops'));
+
+    const response = await serverInstance.inject(validRequestOptions);
+
+    expect(response).toHaveProperty('statusCode', 500);
+    expect(JSON.parse(response.payload)).toEqual({
+      message: 'Parcel could not be stored; please try again later',
     });
 
-    test('Parcel should be put in the right object store location', async () => {
-      await serverInstance.inject(validRequestOptions);
+    // TODO: Find a way to spy on the error logger
+    // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
+  });
 
-      expect(mockObjectStoreClient.putObject).toBeCalledTimes(1);
-      const expectedParcelExpiry = Math.floor(PARCEL.expiryDate.getTime() / 1_000).toString();
-      const expectedStoreObject: StoreObject = {
-        body: validRequestOptions.payload as Buffer,
-        metadata: { 'parcel-expiry': expectedParcelExpiry },
-      };
-      expect(mockObjectStoreClient.putObject).toBeCalledWith(
-        expectedStoreObject,
-        expectedObjectKey,
-        OBJECT_STORE_BUCKET,
-      );
-    });
+  test('Parcel should be bound for private gateway if valid', async () => {
+    await serverInstance.inject(validRequestOptions);
 
-    test('Failing to save parcel in object store should result in a 500 response', async () => {
-      const error = new Error('Oops');
-      mockObjectStoreClient.putObject.mockReset();
-      mockObjectStoreClient.putObject.mockRejectedValueOnce(error);
+    expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledTimes(1);
+    expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledWith(
+      expect.objectContaining({ id: PARCEL.id }),
+      validRequestOptions.payload,
+      mockFastifyMongooseObject,
+      mockNatsClient,
+    );
+  });
 
-      const response = await serverInstance.inject(validRequestOptions);
+  test('HTTP 202 should be returned if the parcel was successfully stored', async () => {
+    const response = await serverInstance.inject(validRequestOptions);
 
-      expect(response).toHaveProperty('statusCode', 500);
-      expect(JSON.parse(response.payload)).toEqual({
-        message: 'Parcel could not be stored; please try again later',
-      });
-      expect(mockNatsClient.publishMessage).not.toBeCalled();
+    expect(response).toHaveProperty('statusCode', 202);
+    expect(JSON.parse(response.payload)).toEqual({});
+  });
 
-      // TODO: Find a way to spy on the error logger
-      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
-    });
+  test('Current request id should be part of the client id in the NATS connection', async () => {
+    await serverInstance.inject(validRequestOptions);
 
-    test('Parcel object key should be published to right NATS Streaming channel', async () => {
-      await serverInstance.inject(validRequestOptions);
+    expect(mockNatsClientClass).toBeCalledTimes(1);
+    expect(mockNatsClientClass).toBeCalledWith(
+      STUB_NATS_SERVER_URL,
+      STUB_NATS_CLUSTER_ID,
+      expect.stringMatching(/^pohttp-req-\d+$/),
+    );
+  });
 
-      expect(mockNatsClientClass).toBeCalledTimes(1);
-      expect(mockNatsClientClass).toBeCalledWith(
-        STUB_NATS_SERVER_URL,
-        STUB_NATS_CLUSTER_ID,
-        expect.stringMatching(/^pohttp-req-\d+$/),
-      );
+  test('NATS connection should be closed upon successful completion', async () => {
+    await serverInstance.inject(validRequestOptions);
 
-      expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
-      expect(mockNatsClient.publishMessage).toBeCalledWith(
-        expectedObjectKey,
-        `pdc-parcel.${await stubPdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
-      );
-    });
+    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
+  });
 
-    test('Failing to queue the parcel should result in a 500 response', async () => {
-      const error = new Error('Oops');
-      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
-      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
+  test('NATS connection should be closed upon failure', async () => {
+    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValue(new Error('Oops'));
 
-      const response = await serverInstance.inject(validRequestOptions);
+    await serverInstance.inject(validRequestOptions);
 
-      expect(response).toHaveProperty('statusCode', 500);
-      expect(JSON.parse(response.payload)).toEqual({
-        message: 'Parcel could not be stored; please try again later',
-      });
-
-      // TODO: Find a way to spy on the error logger
-      // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue parcel', { err: error });
-    });
-
-    test('NATS connection should be closed upon successful completion', async () => {
-      await serverInstance.inject(validRequestOptions);
-
-      expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-    });
-
-    test('NATS connection should be closed upon failure', async () => {
-      const error = new Error('Oops');
-      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockReset();
-      ((mockNatsClient.publishMessage as unknown) as jest.SpyInstance).mockRejectedValueOnce(error);
-
-      await serverInstance.inject(validRequestOptions);
-
-      expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-    });
+    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
   });
 });

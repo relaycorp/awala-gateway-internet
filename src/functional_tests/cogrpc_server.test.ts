@@ -10,6 +10,8 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 
 import { asyncIterableToArray } from '../_test_utils';
+import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
+import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { ParcelStore } from '../services/parcelStore';
 import { configureServices, GW_GOGRPC_URL } from './services';
@@ -77,7 +79,8 @@ describe('Cargo collection', () => {
     await parcelStore.storeGatewayBoundParcel(
       parcel,
       Buffer.from(parcelSerialized),
-      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      await createMongooseConnectionFromEnv(),
+      NatsStreamingClient.initFromEnv('functional-test'),
     );
 
     const cca = new CargoCollectionAuthorization(

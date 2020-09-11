@@ -120,17 +120,17 @@ describe('ObjectStore', () => {
   });
 
   describe('initFromEnv', () => {
-    const baseEnvVars = {
+    const requiredEnvVars = {
       OBJECT_STORE_ACCESS_KEY_ID: 'the-access-key-id',
       OBJECT_STORE_ENDPOINT: 'objects.example.com:9000',
       OBJECT_STORE_SECRET_KEY: 'the-secret-key',
     };
-    const mockEnvVars = configureMockEnvVars(baseEnvVars);
+    const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 
-    test.each(['OBJECT_STORE_ENDPOINT', 'OBJECT_STORE_ACCESS_KEY_ID', 'OBJECT_STORE_SECRET_KEY'])(
+    test.each(Object.getOwnPropertyNames(requiredEnvVars))(
       '%s should be required',
       (envVarKey: string) => {
-        mockEnvVars({ ...baseEnvVars, [envVarKey]: undefined });
+        mockEnvVars({ ...requiredEnvVars, [envVarKey]: undefined });
 
         expect(() => ObjectStoreClient.initFromEnv()).toThrowWithMessage(
           EnvVarError,
@@ -140,7 +140,7 @@ describe('ObjectStore', () => {
     );
 
     test('OBJECT_STORE_TLS_ENABLED should be honored if present', () => {
-      mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: 'false' });
+      mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_TLS_ENABLED: 'false' });
 
       ObjectStoreClient.initFromEnv();
 
@@ -150,7 +150,7 @@ describe('ObjectStore', () => {
     });
 
     test('TLS should be enabled if OBJECT_STORE_TLS_ENABLED is missing', () => {
-      mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
+      mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
       ObjectStoreClient.initFromEnv();
 
@@ -160,21 +160,21 @@ describe('ObjectStore', () => {
     });
 
     test('Environment variables should be passed to constructor', () => {
-      mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
+      mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
       ObjectStoreClient.initFromEnv();
 
       expect(AWS.S3).toBeCalledTimes(1);
       const s3CallArgs = getMockContext(AWS.S3).calls[0][0];
       expect(s3CallArgs).toMatchObject<AWS.S3.Types.ClientConfiguration>({
-        accessKeyId: baseEnvVars.OBJECT_STORE_ACCESS_KEY_ID,
-        endpoint: baseEnvVars.OBJECT_STORE_ENDPOINT,
-        secretAccessKey: baseEnvVars.OBJECT_STORE_SECRET_KEY,
+        accessKeyId: requiredEnvVars.OBJECT_STORE_ACCESS_KEY_ID,
+        endpoint: requiredEnvVars.OBJECT_STORE_ENDPOINT,
+        secretAccessKey: requiredEnvVars.OBJECT_STORE_SECRET_KEY,
       });
     });
 
     test('Client should be returned', () => {
-      mockEnvVars({ ...baseEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
+      mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_TLS_ENABLED: undefined });
 
       expect(ObjectStoreClient.initFromEnv()).toBeInstanceOf(ObjectStoreClient);
     });

@@ -188,7 +188,7 @@ describe('receiveParcel', () => {
     expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
-      mockFastifyMongooseObject,
+      mockFastifyMongooseObject.db,
       mockNatsClient,
     );
   });

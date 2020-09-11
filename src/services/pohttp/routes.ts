@@ -67,7 +67,7 @@ export default async function registerRoutes(
         await parcelStore.storeGatewayBoundParcel(
           parcel,
           request.body,
-          (fastify as any).mongo,
+          (fastify as any).mongo.db,
           natsClient,
         );
       } catch (error) {

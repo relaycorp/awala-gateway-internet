@@ -1,6 +1,5 @@
 import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp/relaynet-core';
-import { deliverParcel, PoHTTPError } from '@relaycorp/relaynet-pohttp';
-import { AxiosError } from 'axios';
+import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { Message, Stan } from 'node-nats-streaming';
 
 import { configureServices } from './services';
@@ -63,16 +62,14 @@ describe('PoHTTP server', () => {
       subjectPublicKey: senderKeyPair.publicKey,
       validityEndDate: tomorrow,
     });
-
     const parcel = new Parcel('0deadbeef', senderCertificate, Buffer.from([]));
 
-    await expect(
-      deliverParcel(GW_POHTTP_URL, await parcel.serialize(senderKeyPair.privateKey)),
-    ).rejects.toSatisfy((err: PoHTTPError) => {
-      const response = (err.cause() as AxiosError).response;
-      return (
-        response!.status === 400 && response!.data.message === 'Parcel sender is not authorized'
-      );
-    });
+    try {
+      await deliverParcel(GW_POHTTP_URL, await parcel.serialize(senderKeyPair.privateKey));
+    } catch (error) {
+      expect(error).toBeInstanceOf(PoHTTPInvalidParcelError);
+      return;
+    }
+    expect.fail("Parcel delivery should've failed");
   });
 });

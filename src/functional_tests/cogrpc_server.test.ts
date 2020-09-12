@@ -17,7 +17,7 @@ import { arrayToIterable, generatePdaChain, getFirstQueueMessage, sleep } from '
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
-configureServices();
+configureServices(['cogrpc']);
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {

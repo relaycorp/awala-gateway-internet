@@ -11,7 +11,7 @@
     "test": "run-s static-checks test:unit",
     "test:unit": "jest --coverage",
     "test:functional": "run-s test:functional:build test:functional:jest",
-    "test:functional:build": "docker-compose -f docker-compose.yml -f src/functional_tests/docker-compose.override.yml build",
+    "test:functional:build": "docker-compose -f docker-compose.yml -f src/functional_tests/docker-compose.override.yml --project-name gw-functional-tests build",
     "test:functional:jest": "jest --config jest.config.functional.js --runInBand",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",

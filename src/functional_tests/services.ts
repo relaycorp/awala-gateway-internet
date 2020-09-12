@@ -41,7 +41,18 @@ export function configureServices(servicesToLog?: readonly string[]): void {
     await sleep(1);
   });
 
-  afterAll(async () => tearDownServices(servicesToLog));
+  afterEach(async () => {
+    // Output logs for select services. Useful if something went wrong.
+    if (servicesToLog) {
+      // tslint:disable-next-line:readonly-array
+      await dockerCompose.logs(servicesToLog as string[], {
+        composeOptions: COMPOSE_OPTIONS,
+        log: true,
+      });
+    }
+  });
+
+  afterAll(tearDownServices);
 }
 
 export async function runServiceCommand(
@@ -79,15 +90,7 @@ async function startServices(services?: readonly string[]): Promise<void> {
   }
 }
 
-async function tearDownServices(servicesToLog?: readonly string[]): Promise<void> {
-  if (servicesToLog) {
-    // tslint:disable-next-line:readonly-array
-    await dockerCompose.logs(servicesToLog as string[], {
-      composeOptions: COMPOSE_OPTIONS,
-      log: true,
-    });
-  }
-
+async function tearDownServices(): Promise<void> {
   await dockerCompose.down({
     commandOptions: ['--remove-orphans', '--volumes'],
     composeOptions: COMPOSE_OPTIONS,

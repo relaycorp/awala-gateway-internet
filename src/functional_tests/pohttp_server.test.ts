@@ -10,7 +10,7 @@ import {
   OBJECT_STORAGE_CLIENT,
 } from './utils';
 
-configureServices();
+configureServices(['pohttp']);
 
 describe('PoHTTP server', () => {
   // tslint:disable-next-line:no-let

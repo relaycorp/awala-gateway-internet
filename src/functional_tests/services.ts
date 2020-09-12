@@ -26,7 +26,7 @@ const COMPOSE_OPTIONS = [
   'src/functional_tests/docker-compose.override.yml',
 ];
 
-export function configureServices(): void {
+export function configureServices(servicesToLog?: readonly string[]): void {
   beforeEach(async () => {
     jest.setTimeout(30_000);
 
@@ -41,7 +41,7 @@ export function configureServices(): void {
     await sleep(1);
   });
 
-  afterAll(tearDownServices);
+  afterAll(async () => tearDownServices(servicesToLog));
 }
 
 export async function runServiceCommand(
@@ -79,7 +79,15 @@ async function startServices(services?: readonly string[]): Promise<void> {
   }
 }
 
-async function tearDownServices(): Promise<void> {
+async function tearDownServices(servicesToLog?: readonly string[]): Promise<void> {
+  if (servicesToLog) {
+    // tslint:disable-next-line:readonly-array
+    await dockerCompose.logs(servicesToLog as string[], {
+      composeOptions: COMPOSE_OPTIONS,
+      log: true,
+    });
+  }
+
   await dockerCompose.down({
     commandOptions: ['--remove-orphans', '--volumes'],
     composeOptions: COMPOSE_OPTIONS,

@@ -6,12 +6,15 @@ import { get as getEnvVar } from 'env-var';
 
 import { IS_GITHUB, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_CLIENT, sleep } from './utils';
 
+export const GW_POHTTP_URL = 'http://127.0.0.1:8080';
 export const GW_GOGRPC_URL = 'http://127.0.0.1:8081/';
 export const PONG_ENDPOINT_ADDRESS = 'http://pong:8080/';
 
 const VAULT_URL = getEnvVar('VAULT_URL').required().asString();
 const VAULT_TOKEN = getEnvVar('VAULT_TOKEN').required().asString();
 const VAULT_KV_PREFIX = getEnvVar('VAULT_KV_PREFIX').required().asString();
+
+const BACKING_SERVICES: readonly string[] = ['mongodb', 'nats', 'vault', 'object-store'];
 
 // tslint:disable-next-line:readonly-array
 const COMPOSE_OPTIONS = [
@@ -28,12 +31,14 @@ export function configureServices(): void {
     jest.setTimeout(30_000);
 
     await tearDownServices();
-    await setUpServices();
-    if (IS_GITHUB) {
-      // GitHub is painfully slow
-      await sleep(3);
-    }
-    await bootstrapServiceData();
+
+    await startServices(BACKING_SERVICES);
+    await sleep(IS_GITHUB ? 3 : 1); // GitHub is painfully slow
+    await bootstrapBackingServices();
+
+    // Start the remaining services
+    await startServices();
+    await sleep(1);
   });
 
   afterAll(tearDownServices);
@@ -55,7 +60,7 @@ export async function runServiceCommand(
   return result.out;
 }
 
-async function bootstrapServiceData(): Promise<void> {
+async function bootstrapBackingServices(): Promise<void> {
   await vaultEnableSecret(VAULT_KV_PREFIX);
   await runServiceCommand('cogrpc', ['build/main/bin/generate-keypairs.js']);
 
@@ -64,11 +69,14 @@ async function bootstrapServiceData(): Promise<void> {
   }).promise();
 }
 
-async function setUpServices(): Promise<void> {
-  await dockerCompose.upAll({
-    composeOptions: COMPOSE_OPTIONS,
-    log: true,
-  });
+async function startServices(services?: readonly string[]): Promise<void> {
+  const options = { composeOptions: COMPOSE_OPTIONS, log: true };
+  if (services) {
+    // tslint:disable-next-line:readonly-array
+    await dockerCompose.upMany(services as string[], options);
+  } else {
+    await dockerCompose.upAll(options);
+  }
 }
 
 async function tearDownServices(): Promise<void> {

@@ -7,20 +7,12 @@ import {
   issueGatewayCertificate,
   Parcel,
 } from '@relaycorp/relaynet-core';
+import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
 
 import { asyncIterableToArray } from '../_test_utils';
-import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
-import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../backingServices/objectStorage';
-import { ParcelStore } from '../services/parcelStore';
-import { configureServices, GW_GOGRPC_URL } from './services';
-import {
-  arrayToIterable,
-  generatePdaChain,
-  getFirstQueueMessage,
-  OBJECT_STORAGE_BUCKET,
-} from './utils';
+import { configureServices, GW_GOGRPC_URL, GW_POHTTP_URL } from './services';
+import { arrayToIterable, generatePdaChain, getFirstQueueMessage, sleep } from './utils';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
@@ -73,15 +65,11 @@ describe('Cargo collection', () => {
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       pdaChain.pdaCert,
       Buffer.from([]),
+      { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
     );
     const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
-    const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), OBJECT_STORAGE_BUCKET);
-    await parcelStore.storeGatewayBoundParcel(
-      parcel,
-      Buffer.from(parcelSerialized),
-      await createMongooseConnectionFromEnv(),
-      NatsStreamingClient.initFromEnv('functional-test'),
-    );
+    await deliverParcel(GW_POHTTP_URL, parcelSerialized);
+    await sleep(1);
 
     const cca = new CargoCollectionAuthorization(
       GW_GOGRPC_URL,

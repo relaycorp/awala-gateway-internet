@@ -2,15 +2,13 @@ import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp
 import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { Message, Stan } from 'node-nats-streaming';
 
-import { configureServices } from './services';
+import { configureServices, GW_POHTTP_URL } from './services';
 import {
   connectToNatsStreaming,
   generatePdaChain,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
 } from './utils';
-
-const GW_POHTTP_URL = 'http://127.0.0.1:8080';
 
 configureServices();
 

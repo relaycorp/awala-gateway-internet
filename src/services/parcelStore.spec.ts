@@ -16,9 +16,10 @@ import * as natsStreaming from '../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
 import { configureMockEnvVars, generatePdaChain } from './_test_utils';
 import * as certs from './certs';
+import * as parcelCollection from './parcelCollection';
 
 const mockLogger = mockPino();
-import { ParcelStore } from './parcelStore';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
 
@@ -40,6 +41,11 @@ beforeAll(async () => {
   );
   PARCEL_SERIALIZED = Buffer.from(await PARCEL.serialize(PDA_CHAIN.pdaGranteePrivateKey));
 });
+
+const mockNatsClient: natsStreaming.NatsStreamingClient = {
+  publishMessage: mockSpy(jest.fn()),
+} as any;
+const mockMongooseConnection: Connection = mockSpy(jest.fn()) as any;
 
 describe('retrieveActiveParcelsForGateway', () => {
   const mockGetObject = mockSpy(jest.fn());
@@ -220,15 +226,10 @@ describe('storeGatewayBoundParcel', () => {
   const mockObjectStoreClient: ObjectStoreClient = { putObject: mockPutObject } as any;
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
-  const mockMongooseConnection: Connection = mockSpy(jest.fn()) as any;
   const mockRetrieveOwnCertificates = mockSpy(
     jest.spyOn(certs, 'retrieveOwnCertificates'),
     async () => [PDA_CHAIN.publicGatewayCert],
   );
-
-  const mockNatsClient: natsStreaming.NatsStreamingClient = {
-    publishMessage: mockSpy(jest.fn()),
-  } as any;
 
   let expectedObjectKey: string;
   beforeAll(async () => {
@@ -393,20 +394,111 @@ describe('storeEndpointBoundParcel', () => {
   const mockObjectStoreClient: ObjectStoreClient = { putObject: mockPutObject } as any;
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
-  test('Generated object key should be output', async () => {
-    const key = await store.storeEndpointBoundParcel(PARCEL_SERIALIZED);
+  const mockWasParcelCollected = mockSpy(
+    jest.spyOn(parcelCollection, 'wasParcelCollected'),
+    () => false,
+  );
+  const mockRecordParcelCollection = mockSpy(
+    jest.spyOn(parcelCollection, 'recordParcelCollection'),
+    () => undefined,
+  );
 
-    expect(key).toMatch(/^[0-9a-f-]+$/);
+  test('Parcel should be refused if it is invalid', async () => {
+    const invalidParcelCreationDate = new Date(PDA_CHAIN.pdaCert.startDate.getTime());
+    invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() - 1);
+    const invalidParcel = new Parcel(
+      await PDA_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
+      PDA_CHAIN.pdaCert,
+      Buffer.from([]),
+      { creationDate: invalidParcelCreationDate },
+    );
+    const invalidParcelSerialized = await invalidParcel.serialize(PDA_CHAIN.pdaGranteePrivateKey);
+
+    await expect(
+      store.storeEndpointBoundParcel(
+        invalidParcel,
+        Buffer.from(invalidParcelSerialized),
+        PRIVATE_GATEWAY_ADDRESS,
+        mockMongooseConnection,
+        mockNatsClient,
+      ),
+    ).rejects.toBeInstanceOf(InvalidMessageError);
+    expect(mockPutObject).not.toBeCalled();
+  });
+
+  test('Parcel should be ignored if it was already processed', async () => {
+    mockWasParcelCollected.mockResolvedValue(true);
+
+    await expect(
+      store.storeEndpointBoundParcel(
+        PARCEL,
+        PARCEL_SERIALIZED,
+        PRIVATE_GATEWAY_ADDRESS,
+        mockMongooseConnection,
+        mockNatsClient,
+      ),
+    ).resolves.toBeNull();
+
+    expect(mockPutObject).not.toBeCalled();
+    expect(mockWasParcelCollected).toBeCalledWith(
+      PARCEL,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+    );
+  });
+
+  test('The processing of the parcel should be recorded if successful', async () => {
+    await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
+
+    expect(mockRecordParcelCollection).toBeCalledWith(
+      PARCEL,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+    );
+  });
+
+  test('Generated object key should be output', async () => {
+    const key = await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
+
+    const senderPrivateAddress = await PARCEL.senderCertificate.calculateSubjectPrivateAddress();
+    const expectedKey = new RegExp(
+      `^${PRIVATE_GATEWAY_ADDRESS}/${senderPrivateAddress}/[0-9a-f-]+$`,
+    );
+    expect(key).toMatch(expectedKey);
   });
 
   test('Object should be put in the right bucket', async () => {
-    await store.storeEndpointBoundParcel(PARCEL_SERIALIZED);
+    await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
   });
 
-  test('Full object key should be prefixed', async () => {
-    const key = await store.storeEndpointBoundParcel(PARCEL_SERIALIZED);
+  test('Parcel should be stored with generated object key', async () => {
+    const key = await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(
       expect.anything(),
@@ -416,12 +508,38 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    await store.storeEndpointBoundParcel(PARCEL_SERIALIZED);
+    await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
 
     expect(mockPutObject).toBeCalledWith(
       expect.objectContaining({ body: PARCEL_SERIALIZED }),
       expect.anything(),
       expect.anything(),
+    );
+  });
+
+  test('Parcel data should be published to right NATS Streaming channel', async () => {
+    const key = await store.storeEndpointBoundParcel(
+      PARCEL,
+      PARCEL_SERIALIZED,
+      PRIVATE_GATEWAY_ADDRESS,
+      mockMongooseConnection,
+      mockNatsClient,
+    );
+
+    const expectedMessageData: QueuedInternetBoundParcelMessage = {
+      parcelExpiryDate: PARCEL.expiryDate,
+      parcelObjectKey: key!!,
+      parcelRecipientAddress: PARCEL.recipientAddress,
+    };
+    expect(mockNatsClient.publishMessage).toBeCalledWith(
+      JSON.stringify(expectedMessageData),
+      'internet-parcels',
     );
   });
 });

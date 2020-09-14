@@ -6,19 +6,13 @@ import pino from 'pino';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
-import { ParcelStore } from './parcelStore';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 interface ActiveParcelData {
   readonly parcelObjectKey: string;
   readonly parcelRecipientAddress: string;
   // tslint:disable-next-line:no-mixed-interface
   readonly ack: () => void;
-}
-
-export interface QueuedInternetBoundParcelMessage {
-  readonly parcelObjectKey: string;
-  readonly parcelRecipientAddress: string;
-  readonly parcelExpiryDate: Date;
 }
 
 const LOGGER = pino();
@@ -94,7 +88,11 @@ export async function processInternetBoundParcels(
   }
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
-  const queueConsumer = natsStreamingClient.makeQueueConsumer('crc-parcels', 'worker', 'worker');
+  const queueConsumer = natsStreamingClient.makeQueueConsumer(
+    'internet-parcels',
+    'worker',
+    'worker',
+  );
   try {
     await pipe(queueConsumer, parseMessages, deliverParcels);
   } finally {

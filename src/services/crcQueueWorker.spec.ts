@@ -17,7 +17,6 @@ import {
   SessionlessEnvelopedData,
   SessionPublicKeyData,
 } from '@relaycorp/relaynet-core';
-import bufferToArray from 'buffer-to-arraybuffer';
 import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy, PdaChain } from '../_test_utils';
@@ -29,12 +28,10 @@ import {
   castMock,
   configureMockEnvVars,
   generatePdaChain,
-  getMockContext,
   getMockInstance,
   mockStanMessage,
 } from './_test_utils';
 import * as mongoPublicKeyStore from './MongoPublicKeyStore';
-import * as parcelCollection from './parcelCollection';
 import { ParcelStore } from './parcelStore';
 
 const mockLogger = mockPino();
@@ -42,21 +39,12 @@ import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
 
-const STUB_NATS_SERVER = 'nats://example.com';
-const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
 const STUB_WORKER_NAME = 'worker-name';
 
 let mockNatsClient: NatsStreamingClient;
 let mockQueueMessages: readonly stan.Message[];
-// tslint:disable-next-line:readonly-array
-let mockPublishedMessages: Buffer[];
 beforeEach(() => {
   mockQueueMessages = [];
-  mockPublishedMessages = [];
-
-  async function mockPublishMessage(messageData: Buffer, _channel: string): Promise<void> {
-    mockPublishedMessages.push(messageData);
-  }
 
   async function* mockMakeQueueConsumer(): AsyncIterable<stan.Message> {
     for (const message of mockQueueMessages) {
@@ -67,7 +55,6 @@ beforeEach(() => {
   mockNatsClient = castMock<NatsStreamingClient>({
     disconnect: jest.fn(),
     makeQueueConsumer: jest.fn().mockImplementation(mockMakeQueueConsumer),
-    publishMessage: jest.fn().mockImplementation(mockPublishMessage),
   });
 });
 mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
@@ -78,10 +65,6 @@ const MOCK_MONGOOSE_CONNECTION = { what: 'mongooseConnection' };
 mockSpy(jest.spyOn(mongo, 'createMongooseConnectionFromEnv'), () => MOCK_MONGOOSE_CONNECTION);
 
 //region Keystore-related fixtures
-
-const STUB_VAULT_URL = 'https://vault.com';
-const STUB_VAULT_TOKEN = 'letmein';
-const STUB_VAULT_KV_PREFIX = 'keys/';
 
 let mockPrivateKeyStore: MockPrivateKeyStore;
 let mockPublicKeyStore: MockPublicKeyStore;
@@ -97,28 +80,17 @@ const OBJECT_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
-mockSpy(
+const mockStoreEndpointBoundParcel = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeEndpointBoundParcel'),
-  async (parcelSerialized: Buffer) => {
-    const parcel = await Parcel.deserialize(bufferToArray(parcelSerialized));
-    return parcel.id;
+  async (parcel: Parcel) => {
+    return `parcels/${parcel.id}`;
   },
 );
-
-//region Parcel collection fixtures
-
-mockSpy(jest.spyOn(parcelCollection, 'wasParcelCollected'), () => false);
-mockSpy(jest.spyOn(parcelCollection, 'recordParcelCollection'), () => undefined);
 
 //endregion
 
 const BASE_ENV_VARS = {
-  NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
-  NATS_SERVER_URL: STUB_NATS_SERVER,
   OBJECT_STORE_BUCKET,
-  VAULT_KV_PREFIX: STUB_VAULT_KV_PREFIX,
-  VAULT_TOKEN: STUB_VAULT_TOKEN,
-  VAULT_URL: STUB_VAULT_URL,
 };
 configureMockEnvVars(BASE_ENV_VARS);
 
@@ -265,46 +237,35 @@ test('Session keys of sender should be stored if present', async () => {
 
 describe('Parcel processing', () => {
   test('Parcels should be stored in the object store', async () => {
-    mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
+    const cargo = await generateCargo(PARCEL_SERIALIZED);
+    mockQueueMessages = [
+      mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
+    ];
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(ParcelStore.prototype.storeEndpointBoundParcel).toBeCalledTimes(1);
     expect(ParcelStore.prototype.storeEndpointBoundParcel).toBeCalledWith(
-      Buffer.from(PARCEL_SERIALIZED),
-    );
-  });
-
-  test('Parcels should be published on channel "crc-parcels"', async () => {
-    mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
-
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockNatsClient.publishMessage).toBeCalledTimes(1);
-    expect(mockNatsClient.publishMessage).toBeCalledWith(expect.anything(), 'crc-parcels');
-
-    const publishMessageArgs = getMockContext(mockNatsClient.publishMessage).calls[0];
-    const messageData = JSON.parse(publishMessageArgs[0].toString());
-    expect(messageData).toHaveProperty('parcelExpiryDate', PARCEL.expiryDate.toISOString());
-    expect(messageData).toHaveProperty('parcelRecipientAddress', PARCEL.recipientAddress);
-    expect(messageData).toHaveProperty('parcelObjectKey', PARCEL.id);
-  });
-
-  test('Parcels should have their collection recorded', async () => {
-    mockQueueMessages = [mockStanMessage(await generateCargoSerialized(PARCEL_SERIALIZED))];
-
-    await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(parcelCollection.recordParcelCollection).toBeCalledTimes(1);
-    expect(parcelCollection.recordParcelCollection).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
+      Buffer.from(PARCEL_SERIALIZED),
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
+      mockNatsClient,
+    );
+    expect(mockLogger.debug).toBeCalledWith(
+      {
+        cargoId: cargo.id,
+        parcelId: PARCEL.id,
+        parcelObjectKey: `parcels/${PARCEL.id}`,
+        parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
+        peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+        worker: STUB_WORKER_NAME,
+      },
+      'Parcel was stored',
     );
   });
 
   test('Parcels previously received should be ignored', async () => {
-    getMockInstance(parcelCollection.wasParcelCollected).mockResolvedValue(true);
+    mockStoreEndpointBoundParcel.mockResolvedValue(null);
 
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
@@ -313,41 +274,27 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockPublishedMessages).toHaveLength(0);
-    expect(parcelCollection.recordParcelCollection).not.toBeCalled();
-
     expect(mockLogger.debug).toBeCalledWith(
       {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
+        parcelObjectKey: null,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
         peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
       },
-      'Parcel was previously processed',
+      'Ignoring previously processed parcel',
     );
   });
 
   test('Well-formed yet invalid parcels should be logged and ignored', async () => {
-    const expiredParcel = new Parcel(
-      await CERT_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
-      CERT_CHAIN.pdaCert,
-      Buffer.from('hi'),
-      {
-        creationDate: CERT_CHAIN.pdaCert.expiryDate,
-        ttl: 0,
-      },
-    );
-    const expiredParcelSerialized = await expiredParcel.serialize(CERT_CHAIN.pdaGranteePrivateKey);
-
-    const cargo = await generateCargo(expiredParcelSerialized);
+    mockStoreEndpointBoundParcel.mockRejectedValue(new InvalidMessageError('Oops'));
+    const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
     ];
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-    expect(mockPublishedMessages).toHaveLength(0);
 
     expect(mockLogger.info).toBeCalledWith(
       {
@@ -358,6 +305,17 @@ describe('Parcel processing', () => {
       },
       'Parcel is invalid',
     );
+  });
+
+  test('Errors in backing services should be propagated', async () => {
+    const error = new Error('Oops');
+    mockStoreEndpointBoundParcel.mockRejectedValue(error);
+    const cargo = await generateCargo(PARCEL_SERIALIZED);
+    mockQueueMessages = [
+      mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
+    ];
+
+    await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
   });
 });
 
@@ -375,7 +333,6 @@ describe('PCA processing', () => {
       PCA.recipientEndpointAddress,
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
-    expect(mockPublishedMessages).toHaveLength(0);
   });
 
   test('Errors while deleting corresponding parcel should be propagated', async () => {
@@ -388,8 +345,6 @@ describe('PCA processing', () => {
     ];
 
     await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(err);
-
-    expect(mockPublishedMessages).toHaveLength(0);
   });
 });
 
@@ -420,11 +375,6 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   ];
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-  expect(mockPublishedMessages).toEqual([
-    expect.stringMatching(PARCEL.id),
-    expect.stringMatching(additionalParcel.id),
-  ]);
 
   const cargoSenderAddress = await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
   expect(mockLogger.info).toBeCalledWith(

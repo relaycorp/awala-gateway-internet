@@ -8,12 +8,19 @@ import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
 import { convertDateToTimestamp, sha256Hex } from '../utils';
 import { retrieveOwnCertificates } from './certs';
+import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
 
 const LOGGER = pino();
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 const EXPIRY_METADATA_KEY = 'parcel-expiry';
+
+export interface QueuedInternetBoundParcelMessage {
+  readonly parcelObjectKey: string;
+  readonly parcelRecipientAddress: string;
+  readonly parcelExpiryDate: Date;
+}
 
 export class ParcelStore {
   public static initFromEnv(): ParcelStore {
@@ -133,14 +140,39 @@ export class ParcelStore {
     return storeObject.body;
   }
 
-  public async storeEndpointBoundParcel(parcelSerialized: Buffer): Promise<string> {
-    const objectKey = uuid();
+  public async storeEndpointBoundParcel(
+    parcel: Parcel,
+    parcelSerialized: Buffer,
+    peerGatewayAddress: string,
+    mongooseConnection: Connection,
+    natsStreamingClient: NatsStreamingClient,
+  ): Promise<string | null> {
+    // Don't require the sender to be on a valid path from the current public gateway: Doing so
+    // would only work if the recipient is also served by this gateway.
+    await parcel.validate();
+
+    if (await wasParcelCollected(parcel, peerGatewayAddress, mongooseConnection)) {
+      return null;
+    }
+
+    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+    const parcelObjectKey = `${peerGatewayAddress}/${senderPrivateAddress}/${uuid()}`;
     await this.objectStoreClient.putObject(
       { body: parcelSerialized, metadata: {} },
-      makeFullInternetBoundObjectKey(objectKey),
+      makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
     );
-    return objectKey;
+
+    const messageData: QueuedInternetBoundParcelMessage = {
+      parcelExpiryDate: parcel.expiryDate,
+      parcelObjectKey,
+      parcelRecipientAddress: parcel.recipientAddress,
+    };
+    await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'internet-parcels');
+
+    await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
+
+    return parcelObjectKey;
   }
 
   public async deleteEndpointBoundParcel(parcelObjectKey: string): Promise<void> {

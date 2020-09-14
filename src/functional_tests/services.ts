@@ -38,7 +38,7 @@ export function configureServices(servicesToLog?: readonly string[]): void {
 
     // Start the remaining services
     await startServices();
-    await sleep(1);
+    await sleep(IS_GITHUB ? 2 : 1);
   });
 
   afterEach(async () => {

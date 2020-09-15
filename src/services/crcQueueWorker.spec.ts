@@ -80,8 +80,8 @@ const OBJECT_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
-const mockStoreEndpointBoundParcel = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'storeEndpointBoundParcel'),
+const mockStoreParcelFromPeerGateway = mockSpy(
+  jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),
   async (parcel: Parcel) => {
     return `parcels/${parcel.id}`;
   },
@@ -244,7 +244,7 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(ParcelStore.prototype.storeEndpointBoundParcel).toBeCalledWith(
+    expect(mockStoreParcelFromPeerGateway).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       Buffer.from(PARCEL_SERIALIZED),
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
@@ -265,7 +265,7 @@ describe('Parcel processing', () => {
   });
 
   test('Parcels previously received should be ignored', async () => {
-    mockStoreEndpointBoundParcel.mockResolvedValue(null);
+    mockStoreParcelFromPeerGateway.mockResolvedValue(null);
 
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
@@ -288,7 +288,7 @@ describe('Parcel processing', () => {
   });
 
   test('Well-formed yet invalid parcels should be logged and ignored', async () => {
-    mockStoreEndpointBoundParcel.mockRejectedValue(new InvalidMessageError('Oops'));
+    mockStoreParcelFromPeerGateway.mockRejectedValue(new InvalidMessageError('Oops'));
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),
@@ -309,7 +309,7 @@ describe('Parcel processing', () => {
 
   test('Errors in backing services should be propagated', async () => {
     const error = new Error('Oops');
-    mockStoreEndpointBoundParcel.mockRejectedValue(error);
+    mockStoreParcelFromPeerGateway.mockRejectedValue(error);
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(CERT_CHAIN.privateGatewayPrivateKey)),

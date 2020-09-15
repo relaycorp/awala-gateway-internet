@@ -61,30 +61,45 @@ export class ParcelStore {
     }
   }
 
-  // public async storeParcel(
-  //   _parcel: Parcel,
-  //   _parcelSerialized: Buffer,
-  //   _mongooseConnection: Connection,
-  //   _natsStreamingConnection: NatsStreamingClient,
-  // ): Promise<void> {
-  //   throw new Error('implement!');
-  // }
+  public async storeParcelFromPeerGateway(
+    parcel: Parcel,
+    parcelSerialized: Buffer,
+    peerGatewayAddress: string,
+    mongooseConnection: Connection,
+    natsStreamingConnection: NatsStreamingClient,
+  ): Promise<string | null> {
+    if (parcel.isRecipientAddressPrivate) {
+      return this.storeGatewayBoundParcel(
+        parcel,
+        parcelSerialized,
+        mongooseConnection,
+        natsStreamingConnection,
+      );
+    }
+    return this.storeEndpointBoundParcel(
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
+      mongooseConnection,
+      natsStreamingConnection,
+    );
+  }
 
   /**
-   * Store the `parcel`.
+   * Store a parcel bound for a private endpoint served by a peer gateway.
    *
    * @param parcel
    * @param parcelSerialized
    * @param mongooseConnection
    * @param natsStreamingClient
-   * @throws InvalidMessageError if the parcel is invalid or its sender is not trusted/authorized
+   * @throws InvalidMessageException
    */
   public async storeGatewayBoundParcel(
     parcel: Parcel,
     parcelSerialized: Buffer,
     mongooseConnection: Connection,
     natsStreamingClient: NatsStreamingClient,
-  ): Promise<void> {
+  ): Promise<string> {
     const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
     const certificationPath = (await parcel.validate(trustedCertificates))!!;
 
@@ -107,6 +122,8 @@ export class ParcelStore {
     );
 
     await natsStreamingClient.publishMessage(key, `pdc-parcel.${privateGatewayAddress}`);
+
+    return key;
   }
 
   /**
@@ -140,6 +157,16 @@ export class ParcelStore {
     return storeObject.body;
   }
 
+  /**
+   * Store a parcel bound for a public endpoint.
+   *
+   * @param parcel
+   * @param parcelSerialized
+   * @param peerGatewayAddress
+   * @param mongooseConnection
+   * @param natsStreamingClient
+   * @throws InvalidMessageException
+   */
   public async storeEndpointBoundParcel(
     parcel: Parcel,
     parcelSerialized: Buffer,

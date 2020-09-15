@@ -72,7 +72,8 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
           await processParcel(
             item,
             Buffer.from(itemSerialized),
-            cargo,
+            peerGatewayAddress,
+            cargo.id,
             parcelStore,
             mongooseConnection,
             natsStreamingClient,
@@ -123,17 +124,17 @@ async function unwrapCargo(
 async function processParcel(
   parcel: Parcel,
   parcelSerialized: Buffer,
-  cargo: Cargo,
+  peerGatewayAddress: string,
+  cargoId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
   workerName: string,
 ): Promise<void> {
-  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
   // tslint:disable-next-line:no-let
   let parcelObjectKey: string | null;
   try {
-    parcelObjectKey = await parcelStore.storeEndpointBoundParcel(
+    parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -142,10 +143,7 @@ async function processParcel(
     );
   } catch (err) {
     if (err instanceof InvalidMessageError) {
-      logger.info(
-        { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
-        'Parcel is invalid',
-      );
+      logger.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
       return;
     }
 
@@ -154,7 +152,7 @@ async function processParcel(
 
   logger.debug(
     {
-      cargoId: cargo.id,
+      cargoId,
       parcelId: parcel.id,
       parcelObjectKey,
       parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),

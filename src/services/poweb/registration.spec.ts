@@ -12,7 +12,7 @@ import { FastifyInstance } from 'fastify';
 import { sha256 } from '../../_test_utils';
 import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
-import { PNR_CONTENT_TYPE, PNRR_CONTENT_TYPE } from './contentTypes';
+import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
 
 const ENDPOINT_URL = '/v1/nodes';
@@ -37,7 +37,7 @@ test('HTTP 415 should be returned if the request Content-Type is not a PNRR', as
 
 test('HTTP 400 should be returned if the PNRR is not valid', async () => {
   const response = await fastify.inject({
-    headers: { 'content-type': PNRR_CONTENT_TYPE },
+    headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: 'Not really a PNRA',
     url: ENDPOINT_URL,
@@ -59,7 +59,7 @@ test('HTTP 400 should be returned if the authorization in the PNRR is invalid', 
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
   const response = await fastify.inject({
-    headers: { 'content-type': PNRR_CONTENT_TYPE },
+    headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: Buffer.from(payload),
     url: ENDPOINT_URL,
@@ -82,7 +82,7 @@ test('HTTP 403 should be returned if PNRA is used with unauthorized key', async 
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
   const response = await fastify.inject({
-    headers: { 'content-type': PNRR_CONTENT_TYPE },
+    headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: Buffer.from(payload),
     url: ENDPOINT_URL,
@@ -104,14 +104,14 @@ test('HTTP 200 with the registration should be returned if the PNRA is valid', a
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
   const response = await fastify.inject({
-    headers: { 'content-type': PNRR_CONTENT_TYPE },
+    headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: Buffer.from(payload),
     url: ENDPOINT_URL,
   });
 
   expect(response).toHaveProperty('statusCode', 200);
-  expect(response.headers['content-type']).toEqual(PNR_CONTENT_TYPE);
+  expect(response.headers['content-type']).toEqual(CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION);
 
   const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
   expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();

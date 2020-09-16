@@ -2,14 +2,18 @@ import { get as getEnvVar } from 'env-var';
 import {
   fastify,
   FastifyInstance,
+  FastifyLoggerOptions,
   FastifyPluginCallback,
   FastifyPluginOptions,
   HTTPMethods,
 } from 'fastify';
+import { Logger } from 'pino';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
 const SERVER_HOST = '0.0.0.0';
+
+export type FastifyLogger = boolean | FastifyLoggerOptions | Logger;
 
 export const HTTP_METHODS: readonly HTTPMethods[] = [
   'POST',
@@ -48,9 +52,10 @@ export function registerDisallowedMethods(
 export async function configureFastify<RouteOptions extends FastifyPluginOptions = {}>(
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
+  logger: FastifyLogger = true,
 ): Promise<FastifyInstance> {
   const server = fastify({
-    logger: true,
+    logger,
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER').default(DEFAULT_REQUEST_ID_HEADER).asString(),
   });
 

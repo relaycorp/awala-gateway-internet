@@ -23,6 +23,7 @@ describe('makeServer', () => {
       expect.objectContaining<Partial<RouteOptions>>({
         publicGatewayPrivateKey: getFixtures().publicGatewayPrivateKey,
       }),
+      undefined,
     );
   });
 
@@ -36,7 +37,22 @@ describe('makeServer', () => {
           c.isEqual(getFixtures().publicGatewayCert),
         ),
       }),
+      undefined,
     );
+  });
+
+  test('No logger should be passed by default', async () => {
+    await makeServer();
+
+    expect(mockConfigureFastify).toBeCalledWith(expect.anything(), expect.anything(), undefined);
+  });
+
+  test('Any explicit logger should be honored', async () => {
+    const logger: fastifyUtils.FastifyLogger = { level: 'debug' };
+
+    await makeServer(logger);
+
+    expect(mockConfigureFastify).toBeCalledWith(expect.anything(), expect.anything(), logger);
   });
 
   test('Fastify instance should be returned', async () => {

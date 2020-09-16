@@ -3,7 +3,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { registerDisallowedMethods } from '../fastifyUtils';
-import { PNRA_CONTENT_TYPE } from './contentTypes';
+import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/pre-registrations';
@@ -30,7 +30,9 @@ export default async function registerRoutes(
         privateGatewayPublicKeyDigest,
         options.publicGatewayPrivateKey,
       );
-      return reply.header('Content-Type', PNRA_CONTENT_TYPE).send(authorizationSerialized);
+      return reply
+        .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.AUTHORIZATION)
+        .send(authorizationSerialized);
     },
   });
 }

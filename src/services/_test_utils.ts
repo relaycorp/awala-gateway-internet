@@ -10,6 +10,8 @@ import {
 } from '@relaycorp/relaynet-core';
 import envVar from 'env-var';
 import { FastifyInstance, HTTPMethods } from 'fastify';
+import fastifyPlugin from 'fastify-plugin';
+import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 import * as pkijs from 'pkijs';
 
@@ -199,5 +201,17 @@ export function testDisallowedMethods(
 
     expect(response).toHaveProperty('statusCode', 204);
     expect(response).toHaveProperty('headers.allow', allowedMethodsString);
+  });
+}
+
+export function mockFastifyMongoose(fastifyMongoose: { readonly db: Connection }): void {
+  const mockFastifyPlugin = fastifyPlugin;
+  jest.mock('fastify-mongoose', () => {
+    function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
+      fastify.decorate('mongo', fastifyMongoose);
+      next();
+    }
+
+    return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
   });
 }

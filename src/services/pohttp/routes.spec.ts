@@ -2,7 +2,6 @@
 
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
-import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
 import { mockSpy, PdaChain } from '../../_test_utils';
@@ -12,21 +11,14 @@ import {
   generatePdaChain,
   generateStubParcel,
   getMockInstance,
+  mockFastifyMongoose,
   testDisallowedMethods,
 } from '../_test_utils';
 import { ParcelStore } from '../parcelStore';
 import { makeServer } from './server';
 
-const mockFastifyPlugin = fastifyPlugin;
-const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' }, ObjectId: {} };
-jest.mock('fastify-mongoose', () => {
-  function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
-    fastify.decorate('mongo', mockFastifyMongooseObject);
-    next();
-  }
-
-  return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
-});
+const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' } as any, ObjectId: {} };
+mockFastifyMongoose(mockFastifyMongooseObject);
 
 const validRequestOptions: InjectOptions = {
   headers: {

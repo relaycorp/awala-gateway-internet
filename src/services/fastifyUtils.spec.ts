@@ -1,6 +1,7 @@
 /* tslint:disable:no-let */
 import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
+import pino from 'pino';
 
 import { mockSpy } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
@@ -25,11 +26,22 @@ const mockEnvVars = configureMockEnvVars({ MONGO_URI: stubMongoUri });
 const dummyRoutes: FastifyPluginCallback = () => null;
 
 describe('configureFastify', () => {
-  test('Logger should be enabled', () => {
+  test('Logger should be enabled by default', () => {
     configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('logger', true);
+  });
+
+  test('Custom logger should be supported', () => {
+    const customLogger = pino();
+    configureFastify([dummyRoutes], undefined, customLogger);
+
+    expect(fastify).toBeCalledWith(
+      expect.objectContaining({
+        logger: customLogger,
+      }),
+    );
   });
 
   test('X-Request-Id should be the default request id header', () => {

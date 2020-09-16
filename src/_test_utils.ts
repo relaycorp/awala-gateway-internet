@@ -1,6 +1,7 @@
 import { Certificate } from '@relaycorp/relaynet-core';
 import { BinaryLike, createHash, Hash } from 'crypto';
 import pino from 'pino';
+import split2 from 'split2';
 
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
   for (const item of array) {
@@ -45,6 +46,26 @@ export function mockPino(): pino.Logger {
   };
   jest.mock('pino', () => jest.fn().mockImplementation(() => mockPinoLogger));
   return mockPinoLogger as any;
+}
+
+// tslint:disable-next-line:readonly-array
+export function makeMockLogging(): { readonly logger: pino.Logger; readonly logs: object[] } {
+  // tslint:disable-next-line:readonly-array
+  const logs: object[] = [];
+  const stream = split2((data) => {
+    logs.push(JSON.parse(data));
+  });
+  const logger = pino({ level: 'debug' }, stream);
+  return { logger, logs };
+}
+
+export function partialPinoLog(level: pino.Level, message: string, extraAttributes?: any): object {
+  const levelNumber = pino.levels.values[level];
+  return expect.objectContaining({
+    level: levelNumber,
+    msg: message,
+    ...(extraAttributes && extraAttributes),
+  });
 }
 
 export interface PdaChain {

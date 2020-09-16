@@ -10,7 +10,8 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { sha256 } from '../../utils';
-import { PNR_CONTENT_TYPE, PNRR_CONTENT_TYPE } from './contentTypes';
+import { registerDisallowedMethods } from '../fastifyUtils';
+import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/nodes';
@@ -21,16 +22,10 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   options: RouteOptions,
 ): Promise<void> {
-  fastify.route({
-    method: ['HEAD', 'GET', 'PUT', 'DELETE', 'PATCH'],
-    url: ENDPOINT_URL,
-    async handler(_req, reply): Promise<void> {
-      reply.code(405).header('Allow', 'POST').send();
-    },
-  });
+  registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
   fastify.addContentTypeParser(
-    PNRR_CONTENT_TYPE,
+    CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST,
     { parseAs: 'buffer' },
     async (_req: any, rawBody: Buffer) => rawBody,
   );
@@ -39,7 +34,7 @@ export default async function registerRoutes(
     method: ['POST'],
     url: ENDPOINT_URL,
     async handler(request, reply): Promise<FastifyReply<any>> {
-      if (request.headers['content-type'] !== PNRR_CONTENT_TYPE) {
+      if (request.headers['content-type'] !== CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST) {
         return reply.code(415).send();
       }
 
@@ -89,7 +84,7 @@ export default async function registerRoutes(
       );
       return reply
         .code(200)
-        .header('Content-Type', PNR_CONTENT_TYPE)
+        .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION)
         .send(Buffer.from(registration.serialize()));
     },
   });

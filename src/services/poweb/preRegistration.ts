@@ -2,7 +2,8 @@ import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { PNRA_CONTENT_TYPE } from './contentTypes';
+import { registerDisallowedMethods } from '../fastifyUtils';
+import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/pre-registrations';
@@ -11,13 +12,7 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   options: RouteOptions,
 ): Promise<void> {
-  fastify.route({
-    method: ['HEAD', 'GET', 'PUT', 'DELETE', 'PATCH'],
-    url: ENDPOINT_URL,
-    async handler(_req, reply): Promise<void> {
-      reply.code(405).header('Allow', 'POST').send();
-    },
-  });
+  registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
   fastify.route<{ readonly Body: string }>({
     method: 'POST',
@@ -35,7 +30,9 @@ export default async function registerRoutes(
         privateGatewayPublicKeyDigest,
         options.publicGatewayPrivateKey,
       );
-      return reply.header('Content-Type', PNRA_CONTENT_TYPE).send(authorizationSerialized);
+      return reply
+        .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.AUTHORIZATION)
+        .send(authorizationSerialized);
     },
   });
 }

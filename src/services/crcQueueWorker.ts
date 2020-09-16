@@ -1,6 +1,7 @@
 import {
   Cargo,
   CargoMessageSet,
+  InvalidMessageError,
   Parcel,
   ParcelCollectionAck,
   PrivateKeyStore,
@@ -18,9 +19,7 @@ import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
-import { QueuedInternetBoundParcelMessage } from './internetBoundParcelsQueueWorker';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
-import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
 import { ParcelStore } from './parcelStore';
 
 const logger = pino();
@@ -72,8 +71,9 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         if (item instanceof Parcel) {
           await processParcel(
             item,
-            itemSerialized,
-            cargo,
+            Buffer.from(itemSerialized),
+            peerGatewayAddress,
+            cargo.id,
             parcelStore,
             mongooseConnection,
             natsStreamingClient,
@@ -123,43 +123,42 @@ async function unwrapCargo(
 
 async function processParcel(
   parcel: Parcel,
-  parcelSerialized: ArrayBuffer,
-  cargo: Cargo,
+  parcelSerialized: Buffer,
+  peerGatewayAddress: string,
+  cargoId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
   workerName: string,
 ): Promise<void> {
-  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
+  // tslint:disable-next-line:no-let
+  let parcelObjectKey: string | null;
   try {
-    await parcel.validate([cargo.senderCertificate]);
-  } catch (err) {
-    logger.info(
-      { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
-      'Parcel is invalid and/or did not originate in the gateway that created the cargo',
+    parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
+      mongooseConnection,
+      natsStreamingClient,
     );
-    return;
+  } catch (err) {
+    if (err instanceof InvalidMessageError) {
+      logger.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
+      return;
+    }
+
+    throw err;
   }
 
-  if (await wasParcelCollected(parcel, peerGatewayAddress, mongooseConnection)) {
-    logger.debug(
-      {
-        cargoId: cargo.id,
-        parcelId: parcel.id,
-        parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-        peerGatewayAddress,
-        worker: workerName,
-      },
-      'Parcel was previously processed',
-    );
-    return;
-  }
-  const parcelObjectKey = await parcelStore.storeEndpointBoundParcel(Buffer.from(parcelSerialized));
-  const messageData: QueuedInternetBoundParcelMessage = {
-    parcelExpiryDate: parcel.expiryDate,
-    parcelObjectKey,
-    parcelRecipientAddress: parcel.recipientAddress,
-  };
-  await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'crc-parcels');
-  await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
+  logger.debug(
+    {
+      cargoId,
+      parcelId: parcel.id,
+      parcelObjectKey,
+      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      peerGatewayAddress,
+      worker: workerName,
+    },
+    parcelObjectKey ? 'Parcel was stored' : 'Ignoring previously processed parcel',
+  );
 }

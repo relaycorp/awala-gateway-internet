@@ -1,12 +1,10 @@
-import { Parcel } from '@relaycorp/relaynet-core';
-import { mongoose } from '@typegoose/typegoose';
+import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../../backingServices/objectStorage';
-import { retrieveOwnCertificates } from '../certs';
+import { registerDisallowedMethods } from '../fastifyUtils';
 import { ParcelStore } from '../parcelStore';
 
 export default async function registerRoutes(
@@ -16,9 +14,7 @@ export default async function registerRoutes(
   const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
   const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
 
-  const objectStoreClient = ObjectStoreClient.initFromEnv();
-  const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-  const parcelStore = new ParcelStore(objectStoreClient, objectStoreBucket);
+  const parcelStore = ParcelStore.initFromEnv();
 
   fastify.addContentTypeParser(
     'application/vnd.relaynet.parcel',
@@ -26,13 +22,7 @@ export default async function registerRoutes(
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  fastify.route({
-    method: ['PUT', 'DELETE', 'PATCH'],
-    url: '/',
-    async handler(_req, reply): Promise<void> {
-      reply.code(405).header('Allow', 'HEAD, GET, POST').send();
-    },
-  });
+  registerDisallowedMethods(['HEAD', 'GET', 'POST'], '/', fastify);
 
   fastify.route({
     method: ['HEAD', 'GET'],
@@ -53,8 +43,6 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      //region Validate the parcel
-
       // tslint:disable-next-line:no-let
       let parcel;
       try {
@@ -69,40 +57,6 @@ export default async function registerRoutes(
           .send({ message: 'Parcel recipient should be specified as a private address' });
       }
 
-      // @ts-ignore
-      const mongooseConnection = (fastify.mongo as unknown) as { readonly db: mongoose.Connection };
-      const trustedCertificates = await retrieveOwnCertificates(mongooseConnection.db);
-      try {
-        await parcel.validate(trustedCertificates);
-      } catch (error) {
-        // TODO: Log this
-        return reply.code(400).send({ message: 'Parcel sender is not authorized' });
-      }
-
-      //endregion
-
-      const certificatePath = await parcel.getSenderCertificationPath(trustedCertificates);
-      const recipientGatewayCert = certificatePath[certificatePath.length - 2];
-      const recipientGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
-
-      //region Save to object storage
-      // tslint:disable-next-line:no-let
-      let parcelObjectKey: string;
-      try {
-        parcelObjectKey = await parcelStore.storeGatewayBoundParcel(
-          parcel,
-          request.body,
-          recipientGatewayAddress,
-        );
-      } catch (error) {
-        request.log.error({ err: error }, 'Failed to save parcel in object storage');
-        return reply
-          .code(500)
-          .send({ message: 'Parcel could not be stored; please try again later' });
-      }
-      //region
-
-      //region Notify subscribers
       // TODO: Try to reuse the NATS client within the process, if the client is concurrency-safe
       const natsClient = new NatsStreamingClient(
         natsServerUrl,
@@ -110,16 +64,24 @@ export default async function registerRoutes(
         `pohttp-req-${request.id}`,
       );
       try {
-        await natsClient.publishMessage(parcelObjectKey, `pdc-parcel.${recipientGatewayAddress}`);
+        await parcelStore.storeGatewayBoundParcel(
+          parcel,
+          request.body,
+          (fastify as any).mongo.db,
+          natsClient,
+        );
       } catch (error) {
-        request.log.error({ err: error }, 'Failed to queue parcel');
-        return reply
-          .code(500)
-          .send({ message: 'Parcel could not be stored; please try again later' });
+        if (error instanceof InvalidMessageError) {
+          return reply.code(403).send({ message: 'The parcel is invalid' });
+        } else {
+          request.log.error({ err: error }, 'Failed to save parcel in object storage');
+          return reply
+            .code(500)
+            .send({ message: 'Parcel could not be stored; please try again later' });
+        }
       } finally {
         natsClient.disconnect();
       }
-      //endregion
 
       return reply.code(202).send({});
     },

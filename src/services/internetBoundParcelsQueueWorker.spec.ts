@@ -7,13 +7,10 @@ import { arrayToAsyncIterable, mockPino, mockSpy } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
 import { configureMockEnvVars, mockStanMessage, TOMORROW } from './_test_utils';
-import { ParcelStore } from './parcelStore';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 const MOCK_PINO = mockPino();
-import {
-  processInternetBoundParcels,
-  QueuedInternetBoundParcelMessage,
-} from './internetBoundParcelsQueueWorker';
+import { processInternetBoundParcels } from './internetBoundParcelsQueueWorker';
 
 const OWN_POHTTP_ADDRESS = 'https://gateway.endpoint/';
 
@@ -206,13 +203,13 @@ describe('processInternetBoundParcels', () => {
   });
 
   describe('NATS Streaming Consumer', () => {
-    test('Channel should be "crc-parcels"', async () => {
+    test('Channel should be "internet-parcels"', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
       await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
       expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
-        'crc-parcels',
+        'internet-parcels',
         expect.anything(),
         expect.anything(),
       );

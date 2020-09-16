@@ -1,27 +1,33 @@
 // tslint:disable:no-let
 
-import { MockPrivateKeyStore } from '@relaycorp/relaynet-core';
-import { FastifyInstance } from 'fastify';
-import fastifyPlugin from 'fastify-plugin';
+import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { Connection } from 'mongoose';
 
 import { mockSpy, PdaChain } from '../../_test_utils';
 import * as privateKeyStore from '../../backingServices/privateKeyStore';
-import { configureMockEnvVars, generatePdaChain } from '../_test_utils';
+import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
+import { ParcelStore } from '../parcelStore';
 
 const BASE_ENV_VARS = { MONGO_URI: 'mongodb://example.com' };
 
-export interface FixtureSet extends PdaChain {}
+export interface FixtureSet extends PdaChain {
+  readonly mongooseConnection: Connection;
+  readonly parcelStore: ParcelStore;
+}
 
 export function setUpCommonFixtures(): () => FixtureSet {
-  //region fastify-mongoose
-  const mockFastifyPlugin = fastifyPlugin;
-  jest.mock('fastify-mongoose', () => {
-    function mockFunc(_fastify: FastifyInstance, _options: any, next: () => void): void {
-      next();
-    }
-    return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
-  });
-  //endregion
+  const mockMongooseConnection: Connection = { whatIsThis: 'The Mongoose connection' } as any;
+  mockFastifyMongoose({ db: mockMongooseConnection });
+
+  const mockParcelStore: ParcelStore = {
+    storeParcelFromPeerGateway: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),
+      async (parcel: Parcel) => {
+        return `parcels/${parcel.id}`;
+      },
+    ),
+  } as any;
+  mockSpy(jest.spyOn(ParcelStore, 'initFromEnv'), () => mockParcelStore);
 
   let certificatePath: PdaChain;
   beforeAll(async () => {
@@ -48,6 +54,8 @@ export function setUpCommonFixtures(): () => FixtureSet {
   });
 
   return () => ({
+    mongooseConnection: mockMongooseConnection,
+    parcelStore: mockParcelStore,
     ...certificatePath,
   });
 }

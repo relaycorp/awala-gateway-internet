@@ -72,7 +72,7 @@ async function queueParcel(parcel: Parcel): Promise<void> {
 
   const natsPublish = promisify(natsStreamingConnection.publish).bind(natsStreamingConnection);
   await natsPublish(
-    'crc-parcels',
+    'internet-parcels',
     JSON.stringify({
       parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey: parcel.id,

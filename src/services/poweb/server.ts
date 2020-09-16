@@ -3,12 +3,14 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
-import { configureFastify } from '../fastifyUtils';
+import { configureFastify, FastifyLogger } from '../fastifyUtils';
+import parcelDelivery from './parcelDelivery';
 import preRegistrationRoutes from './preRegistration';
 import registrationRoutes from './registration';
 import RouteOptions from './RouteOptions';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
+  parcelDelivery,
   preRegistrationRoutes,
   registrationRoutes,
 ];
@@ -18,12 +20,16 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  *
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
-export async function makeServer(): Promise<FastifyInstance> {
+export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstance> {
   const publicGatewayKeyPair = await retrieveKeyPair();
-  return configureFastify(ROUTES, {
-    publicGatewayCertificate: publicGatewayKeyPair.certificate,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
-  });
+  return configureFastify(
+    ROUTES,
+    {
+      publicGatewayCertificate: publicGatewayKeyPair.certificate,
+      publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+    },
+    logger,
+  );
 }
 
 async function retrieveKeyPair(): Promise<UnboundKeyPair> {

@@ -73,7 +73,7 @@ jobs:
         uses: azure/docker-login@v1
         with:
           login-server: ghcr.io
-          username: github-actions
+          username: irelaybot
           password: ${{ secrets.GH_CONTAINER_REGISTRY_PASSWORD }}
       - name: Release
         run: npx semantic-release

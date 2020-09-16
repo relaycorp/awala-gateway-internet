@@ -5,6 +5,6 @@ plugins:
   - - "@semantic-release/npm"
     - npmPublish: false
   - - "@semantic-release/exec"
-    - prepareCmd: docker tag relaynet-gw:local docker.pkg.github.com/relaycorp/relaynet-internet-gateway/main:${nextRelease.version}
-      publishCmd: docker push docker.pkg.github.com/relaycorp/relaynet-internet-gateway/main:${nextRelease.version}
+    - prepareCmd: docker tag relaynet-gw:local ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
+      publishCmd: docker push ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
   - "@semantic-release/github"

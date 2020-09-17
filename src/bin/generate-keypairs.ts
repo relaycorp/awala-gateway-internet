@@ -62,6 +62,7 @@ async function main(): Promise<void> {
     subjectPublicKey: initialSessionKeyPair.publicKey,
     validityEndDate: sessionCertEndDate,
   });
+  await sessionStore.saveInitialSessionKey(initialSessionKeyPair.privateKey, initialKeyCertificate);
 
   console.log(
     JSON.stringify({

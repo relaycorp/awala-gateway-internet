@@ -215,8 +215,8 @@ describe('ObjectStore', () => {
         promise: () =>
           Promise.resolve({
             Contents: objectKeys1.map((k) => ({ Key: k })),
-            ContinuationToken: continuationToken,
             IsTruncated: true,
+            NextContinuationToken: continuationToken,
           }),
       });
       const objectKeys2: readonly string[] = [`${PREFIX}style.css`, `${PREFIX}mobile.css`];

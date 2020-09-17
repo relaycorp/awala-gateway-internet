@@ -59,15 +59,15 @@ export class ObjectStoreClient {
     do {
       const request = this.client.listObjectsV2({
         Bucket: bucket,
-        ContinuationToken: continuationToken,
         Prefix: prefix,
+        ...(continuationToken && { ContinuationToken: continuationToken }),
       });
       const response = await request.promise();
       for (const objectData of response.Contents as S3.ObjectList) {
         yield objectData.Key as string;
       }
 
-      continuationToken = response.ContinuationToken;
+      continuationToken = response.NextContinuationToken;
     } while (continuationToken !== undefined);
   }
 

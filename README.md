@@ -26,6 +26,12 @@ Create Vault backend:
 docker-compose exec -e VAULT_ADDR='http://127.0.0.1:8200' -e VAULT_TOKEN=letmein vault vault secrets enable -path=gw-keys kv-v2
 ```
 
+Create the initial key pair:
+
+```
+docker-compose run --rm cogrpc src/bin/generate-keypairs.ts
+```
+
 Create MongoDB collections:
 
 ```

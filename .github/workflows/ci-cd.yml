@@ -34,8 +34,10 @@ jobs:
 
       # Export Docker image so it can be published
       - name: Export Docker image
+        if: github.ref == 'refs/heads/master'
         run: docker save -o /tmp/docker-image relaynet-gw:local
       - name: Upload Docker image
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v2
         with:
           name: docker-image
@@ -69,7 +71,7 @@ jobs:
           path: /tmp
       - name: Import Docker image
         run: docker load -i /tmp/docker-image
-      - name: Log in to GitHub Packages
+      - name: Log in to GitHub Container Registry
         uses: azure/docker-login@v1
         with:
           login-server: ghcr.io

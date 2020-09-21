@@ -58,6 +58,11 @@ export async function runServer(): Promise<void> {
   server.start();
 }
 
+/**
+ * Self issue certificate.
+ *
+ * As a workaround for: https://github.com/kubernetes/ingress-gce/issues/18#issuecomment-694815076
+ */
 async function selfIssueCertificate(): Promise<KeyCertPair> {
   const ipAddress = getEnvVar('SERVER_IP_ADDRESS').required().asString();
   const keys = selfsigned.generate([{ name: 'commonName', value: ipAddress }], {

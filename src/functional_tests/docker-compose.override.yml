@@ -41,4 +41,4 @@ services:
 
   cogrpc:
     environment:
-      COGRPC_ADDRESS: http://127.0.0.1:8081/
+      COGRPC_ADDRESS: https://127.0.0.1:8081/

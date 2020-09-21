@@ -44,6 +44,10 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     this.emit('end');
   }
 
+  public getPeer(): string {
+    return '127.0.0.1';
+  }
+
   public convertToGrpcStream(): grpc.ServerDuplexStream<Input, Output> {
     // Unfortunately, ServerDuplexStream's constructor is private so we have to resort to this
     // ugly hack

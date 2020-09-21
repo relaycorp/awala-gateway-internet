@@ -10,7 +10,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
-import pino from 'pino';
+import { Logger } from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
@@ -24,15 +24,14 @@ import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { generatePCAs } from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 
-interface ServiceImplementationOptions {
+export interface ServiceImplementationOptions {
+  readonly baseLogger: Logger;
   readonly gatewayKeyIdBase64: string;
   readonly parcelStoreBucket: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
   readonly cogrpcAddress: string;
 }
-
-const LOGGER = pino();
 
 export async function makeServiceImplementation(
   options: ServiceImplementationOptions,
@@ -45,7 +44,9 @@ export async function makeServiceImplementation(
   const vaultKeyStore = initVaultKeyStore();
 
   const mongooseConnection = await createMongooseConnectionFromEnv();
-  mongooseConnection.on('error', (err) => LOGGER.error({ err }, 'Mongoose connection error'));
+  mongooseConnection.on('error', (err) =>
+    options.baseLogger.error({ err }, 'Mongoose connection error'),
+  );
 
   return {
     async deliverCargo(
@@ -56,6 +57,10 @@ export async function makeServiceImplementation(
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
+      const logger = options.baseLogger.child({
+        grpcClient: call.getPeer(),
+        grpcMethod: 'collectCargo',
+      });
       await collectCargo(
         call,
         mongooseConnection,
@@ -63,6 +68,7 @@ export async function makeServiceImplementation(
         currentKeyId,
         parcelStore,
         vaultKeyStore,
+        logger,
       );
     },
   };
@@ -116,6 +122,7 @@ async function collectCargo(
   currentKeyId: Buffer,
   parcelStore: ParcelStore,
   vaultKeyStore: VaultPrivateKeyStore,
+  logger: Logger,
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
 
@@ -170,7 +177,7 @@ async function collectCargo(
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
-    LOGGER.error({ err, peerGatewayAddress }, 'Failed to send cargo');
+    logger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
     call.emit('error', {
       code: grpc.status.UNAVAILABLE,
       message: 'Internal server error; please try again later',

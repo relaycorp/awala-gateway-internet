@@ -21,7 +21,7 @@ import * as grpc from 'grpc';
 import mongoose from 'mongoose';
 import uuid from 'uuid-random';
 
-import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
+import { arrayToAsyncIterable, makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
 import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import { configureMockEnvVars, makeEmptyCertificate } from '../_test_utils';
@@ -31,9 +31,7 @@ import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import * as parcelCollectionAck from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
-
-const MOCK_PINO = mockPino();
-import { makeServiceImplementation } from './service';
+import { makeServiceImplementation, ServiceImplementationOptions } from './service';
 
 //region Fixtures
 
@@ -74,13 +72,20 @@ configureMockEnvVars({
   VAULT_URL: 'http://vault.example',
 });
 
-const SERVICE_IMPLEMENTATION_OPTIONS = {
-  cogrpcAddress: COGRPC_ADDRESS,
-  gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
-  natsClusterId: NATS_CLUSTER_ID,
-  natsServerUrl: NATS_SERVER_URL,
-  parcelStoreBucket: OBJECT_STORE_BUCKET,
-};
+let MOCK_LOGS: readonly object[];
+let SERVICE_IMPLEMENTATION_OPTIONS: ServiceImplementationOptions;
+beforeEach(() => {
+  const mockLogging = makeMockLogging();
+  MOCK_LOGS = mockLogging.logs;
+  SERVICE_IMPLEMENTATION_OPTIONS = {
+    baseLogger: mockLogging.logger,
+    cogrpcAddress: COGRPC_ADDRESS,
+    gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
+    natsClusterId: NATS_CLUSTER_ID,
+    natsServerUrl: NATS_SERVER_URL,
+    parcelStoreBucket: OBJECT_STORE_BUCKET,
+  };
+});
 
 //endregion
 
@@ -109,7 +114,11 @@ describe('makeServiceImplementation', () => {
       const error = new Error('Database credentials are wrong');
 
       MOCK_MONGOOSE_CONNECTION.on('error', (err) => {
-        expect(MOCK_PINO.error).toBeCalledWith({ err }, 'Mongoose connection error');
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('error', 'Mongoose connection error', {
+            err: expect.objectContaining({ message: err.message }),
+          }),
+        );
         cb();
       });
       MOCK_MONGOOSE_CONNECTION.emit('error', error);
@@ -640,9 +649,13 @@ describe('collectCargo', () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     CALL.on('error', async (callError) => {
-      expect(MOCK_PINO.error).toBeCalledWith(
-        { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
-        'Failed to send cargo',
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('error', 'Failed to send cargo', {
+          err: expect.objectContaining({ message: err.message }),
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'collectCargo',
+          peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+        }),
       );
 
       expect(callError).toEqual({
@@ -667,9 +680,13 @@ describe('collectCargo', () => {
 
     test('Error should be logged and end the call', async (cb) => {
       CALL.on('error', async () => {
-        expect(MOCK_PINO.error).toBeCalledWith(
-          { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
-          'Failed to send cargo',
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('error', 'Failed to send cargo', {
+            err: expect.objectContaining({ message: err.message }),
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'collectCargo',
+            peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+          }),
         );
         cb();
       });

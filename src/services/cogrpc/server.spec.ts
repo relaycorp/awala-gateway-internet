@@ -3,6 +3,7 @@
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpc from 'grpc';
 import * as grpcHealthCheck from 'grpc-health-check';
+import selfsigned from 'selfsigned';
 
 import { mockSpy } from '../../_test_utils';
 import { configureMockEnvVars } from '../_test_utils';
@@ -26,12 +27,19 @@ jest.mock('grpc', () => {
   };
 });
 
+const mockSelfSignedOutput = {
+  cert: 'the certificate, PEM-encoded',
+  private: 'the private key, PEM-encoded',
+};
+const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSelfSignedOutput);
+
 const BASE_ENV_VARS = {
   COGRPC_ADDRESS: 'https://cogrpc.example.com/',
   GATEWAY_KEY_ID: 'base64-encoded key id',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
   OBJECT_STORE_BUCKET: 'bucket-name',
+  SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
@@ -42,6 +50,7 @@ describe('runServer', () => {
     'NATS_CLUSTER_ID',
     'COGRPC_ADDRESS',
     'OBJECT_STORE_BUCKET',
+    'SERVER_IP_ADDRESS',
   ])('Environment variable %s should be present', async (envVar) => {
     mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
@@ -148,13 +157,29 @@ describe('runServer', () => {
     });
   });
 
-  test('Server should not use TLS', async () => {
+  test('Server should use TLS with a self-issued certificate', async () => {
+    const spiedCreateSsl = jest.spyOn(grpc.ServerCredentials, 'createSsl');
+
     await runServer();
 
     expect(mockServer.bind).toBeCalledTimes(1);
-    expect(mockServer.bind).toBeCalledWith(
-      expect.anything(),
-      grpc.ServerCredentials.createInsecure(),
+    expect(spiedCreateSsl).toBeCalledWith(null, [
+      {
+        cert_chain: Buffer.from(mockSelfSignedOutput.cert),
+        private_key: Buffer.from(mockSelfSignedOutput.private),
+      },
+    ]);
+    expect(mockSelfSigned).toBeCalledWith(
+      [{ name: 'commonName', value: BASE_ENV_VARS.SERVER_IP_ADDRESS }],
+      {
+        days: 365,
+        extensions: [
+          {
+            altNames: [{ ip: BASE_ENV_VARS.SERVER_IP_ADDRESS, type: 7 }],
+            name: 'subjectAltName',
+          },
+        ],
+      },
     );
   });
 

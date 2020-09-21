@@ -1,7 +1,8 @@
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
-import { Server, ServerCredentials } from 'grpc';
+import { KeyCertPair, Server, ServerCredentials } from 'grpc';
 import grpcHealthCheck from 'grpc-health-check';
+import * as selfsigned from 'selfsigned';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { makeServiceImplementation } from './service';
@@ -47,9 +48,31 @@ export async function runServer(): Promise<void> {
   });
   server.addService(grpcHealthCheck.service, healthCheckService);
 
-  const bindResult = server.bind(NETLOC, ServerCredentials.createInsecure());
+  const bindResult = server.bind(
+    NETLOC,
+    ServerCredentials.createSsl(null, [await selfIssueCertificate()]),
+  );
   if (bindResult < 0) {
     throw new Error(`Failed to listen on ${NETLOC}`);
   }
   server.start();
+}
+
+async function selfIssueCertificate(): Promise<KeyCertPair> {
+  const ipAddress = getEnvVar('SERVER_IP_ADDRESS').required().asString();
+  const keys = selfsigned.generate([{ name: 'commonName', value: ipAddress }], {
+    days: 365,
+    extensions: [
+      {
+        altNames: [
+          {
+            ip: ipAddress,
+            type: 7, // IP Address
+          },
+        ],
+        name: 'subjectAltName',
+      },
+    ],
+  });
+  return { cert_chain: Buffer.from(keys.cert), private_key: Buffer.from(keys.private) };
 }

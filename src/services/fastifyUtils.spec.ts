@@ -5,6 +5,7 @@ import pino from 'pino';
 
 import { mockSpy } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 import { configureFastify, runFastify } from './fastifyUtils';
 
 const mockFastify: FastifyInstance = {
@@ -59,6 +60,20 @@ describe('configureFastify', () => {
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader.toLowerCase());
+  });
+
+  test('Maximum request body should allow for the largest RAMF message', () => {
+    configureFastify([dummyRoutes]);
+
+    const fastifyCallArgs = getMockContext(fastify).calls[0];
+    expect(fastifyCallArgs[0]).toHaveProperty('bodyLimit', MAX_RAMF_MESSAGE_SIZE);
+  });
+
+  test('Proxy request headers should be trusted', () => {
+    configureFastify([dummyRoutes]);
+
+    const fastifyCallArgs = getMockContext(fastify).calls[0];
+    expect(fastifyCallArgs[0]).toHaveProperty('trustProxy', true);
   });
 
   test('Routes should be loaded', async () => {

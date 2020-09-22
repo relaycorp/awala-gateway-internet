@@ -8,6 +8,7 @@ import {
   HTTPMethods,
 } from 'fastify';
 import { Logger } from 'pino';
+import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
@@ -55,11 +56,13 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   logger: FastifyLogger = true,
 ): Promise<FastifyInstance> {
   const server = fastify({
+    bodyLimit: MAX_RAMF_MESSAGE_SIZE,
     logger,
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
       .default(DEFAULT_REQUEST_ID_HEADER)
       .asString()
       .toLowerCase(),
+    trustProxy: true,
   });
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));

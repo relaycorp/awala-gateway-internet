@@ -56,7 +56,10 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
 ): Promise<FastifyInstance> {
   const server = fastify({
     logger,
-    requestIdHeader: getEnvVar('REQUEST_ID_HEADER').default(DEFAULT_REQUEST_ID_HEADER).asString(),
+    requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
+      .default(DEFAULT_REQUEST_ID_HEADER)
+      .asString()
+      .toLowerCase(),
   });
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));

@@ -10,7 +10,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import * as grpc from 'grpc';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
-import pino from 'pino';
+import { Logger } from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
@@ -24,15 +24,19 @@ import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { generatePCAs } from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 
-interface ServiceImplementationOptions {
+const INTERNAL_SERVER_ERROR = {
+  code: grpc.status.UNAVAILABLE,
+  message: 'Internal server error; please try again later',
+};
+
+export interface ServiceImplementationOptions {
+  readonly baseLogger: Logger;
   readonly gatewayKeyIdBase64: string;
   readonly parcelStoreBucket: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
   readonly cogrpcAddress: string;
 }
-
-const LOGGER = pino();
 
 export async function makeServiceImplementation(
   options: ServiceImplementationOptions,
@@ -45,17 +49,33 @@ export async function makeServiceImplementation(
   const vaultKeyStore = initVaultKeyStore();
 
   const mongooseConnection = await createMongooseConnectionFromEnv();
-  mongooseConnection.on('error', (err) => LOGGER.error({ err }, 'Mongoose connection error'));
+  mongooseConnection.on('error', (err) =>
+    options.baseLogger.error({ err }, 'Mongoose connection error'),
+  );
 
   return {
     async deliverCargo(
       call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
     ): Promise<void> {
-      await deliverCargo(call, mongooseConnection, options.natsServerUrl, options.natsClusterId);
+      const logger = options.baseLogger.child({
+        grpcClient: call.getPeer(),
+        grpcMethod: 'deliverCargo',
+      });
+      await deliverCargo(
+        call,
+        mongooseConnection,
+        options.natsServerUrl,
+        options.natsClusterId,
+        logger,
+      );
     },
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
     ): Promise<void> {
+      const logger = options.baseLogger.child({
+        grpcClient: call.getPeer(),
+        grpcMethod: 'collectCargo',
+      });
       await collectCargo(
         call,
         mongooseConnection,
@@ -63,6 +83,7 @@ export async function makeServiceImplementation(
         currentKeyId,
         parcelStore,
         vaultKeyStore,
+        logger,
       );
     },
   };
@@ -73,25 +94,39 @@ async function deliverCargo(
   mongooseConnection: Connection,
   natsServerUrl: string,
   natsClusterId: string,
+  logger: Logger,
 ): Promise<void> {
   const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
 
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');
 
+  // tslint:disable-next-line:no-let
+  let cargoesDelivered = 0;
+
   async function* validateDelivery(
     source: AsyncIterable<CargoDelivery>,
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
+      // tslint:disable-next-line:no-let
+      let peerGatewayAddress: string | null = null;
+      // tslint:disable-next-line:no-let
+      let cargoId: string | null = null;
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
+        cargoId = cargo.id;
+        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
         await cargo.validate(trustedCerts);
-      } catch (error) {
+      } catch (err) {
         // Acknowledge that we got it, not that it was accepted and stored. See:
         // https://github.com/relaynet/specs/issues/38
+        logger.info({ err, peerGatewayAddress }, 'Ignoring malformed/invalid cargo');
         call.write({ id: delivery.id });
         continue;
       }
+
+      logger.info({ cargoId, peerGatewayAddress }, 'Processing valid cargo');
+      cargoesDelivered += 1;
       yield { id: delivery.id, data: delivery.cargo };
     }
   }
@@ -104,9 +139,15 @@ async function deliverCargo(
 
   try {
     await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+  } catch (err) {
+    logger.error({ err }, 'Failed to store cargo');
+    call.emit('error', INTERNAL_SERVER_ERROR);
+    return;
   } finally {
     natsClient.disconnect();
   }
+
+  logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');
 }
 
 async function collectCargo(
@@ -116,22 +157,29 @@ async function collectCargo(
   currentKeyId: Buffer,
   parcelStore: ParcelStore,
   vaultKeyStore: VaultPrivateKeyStore,
+  logger: Logger,
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
 
-  // tslint:disable-next-line:no-let
-  let cca: CargoCollectionAuthorization;
-  try {
-    cca = await parseAndValidateCCAFromMetadata(authorizationMetadata);
-  } catch (error) {
+  const ccaOrError = await parseAndValidateCCAFromMetadata(authorizationMetadata);
+  if (ccaOrError instanceof Error) {
+    logger.info({ reason: ccaOrError.message }, 'Refusing malformed/invalid CCA');
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
-      message: error.message,
+      message: ccaOrError.message,
     });
     return;
   }
 
+  const cca = ccaOrError;
+  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const ccaAwareLogger = logger.child({ peerGatewayAddress });
+
   if (cca.recipientAddress !== ownCogrpcAddress) {
+    ccaAwareLogger.info(
+      { ccaRecipientAddress: cca.recipientAddress },
+      'Refusing CCA bound for another gateway',
+    );
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
       message: 'CCA recipient is a different gateway',
@@ -140,12 +188,16 @@ async function collectCargo(
   }
 
   if (await wasCCAFulfilled(cca, mongooseConnection)) {
+    ccaAwareLogger.info('Refusing CCA that was already fulfilled');
     call.emit('error', {
       code: grpc.status.PERMISSION_DENIED,
       message: 'CCA was already fulfilled',
     });
     return;
   }
+
+  // tslint:disable-next-line:no-let
+  let cargoesCollected = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
@@ -159,10 +211,10 @@ async function collectCargo(
       // In the future we might use the ACKs to support back-pressure
       const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
       call.write(delivery);
+      cargoesCollected += 1;
     }
   }
 
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
   const cargoMessageStream = await concatMessageStreams(
     generatePCAs(peerGatewayAddress, mongooseConnection),
     parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
@@ -170,44 +222,45 @@ async function collectCargo(
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
-    LOGGER.error({ err, peerGatewayAddress }, 'Failed to send cargo');
-    call.emit('error', {
-      code: grpc.status.UNAVAILABLE,
-      message: 'Internal server error; please try again later',
-    });
+    ccaAwareLogger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
+    call.emit('error', INTERNAL_SERVER_ERROR);
     return;
   }
 
   await recordCCAFulfillment(cca, mongooseConnection);
+  ccaAwareLogger.info({ cargoesCollected }, 'CCA was fulfilled successfully');
   call.end();
 }
 
+/**
+ * Parse and validate the CCA in `authorizationMetadata`, or return an error if validation fails.
+ *
+ * We're returning an error instead of throwing it to distinguish validation errors from bugs.
+ *
+ * @param authorizationMetadata
+ */
 async function parseAndValidateCCAFromMetadata(
   authorizationMetadata: readonly grpc.MetadataValue[],
-): Promise<CargoCollectionAuthorization> {
+): Promise<CargoCollectionAuthorization | Error> {
   if (authorizationMetadata.length !== 1) {
-    throw new Error('Authorization metadata should be specified exactly once');
+    return new Error('Authorization metadata should be specified exactly once');
   }
 
   const authorization = authorizationMetadata[0] as string;
   const [authorizationType, authorizationValue] = authorization.split(' ', 2);
   if (authorizationType !== 'Relaynet-CCA') {
-    throw new Error('Authorization type should be Relaynet-CCA');
+    return new Error('Authorization type should be Relaynet-CCA');
   }
   if (authorizationValue === undefined) {
-    throw new Error('Authorization value should be set to the CCA');
+    return new Error('Authorization value should be set to the CCA');
   }
 
   const ccaSerialized = Buffer.from(authorizationValue, 'base64');
-  // tslint:disable-next-line:no-let
-  let cca: CargoCollectionAuthorization;
   try {
-    cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
+    return await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
   } catch (_) {
-    throw new Error('CCA is malformed');
+    return new Error('CCA is malformed');
   }
-
-  return cca;
 }
 
 async function* concatMessageStreams(

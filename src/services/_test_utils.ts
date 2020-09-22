@@ -13,7 +13,6 @@ import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
-import * as pkijs from 'pkijs';
 
 import { PdaChain } from '../_test_utils';
 import { HTTP_METHODS } from './fastifyUtils';
@@ -121,10 +120,6 @@ export async function generateStubEndpointCertificate(
     subjectPublicKey: keyPair.publicKey,
     validityEndDate: TOMORROW,
   });
-}
-
-export function makeEmptyCertificate(): Certificate {
-  return new Certificate(new pkijs.Certificate());
 }
 
 export interface StubParcelOptions {

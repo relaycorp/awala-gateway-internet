@@ -24,6 +24,11 @@ import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { generatePCAs } from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 
+const INTERNAL_SERVER_ERROR = {
+  code: grpc.status.UNAVAILABLE,
+  message: 'Internal server error; please try again later',
+};
+
 export interface ServiceImplementationOptions {
   readonly baseLogger: Logger;
   readonly gatewayKeyIdBase64: string;
@@ -52,7 +57,17 @@ export async function makeServiceImplementation(
     async deliverCargo(
       call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
     ): Promise<void> {
-      await deliverCargo(call, mongooseConnection, options.natsServerUrl, options.natsClusterId);
+      const logger = options.baseLogger.child({
+        grpcClient: call.getPeer(),
+        grpcMethod: 'deliverCargo',
+      });
+      await deliverCargo(
+        call,
+        mongooseConnection,
+        options.natsServerUrl,
+        options.natsClusterId,
+        logger,
+      );
     },
     async collectCargo(
       call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
@@ -79,25 +94,39 @@ async function deliverCargo(
   mongooseConnection: Connection,
   natsServerUrl: string,
   natsClusterId: string,
+  logger: Logger,
 ): Promise<void> {
   const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
 
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');
 
+  // tslint:disable-next-line:no-let
+  let cargoesDelivered = 0;
+
   async function* validateDelivery(
     source: AsyncIterable<CargoDelivery>,
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
+      // tslint:disable-next-line:no-let
+      let peerGatewayAddress: string | null = null;
+      // tslint:disable-next-line:no-let
+      let cargoId: string | null = null;
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
+        cargoId = cargo.id;
+        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
         await cargo.validate(trustedCerts);
-      } catch (error) {
+      } catch (err) {
         // Acknowledge that we got it, not that it was accepted and stored. See:
         // https://github.com/relaynet/specs/issues/38
+        logger.info({ err, peerGatewayAddress }, 'Ignoring malformed/invalid cargo');
         call.write({ id: delivery.id });
         continue;
       }
+
+      logger.info({ cargoId, peerGatewayAddress }, 'Processing valid cargo');
+      cargoesDelivered += 1;
       yield { id: delivery.id, data: delivery.cargo };
     }
   }
@@ -110,9 +139,15 @@ async function deliverCargo(
 
   try {
     await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+  } catch (err) {
+    logger.error({ err }, 'Failed to store cargo');
+    call.emit('error', INTERNAL_SERVER_ERROR);
+    return;
   } finally {
     natsClient.disconnect();
   }
+
+  logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');
 }
 
 async function collectCargo(
@@ -188,10 +223,7 @@ async function collectCargo(
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
     ccaAwareLogger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
-    call.emit('error', {
-      code: grpc.status.UNAVAILABLE,
-      message: 'Internal server error; please try again later',
-    });
+    call.emit('error', INTERNAL_SERVER_ERROR);
     return;
   }
 

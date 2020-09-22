@@ -44,3 +44,18 @@ Create Minio buckets:
 MC_HOST_minio=http://THE-KEY-ID:letmeinpls@object-store:9000
 docker run --rm --network=relaynet-internet-gateway_default -e MC_HOST_minio minio/mc mb minio/relaynet-public-gateway
 ```
+
+## Logging
+
+We use [pino](https://getpino.io/) for logging. Some common log attributes include:
+
+- `cargoId`/`parcelId`: The id of a cargo or parcel, respectively. Useful to track its processing from delivery to collection.
+- `peerGatewayAddress`: The address of a private gateway paired or potentially paired to this public gateway. Useful to find all the events involving a specific private gateway.
+
+We use log levels as follows:
+
+- `debug`: Events that are only relevant during development or debugging. They should be ignored in production.
+- `info`: Events for any outcome observed outside the gateway, or any unusual interaction with a backing service.
+- `warning`: Something has gone wrong but it's being handled gracefully. Triage can start on the next working day.
+- `error`: Something has gone wrong and triage must start within a few minutes. Wake up an SRE if necessary.
+- `critical`: Not used.

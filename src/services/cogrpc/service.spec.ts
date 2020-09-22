@@ -7,33 +7,36 @@ import {
   CargoCollectionAuthorization,
   CargoMessageSet,
   CargoMessageStream,
-  Certificate,
   generateRSAKeyPair,
+  InvalidMessageError,
   issueEndpointCertificate,
-  issueGatewayCertificate,
   Parcel,
   ParcelCollectionAck,
+  RAMFSyntaxError,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
 import * as grpc from 'grpc';
 import mongoose from 'mongoose';
-import uuid from 'uuid-random';
 
-import { arrayToAsyncIterable, mockPino, mockSpy } from '../../_test_utils';
+import {
+  arrayToAsyncIterable,
+  makeMockLogging,
+  mockSpy,
+  partialPinoLog,
+  PdaChain,
+} from '../../_test_utils';
 import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
-import { configureMockEnvVars, makeEmptyCertificate } from '../_test_utils';
+import { configureMockEnvVars, generatePdaChain, getMockInstance } from '../_test_utils';
 import * as ccaFulfillments from '../ccaFulfilments';
 import * as certs from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import * as parcelCollectionAck from '../parcelCollection';
 import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
-
-const MOCK_PINO = mockPino();
-import { makeServiceImplementation } from './service';
+import { makeServiceImplementation, ServiceImplementationOptions } from './service';
 
 //region Fixtures
 
@@ -46,16 +49,11 @@ const NATS_CLUSTER_ID = 'nats-cluster-id';
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
-let OWN_PRIVATE_KEY: CryptoKey;
-let OWN_CERTIFICATE: Certificate;
+let PDA_CHAIN: PdaChain;
+let PEER_GATEWAY_ADDRESS: string;
 beforeAll(async () => {
-  const keyPair = await generateRSAKeyPair();
-  OWN_PRIVATE_KEY = keyPair.privateKey;
-  OWN_CERTIFICATE = await issueGatewayCertificate({
-    issuerPrivateKey: keyPair.privateKey,
-    subjectPublicKey: keyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  PDA_CHAIN = await generatePdaChain();
+  PEER_GATEWAY_ADDRESS = await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
 const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = new EventEmitter() as any;
@@ -74,13 +72,20 @@ configureMockEnvVars({
   VAULT_URL: 'http://vault.example',
 });
 
-const SERVICE_IMPLEMENTATION_OPTIONS = {
-  cogrpcAddress: COGRPC_ADDRESS,
-  gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
-  natsClusterId: NATS_CLUSTER_ID,
-  natsServerUrl: NATS_SERVER_URL,
-  parcelStoreBucket: OBJECT_STORE_BUCKET,
-};
+let MOCK_LOGS: readonly object[];
+let SERVICE_IMPLEMENTATION_OPTIONS: ServiceImplementationOptions;
+beforeEach(() => {
+  const mockLogging = makeMockLogging();
+  MOCK_LOGS = mockLogging.logs;
+  SERVICE_IMPLEMENTATION_OPTIONS = {
+    baseLogger: mockLogging.logger,
+    cogrpcAddress: COGRPC_ADDRESS,
+    gatewayKeyIdBase64: GATEWAY_KEY_ID_BASE64,
+    natsClusterId: NATS_CLUSTER_ID,
+    natsServerUrl: NATS_SERVER_URL,
+    parcelStoreBucket: OBJECT_STORE_BUCKET,
+  };
+});
 
 //endregion
 
@@ -109,7 +114,11 @@ describe('makeServiceImplementation', () => {
       const error = new Error('Database credentials are wrong');
 
       MOCK_MONGOOSE_CONNECTION.on('error', (err) => {
-        expect(MOCK_PINO.error).toBeCalledWith({ err }, 'Mongoose connection error');
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('error', 'Mongoose connection error', {
+            err: expect.objectContaining({ message: err.message }),
+          }),
+        );
         cb();
       });
       MOCK_MONGOOSE_CONNECTION.emit('error', error);
@@ -119,9 +128,13 @@ describe('makeServiceImplementation', () => {
 
 describe('deliverCargo', () => {
   const DELIVERY_ID = 'the-id';
-  const CARGO_SERIALIZATION = Buffer.from('Pretend this is a valid cargo');
 
-  const CARGO = new Cargo('0123', makeEmptyCertificate(), Buffer.from('payload'));
+  let CARGO: Cargo;
+  let CARGO_SERIALIZATION: Buffer;
+  beforeAll(async () => {
+    CARGO = new Cargo(COGRPC_ADDRESS, PDA_CHAIN.privateGatewayCert, Buffer.from('payload'));
+    CARGO_SERIALIZATION = Buffer.from(await CARGO.serialize(PDA_CHAIN.privateGatewayPrivateKey));
+  });
 
   let NATS_CLIENT: natsStreaming.NatsStreamingClient;
   // tslint:disable-next-line:readonly-array
@@ -158,7 +171,7 @@ describe('deliverCargo', () => {
 
   const RETRIEVE_OWN_CERTIFICATES_SPY = mockSpy(
     jest.spyOn(certs, 'retrieveOwnCertificates'),
-    () => [OWN_CERTIFICATE],
+    () => [PDA_CHAIN.publicGatewayCert],
   );
 
   test('NATS Streaming publisher should be initialized upfront', async () => {
@@ -177,15 +190,8 @@ describe('deliverCargo', () => {
   });
 
   describe('Cargo processing', () => {
-    const cargoDeserializeSpy = mockSpy(jest.spyOn(Cargo, 'deserialize'), () => CARGO);
-    const cargoValidateSpy = mockSpy(jest.spyOn(CARGO, 'validate'));
-
     test('Malformed message should be ACKd but discarded', async () => {
       // The invalid message is followed by a valid one to check that processing continues
-      cargoDeserializeSpy.mockReset();
-      cargoDeserializeSpy.mockRejectedValueOnce(new Error('Denied'));
-      cargoDeserializeSpy.mockResolvedValueOnce(CARGO);
-
       const invalidDeliveryId = 'invalid';
       CALL.output.push(
         { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
@@ -201,16 +207,28 @@ describe('deliverCargo', () => {
       expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
       expect(PUBLISHED_MESSAGES).toEqual([CARGO_SERIALIZATION]);
+
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
+          err: expect.objectContaining({ type: RAMFSyntaxError.name }),
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'deliverCargo',
+          peerGatewayAddress: null,
+        }),
+      );
     });
 
     test('Well-formed yet invalid message should be ACKd but discarded', async () => {
       // The invalid message is followed by a valid one to check that processing continues
-      cargoValidateSpy.mockReset();
-      cargoValidateSpy.mockRejectedValueOnce(new Error('Denied'));
-      cargoValidateSpy.mockResolvedValueOnce(null);
+      const invalidCargo = new Cargo(
+        COGRPC_ADDRESS,
+        PDA_CHAIN.peerEndpointCert,
+        Buffer.from('payload'),
+      );
+      const invalidCargoSerialized = await invalidCargo.serialize(PDA_CHAIN.peerEndpointPrivateKey);
       const invalidDeliveryId = 'invalid';
       CALL.output.push(
-        { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
+        { cargo: Buffer.from(invalidCargoSerialized), id: invalidDeliveryId },
         {
           cargo: CARGO_SERIALIZATION,
           id: DELIVERY_ID,
@@ -224,6 +242,15 @@ describe('deliverCargo', () => {
       expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
       expect(PUBLISHED_MESSAGES).toEqual([CARGO_SERIALIZATION]);
+
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
+          err: expect.objectContaining({ type: InvalidMessageError.name }),
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'deliverCargo',
+          peerGatewayAddress: await invalidCargo.senderCertificate.calculateSubjectPrivateAddress(),
+        }),
+      );
     });
 
     test('Valid message should be ACKd and added to queue', async () => {
@@ -238,12 +265,70 @@ describe('deliverCargo', () => {
 
       expect(CALL.write).toBeCalledTimes(1);
       expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
+
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('info', 'Processing valid cargo', {
+          cargoId: CARGO.id,
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'deliverCargo',
+          peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+        }),
+      );
     });
 
-    test('No ACK should be sent if a valid cargo cannot be queued', async () => {
+    test('Successful completion should be logged', async () => {
+      CALL.output.push({
+        cargo: CARGO_SERIALIZATION,
+        id: DELIVERY_ID,
+      });
+
+      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
+
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('info', 'Cargo delivery completed successfully', {
+          cargoesDelivered: 1,
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'deliverCargo',
+        }),
+      );
+    });
+
+    test('Errors while processing cargo should be logged and end the call', async (cb) => {
+      const error = new Error('Denied');
+      async function* failToPublishMessage(
+        _: IterableIterator<natsStreaming.PublisherMessage>,
+      ): AsyncIterable<string> {
+        throw error;
+      }
+      getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(failToPublishMessage);
+      CALL.output.push({
+        cargo: CARGO_SERIALIZATION,
+        id: DELIVERY_ID,
+      });
+
+      CALL.on('error', async (callError) => {
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('error', 'Failed to store cargo', {
+            err: expect.objectContaining({ message: error.message }),
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'deliverCargo',
+          }),
+        );
+
+        expect(callError).toEqual({
+          code: grpc.status.UNAVAILABLE,
+          message: 'Internal server error; please try again later',
+        });
+
+        cb();
+      });
+
+      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
+    });
+
+    test('No ACK should be sent if a valid cargo cannot be queued', async (cb) => {
       // Receive two deliveries. The first succeeds but the second fails.
 
-      const error = new Error('Denied');
       async function* publishFirstMessageThenFail(
         messages: IterableIterator<natsStreaming.PublisherMessage>,
       ): AsyncIterable<string> {
@@ -254,12 +339,10 @@ describe('deliverCargo', () => {
             firstMessageYielded = true;
             continue;
           }
-          throw error;
+          throw new Error('Denied');
         }
       }
-      ((NATS_CLIENT.makePublisher as unknown) as jest.MockInstance<any, any>).mockReturnValue(
-        publishFirstMessageThenFail,
-      );
+      getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(publishFirstMessageThenFail);
       const undeliveredMessageId = 'undelivered';
       CALL.output.push(
         {
@@ -272,12 +355,14 @@ describe('deliverCargo', () => {
         },
       );
 
-      await expect(SERVICE.deliverCargo(CALL.convertToGrpcStream())).rejects.toEqual(error);
+      CALL.on('error', async () => {
+        expect(CALL.write).toBeCalledTimes(1);
+        expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
-      expect(CALL.write).toBeCalledTimes(1);
-      expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
+        cb();
+      });
 
-      // TODO: Log error message
+      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
     });
 
     test('NATS Streaming connection should be closed upon completion', async () => {
@@ -291,7 +376,7 @@ describe('deliverCargo', () => {
       expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
     });
 
-    test('NATS Streaming connection should be closed upon error', async () => {
+    test('NATS Streaming connection should be closed upon error', async (cb) => {
       async function* throwError(
         messages: AsyncIterable<natsStreaming.PublisherMessage>,
       ): AsyncIterable<string> {
@@ -300,17 +385,20 @@ describe('deliverCargo', () => {
         }
         throw new Error('Denied');
       }
-      ((NATS_CLIENT.makePublisher as unknown) as jest.MockInstance<any, any>).mockReturnValue(
-        throwError,
-      );
+      getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(throwError);
       CALL.output.push({
         cargo: CARGO_SERIALIZATION,
         id: DELIVERY_ID,
       });
 
-      await expect(SERVICE.deliverCargo(CALL.convertToGrpcStream())).toReject();
+      CALL.on('error', () => {
+        setImmediate(() => {
+          expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
+          cb();
+        });
+      });
 
-      expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
+      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
     });
 
     test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {
@@ -343,18 +431,6 @@ describe('collectCargo', () => {
     CALL = new MockGrpcBidiCall();
   });
 
-  let CCA_SENDER_PRIVATE_KEY: CryptoKey;
-  let CCA_SENDER_CERT: Certificate;
-  beforeAll(async () => {
-    const keyPair = await generateRSAKeyPair();
-    CCA_SENDER_PRIVATE_KEY = keyPair.privateKey;
-    CCA_SENDER_CERT = await issueGatewayCertificate({
-      issuerPrivateKey: keyPair.privateKey,
-      subjectPublicKey: keyPair.publicKey,
-      validityEndDate: TOMORROW,
-    });
-  });
-
   const MOCK_RETRIEVE_ACTIVE_PARCELS = mockSpy(
     jest.spyOn(ParcelStore.prototype, 'retrieveActiveParcelsForGateway'),
     async () => arrayToAsyncIterable([]),
@@ -369,8 +445,8 @@ describe('collectCargo', () => {
   const MOCK_FETCH_NODE_KEY = mockSpy(
     jest.spyOn(VaultPrivateKeyStore.prototype, 'fetchNodeKey'),
     async () => ({
-      certificate: OWN_CERTIFICATE,
-      privateKey: OWN_PRIVATE_KEY,
+      certificate: PDA_CHAIN.publicGatewayCert,
+      privateKey: PDA_CHAIN.publicGatewayPrivateKey,
     }),
   );
 
@@ -405,22 +481,26 @@ describe('collectCargo', () => {
     DUMMY_PARCEL_SERIALIZED = Buffer.from(await DUMMY_PARCEL.serialize(keyPair.privateKey));
   });
 
-  const CCA_ID = uuid();
+  let CCA: CargoCollectionAuthorization;
   let AUTHORIZATION_METADATA: grpc.MetadataValue;
   beforeAll(async () => {
-    const cca = new CargoCollectionAuthorization(COGRPC_ADDRESS, CCA_SENDER_CERT, Buffer.from([]), {
-      id: CCA_ID,
-    });
-    const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
+    CCA = new CargoCollectionAuthorization(
+      COGRPC_ADDRESS,
+      PDA_CHAIN.privateGatewayCert,
+      Buffer.from([]),
+    );
+    const ccaSerialized = Buffer.from(await CCA.serialize(PDA_CHAIN.privateGatewayPrivateKey));
     AUTHORIZATION_METADATA = `Relaynet-CCA ${ccaSerialized.toString('base64')}`;
   });
 
   describe('CCA validation', () => {
     test('UNAUTHENTICATED should be returned if Authorization is missing', async (cb) => {
       CALL.on('error', (error) => {
+        const errorMessage = 'Authorization metadata should be specified exactly once';
+        expect(MOCK_LOGS).toContainEqual(invalidCCALog(errorMessage));
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
-          message: 'Authorization metadata should be specified exactly once',
+          message: errorMessage,
         });
 
         cb();
@@ -431,9 +511,11 @@ describe('collectCargo', () => {
 
     test('UNAUTHENTICATED should be returned if Authorization is duplicated', async (cb) => {
       CALL.on('error', (error) => {
+        const errorMessage = 'Authorization metadata should be specified exactly once';
+        expect(MOCK_LOGS).toContainEqual(invalidCCALog(errorMessage));
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
-          message: 'Authorization metadata should be specified exactly once',
+          message: errorMessage,
         });
 
         cb();
@@ -446,9 +528,11 @@ describe('collectCargo', () => {
 
     test('UNAUTHENTICATED should be returned if Authorization type is invalid', async (cb) => {
       CALL.on('error', (error) => {
+        const errorMessage = 'Authorization type should be Relaynet-CCA';
+        expect(MOCK_LOGS).toContainEqual(invalidCCALog(errorMessage));
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
-          message: 'Authorization type should be Relaynet-CCA',
+          message: errorMessage,
         });
 
         cb();
@@ -461,9 +545,11 @@ describe('collectCargo', () => {
 
     test('UNAUTHENTICATED should be returned if Authorization value is missing', async (cb) => {
       CALL.on('error', (error) => {
+        const errorMessage = 'Authorization value should be set to the CCA';
+        expect(MOCK_LOGS).toContainEqual(invalidCCALog(errorMessage));
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
-          message: 'Authorization value should be set to the CCA',
+          message: errorMessage,
         });
 
         cb();
@@ -476,9 +562,11 @@ describe('collectCargo', () => {
 
     test('UNAUTHENTICATED should be returned if CCA is malformed', async (cb) => {
       CALL.on('error', (error) => {
+        const errorMessage = 'CCA is malformed';
+        expect(MOCK_LOGS).toContainEqual(invalidCCALog(errorMessage));
         expect(error).toEqual({
           code: grpc.status.UNAUTHENTICATED,
-          message: 'CCA is malformed',
+          message: errorMessage,
         });
 
         cb();
@@ -491,7 +579,20 @@ describe('collectCargo', () => {
     });
 
     test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
+      const cca = new CargoCollectionAuthorization(
+        `${COGRPC_ADDRESS}/path`,
+        PDA_CHAIN.privateGatewayCert,
+        Buffer.from([]),
+      );
       CALL.on('error', (error) => {
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('info', 'Refusing CCA bound for another gateway', {
+            ccaRecipientAddress: cca.recipientAddress,
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'collectCargo',
+            peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+          }),
+        );
         expect(error).toEqual({
           code: grpc.status.INVALID_ARGUMENT,
           message: 'CCA recipient is a different gateway',
@@ -500,12 +601,7 @@ describe('collectCargo', () => {
         cb();
       });
 
-      const cca = new CargoCollectionAuthorization(
-        `${COGRPC_ADDRESS}/path`,
-        CCA_SENDER_CERT,
-        Buffer.from([]),
-      );
-      const ccaSerialized = Buffer.from(await cca.serialize(CCA_SENDER_PRIVATE_KEY));
+      const ccaSerialized = Buffer.from(await cca.serialize(PDA_CHAIN.privateGatewayPrivateKey));
       CALL.metadata.add('Authorization', `Relaynet-CCA ${ccaSerialized.toString('base64')}`);
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -513,6 +609,13 @@ describe('collectCargo', () => {
 
     test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async (cb) => {
       CALL.on('error', (error) => {
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'collectCargo',
+            peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+          }),
+        );
         expect(error).toEqual({
           code: grpc.status.PERMISSION_DENIED,
           message: 'CCA was already fulfilled',
@@ -526,6 +629,14 @@ describe('collectCargo', () => {
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
+
+    function invalidCCALog(errorMessage: string): ReturnType<typeof partialPinoLog> {
+      return partialPinoLog('info', 'Refusing malformed/invalid CCA', {
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        reason: errorMessage,
+      });
+    }
   });
 
   test('Parcel store should be bound to correct bucket', async () => {
@@ -545,7 +656,7 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-      await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
   });
 
@@ -569,6 +680,11 @@ describe('collectCargo', () => {
 
     expect(CALL.input).toHaveLength(1);
     await validateCargoDelivery(CALL.input[0], [DUMMY_PARCEL_SERIALIZED]);
+    expect(MOCK_LOGS).toContainEqual(
+      partialPinoLog('info', 'CCA was fulfilled successfully', {
+        cargoesCollected: 1,
+      }),
+    );
   });
 
   test('Call should end after cargo has been delivered', async () => {
@@ -590,7 +706,7 @@ describe('collectCargo', () => {
 
     expect(MOCK_GENERATE_PCAS).toBeCalledTimes(1);
     expect(MOCK_GENERATE_PCAS).toBeCalledWith(
-      await CCA_SENDER_CERT.calculateSubjectPrivateAddress(),
+      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
     );
   });
@@ -629,8 +745,23 @@ describe('collectCargo', () => {
 
     expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledTimes(1);
     expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledWith(
-      expect.objectContaining({ id: CCA_ID }),
+      expect.objectContaining({ id: CCA.id }),
       MOCK_MONGOOSE_CONNECTION,
+    );
+  });
+
+  test('CCA fulfillment should be logged', async () => {
+    CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(MOCK_LOGS).toContainEqual(
+      partialPinoLog('info', 'CCA was fulfilled successfully', {
+        cargoesCollected: 0,
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+      }),
     );
   });
 
@@ -640,9 +771,13 @@ describe('collectCargo', () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     CALL.on('error', async (callError) => {
-      expect(MOCK_PINO.error).toBeCalledWith(
-        { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
-        'Failed to send cargo',
+      expect(MOCK_LOGS).toContainEqual(
+        partialPinoLog('error', 'Failed to send cargo', {
+          err: expect.objectContaining({ message: err.message }),
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'collectCargo',
+          peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+        }),
       );
 
       expect(callError).toEqual({
@@ -667,9 +802,13 @@ describe('collectCargo', () => {
 
     test('Error should be logged and end the call', async (cb) => {
       CALL.on('error', async () => {
-        expect(MOCK_PINO.error).toBeCalledWith(
-          { err, peerGatewayAddress: await CCA_SENDER_CERT.calculateSubjectPrivateAddress() },
-          'Failed to send cargo',
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('error', 'Failed to send cargo', {
+            err: expect.objectContaining({ message: err.message }),
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'collectCargo',
+            peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+          }),
         );
         cb();
       });
@@ -718,7 +857,7 @@ describe('collectCargo', () => {
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<CargoMessageSet> {
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    const { payload } = await cargo.unwrapPayload(CCA_SENDER_PRIVATE_KEY);
+    const { payload } = await cargo.unwrapPayload(PDA_CHAIN.privateGatewayPrivateKey);
     return payload;
   }
 });

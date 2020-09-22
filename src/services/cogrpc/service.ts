@@ -126,19 +126,25 @@ async function collectCargo(
 ): Promise<void> {
   const authorizationMetadata = call.metadata.get('Authorization');
 
-  // tslint:disable-next-line:no-let
-  let cca: CargoCollectionAuthorization;
-  try {
-    cca = await parseAndValidateCCAFromMetadata(authorizationMetadata);
-  } catch (error) {
+  const ccaOrError = await parseAndValidateCCAFromMetadata(authorizationMetadata);
+  if (ccaOrError instanceof Error) {
+    logger.info({ reason: ccaOrError.message }, 'Refusing malformed/invalid CCA');
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
-      message: error.message,
+      message: ccaOrError.message,
     });
     return;
   }
 
+  const cca = ccaOrError;
+  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const ccaAwareLogger = logger.child({ ccaSenderAddress: peerGatewayAddress });
+
   if (cca.recipientAddress !== ownCogrpcAddress) {
+    ccaAwareLogger.info(
+      { ccaRecipientAddress: cca.recipientAddress },
+      'Refusing CCA bound for another gateway',
+    );
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
       message: 'CCA recipient is a different gateway',
@@ -147,12 +153,16 @@ async function collectCargo(
   }
 
   if (await wasCCAFulfilled(cca, mongooseConnection)) {
+    ccaAwareLogger.info('Refusing CCA that was already fulfilled');
     call.emit('error', {
       code: grpc.status.PERMISSION_DENIED,
       message: 'CCA was already fulfilled',
     });
     return;
   }
+
+  // tslint:disable-next-line:no-let
+  let cargoesSent = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
@@ -166,10 +176,10 @@ async function collectCargo(
       // In the future we might use the ACKs to support back-pressure
       const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
       call.write(delivery);
+      cargoesSent += 1;
     }
   }
 
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
   const cargoMessageStream = await concatMessageStreams(
     generatePCAs(peerGatewayAddress, mongooseConnection),
     parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
@@ -177,7 +187,7 @@ async function collectCargo(
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
-    logger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
+    ccaAwareLogger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
     call.emit('error', {
       code: grpc.status.UNAVAILABLE,
       message: 'Internal server error; please try again later',
@@ -186,35 +196,39 @@ async function collectCargo(
   }
 
   await recordCCAFulfillment(cca, mongooseConnection);
+  ccaAwareLogger.info({ cargoesSent }, 'CCA was fulfilled successfully');
   call.end();
 }
 
+/**
+ * Parse and validate the CCA in `authorizationMetadata`, or return an error if validation fails.
+ *
+ * We're returning an error instead of throwing it to distinguish validation errors from bugs.
+ *
+ * @param authorizationMetadata
+ */
 async function parseAndValidateCCAFromMetadata(
   authorizationMetadata: readonly grpc.MetadataValue[],
-): Promise<CargoCollectionAuthorization> {
+): Promise<CargoCollectionAuthorization | Error> {
   if (authorizationMetadata.length !== 1) {
-    throw new Error('Authorization metadata should be specified exactly once');
+    return new Error('Authorization metadata should be specified exactly once');
   }
 
   const authorization = authorizationMetadata[0] as string;
   const [authorizationType, authorizationValue] = authorization.split(' ', 2);
   if (authorizationType !== 'Relaynet-CCA') {
-    throw new Error('Authorization type should be Relaynet-CCA');
+    return new Error('Authorization type should be Relaynet-CCA');
   }
   if (authorizationValue === undefined) {
-    throw new Error('Authorization value should be set to the CCA');
+    return new Error('Authorization value should be set to the CCA');
   }
 
   const ccaSerialized = Buffer.from(authorizationValue, 'base64');
-  // tslint:disable-next-line:no-let
-  let cca: CargoCollectionAuthorization;
   try {
-    cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
+    return await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
   } catch (_) {
-    throw new Error('CCA is malformed');
+    return new Error('CCA is malformed');
   }
-
-  return cca;
 }
 
 async function* concatMessageStreams(

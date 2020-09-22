@@ -5,8 +5,8 @@ import pino from 'pino';
 
 import { mockSpy } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 import { configureFastify, runFastify } from './fastifyUtils';
-import {MAX_RAMF_MESSAGE_SIZE} from "./constants";
 
 const mockFastify: FastifyInstance = {
   listen: mockSpy(jest.fn()),

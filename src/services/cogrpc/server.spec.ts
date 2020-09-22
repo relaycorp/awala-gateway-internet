@@ -3,9 +3,10 @@
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpc from 'grpc';
 import * as grpcHealthCheck from 'grpc-health-check';
+import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
-import { mockSpy } from '../../_test_utils';
+import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
 import { configureMockEnvVars } from '../_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { runServer } from './server';
@@ -112,6 +113,10 @@ describe('runServer', () => {
 
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
     expect(makeServiceImplementationSpy).toBeCalledWith({
+      baseLogger: expect.objectContaining<Partial<Logger>>({
+        debug: expect.anything(),
+        error: expect.anything(),
+      }),
       cogrpcAddress: BASE_ENV_VARS.COGRPC_ADDRESS,
       gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
@@ -189,5 +194,13 @@ describe('runServer', () => {
     expect(mockServer.start).toBeCalledTimes(1);
     expect(mockServer.start).toBeCalledWith();
     expect(mockServer.start).toHaveBeenCalledAfter(mockServer.bind as jest.Mock);
+  });
+
+  test('A log should be produced when the server is ready', async () => {
+    const mockLogging = makeMockLogging();
+
+    await runServer(mockLogging.logger);
+
+    expect(mockLogging.logs).toContainEqual(partialPinoLog('info', 'Ready to receive requests'));
   });
 });

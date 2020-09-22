@@ -2,6 +2,7 @@ import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
 import { KeyCertPair, Server, ServerCredentials } from 'grpc';
 import grpcHealthCheck from 'grpc-health-check';
+import pino, { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
@@ -16,7 +17,7 @@ const MAX_CONNECTION_AGE_MINUTES = 15;
 const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
 const MAX_CONNECTION_IDLE_SECONDS = 5;
 
-export async function runServer(): Promise<void> {
+export async function runServer(logger?: Logger): Promise<void> {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
   const cogrpcAddress = getEnvVar('COGRPC_ADDRESS').required().asString();
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
@@ -31,7 +32,10 @@ export async function runServer(): Promise<void> {
     'grpc.max_metadata_size': MAX_METADATA_SIZE,
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
+
+  const baseLogger = logger ?? pino();
   const serviceImplementation = await makeServiceImplementation({
+    baseLogger,
     cogrpcAddress,
     gatewayKeyIdBase64,
     natsClusterId,
@@ -56,6 +60,8 @@ export async function runServer(): Promise<void> {
     throw new Error(`Failed to listen on ${NETLOC}`);
   }
   server.start();
+
+  baseLogger.info('Ready to receive requests');
 }
 
 /**

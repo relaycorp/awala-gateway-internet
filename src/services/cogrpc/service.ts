@@ -162,7 +162,7 @@ async function collectCargo(
   }
 
   // tslint:disable-next-line:no-let
-  let cargoesSent = 0;
+  let cargoesCollected = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
@@ -176,7 +176,7 @@ async function collectCargo(
       // In the future we might use the ACKs to support back-pressure
       const delivery: CargoDelivery = { cargo: cargoSerialized, id: uuid() };
       call.write(delivery);
-      cargoesSent += 1;
+      cargoesCollected += 1;
     }
   }
 
@@ -196,7 +196,7 @@ async function collectCargo(
   }
 
   await recordCCAFulfillment(cca, mongooseConnection);
-  ccaAwareLogger.info({ cargoesSent }, 'CCA was fulfilled successfully');
+  ccaAwareLogger.info({ cargoesCollected }, 'CCA was fulfilled successfully');
   call.end();
 }
 

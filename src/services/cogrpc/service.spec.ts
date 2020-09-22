@@ -612,7 +612,7 @@ describe('collectCargo', () => {
     await validateCargoDelivery(CALL.input[0], [DUMMY_PARCEL_SERIALIZED]);
     expect(MOCK_LOGS).toContainEqual(
       partialPinoLog('info', 'CCA was fulfilled successfully', {
-        cargoesSent: 1,
+        cargoesCollected: 1,
       }),
     );
   });
@@ -687,7 +687,7 @@ describe('collectCargo', () => {
 
     expect(MOCK_LOGS).toContainEqual(
       partialPinoLog('info', 'CCA was fulfilled successfully', {
-        cargoesSent: 0,
+        cargoesCollected: 0,
         ccaSenderAddress: CCA_SENDER_ADDRESS,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',

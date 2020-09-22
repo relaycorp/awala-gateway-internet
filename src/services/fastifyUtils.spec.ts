@@ -48,7 +48,7 @@ describe('configureFastify', () => {
     configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', 'X-Request-Id');
+    expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', 'x-request-id');
   });
 
   test('Custom request id header can be set via REQUEST_ID_HEADER variable', () => {
@@ -58,7 +58,7 @@ describe('configureFastify', () => {
     configureFastify([dummyRoutes]);
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader);
+    expect(fastifyCallArgs[0]).toHaveProperty('requestIdHeader', requestIdHeader.toLowerCase());
   });
 
   test('Routes should be loaded', async () => {

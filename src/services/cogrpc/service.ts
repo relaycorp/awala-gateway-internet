@@ -138,7 +138,7 @@ async function collectCargo(
 
   const cca = ccaOrError;
   const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
-  const ccaAwareLogger = logger.child({ ccaSenderAddress: peerGatewayAddress });
+  const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
   if (cca.recipientAddress !== ownCogrpcAddress) {
     ccaAwareLogger.info(

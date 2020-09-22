@@ -518,9 +518,9 @@ describe('collectCargo', () => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA bound for another gateway', {
             ccaRecipientAddress: cca.recipientAddress,
-            ccaSenderAddress: CCA_SENDER_ADDRESS,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
+            peerGatewayAddress: CCA_SENDER_ADDRESS,
           }),
         );
         expect(error).toEqual({
@@ -541,9 +541,9 @@ describe('collectCargo', () => {
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
-            ccaSenderAddress: CCA_SENDER_ADDRESS,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
+            peerGatewayAddress: CCA_SENDER_ADDRESS,
           }),
         );
         expect(error).toEqual({
@@ -688,9 +688,9 @@ describe('collectCargo', () => {
     expect(MOCK_LOGS).toContainEqual(
       partialPinoLog('info', 'CCA was fulfilled successfully', {
         cargoesCollected: 0,
-        ccaSenderAddress: CCA_SENDER_ADDRESS,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
+        peerGatewayAddress: CCA_SENDER_ADDRESS,
       }),
     );
   });
@@ -703,10 +703,10 @@ describe('collectCargo', () => {
     CALL.on('error', async (callError) => {
       expect(MOCK_LOGS).toContainEqual(
         partialPinoLog('error', 'Failed to send cargo', {
-          ccaSenderAddress: CCA_SENDER_ADDRESS,
           err: expect.objectContaining({ message: err.message }),
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
+          peerGatewayAddress: CCA_SENDER_ADDRESS,
         }),
       );
 
@@ -734,10 +734,10 @@ describe('collectCargo', () => {
       CALL.on('error', async () => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('error', 'Failed to send cargo', {
-            ccaSenderAddress: CCA_SENDER_ADDRESS,
             err: expect.objectContaining({ message: err.message }),
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
+            peerGatewayAddress: CCA_SENDER_ADDRESS,
           }),
         );
         cb();

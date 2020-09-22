@@ -33,7 +33,7 @@ export function configureServices(servicesToLog?: readonly string[]): void {
     await tearDownServices();
 
     await startServices(BACKING_SERVICES);
-    await sleep(IS_GITHUB ? 3 : 1); // GitHub is painfully slow
+    await sleep(IS_GITHUB ? 5 : 1); // GitHub is painfully slow
     await bootstrapBackingServices();
 
     // Start the remaining services

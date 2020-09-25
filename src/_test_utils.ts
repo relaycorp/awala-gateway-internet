@@ -1,4 +1,5 @@
 import { Certificate } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
 import pino from 'pino';
 import split2 from 'split2';
@@ -16,6 +17,10 @@ export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promi
     values.push(item);
   }
   return values;
+}
+
+export function arrayBufferFrom(value: string): ArrayBuffer {
+  return bufferToArray(Buffer.from(value));
 }
 
 // tslint:disable-next-line:readonly-array

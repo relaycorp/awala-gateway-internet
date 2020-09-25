@@ -4,6 +4,7 @@ import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { configureFastify, FastifyLogger } from '../fastifyUtils';
+import parcelCollection from './parcelCollection';
 import parcelDelivery from './parcelDelivery';
 import preRegistrationRoutes from './preRegistration';
 import registrationRoutes from './registration';
@@ -22,7 +23,7 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  */
 export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstance> {
   const publicGatewayKeyPair = await retrieveKeyPair();
-  return configureFastify(
+  const fastify = await configureFastify(
     ROUTES,
     {
       publicGatewayCertificate: publicGatewayKeyPair.certificate,
@@ -30,6 +31,8 @@ export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstanc
     },
     logger,
   );
+  parcelCollection(fastify.server);
+  return fastify;
 }
 
 async function retrieveKeyPair(): Promise<UnboundKeyPair> {

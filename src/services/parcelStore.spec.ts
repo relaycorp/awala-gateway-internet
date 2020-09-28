@@ -7,8 +7,10 @@ import { Connection } from 'mongoose';
 import {
   arrayToAsyncIterable,
   asyncIterableToArray,
-  mockPino,
+  makeMockLogging,
+  MockLogging,
   mockSpy,
+  partialPinoLog,
   PdaChain,
   sha256Hex,
 } from '../_test_utils';
@@ -17,8 +19,6 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 import { configureMockEnvVars, generatePdaChain } from './_test_utils';
 import * as certs from './certs';
 import * as parcelCollection from './parcelCollection';
-
-const mockLogger = mockPino();
 import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
@@ -56,8 +56,15 @@ describe('retrieveActiveParcelsForGateway', () => {
   } as any;
   const store = new ParcelStore(mockObjectStoreClient, BUCKET);
 
+  let mockLogging: MockLogging;
+  beforeEach(() => {
+    mockLogging = makeMockLogging();
+  });
+
   test('Parcels should be limited to those for the specified gateway', async () => {
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS));
+    await asyncIterableToArray(
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
+    );
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(
       `parcels/gateway-bound/${PRIVATE_GATEWAY_ADDRESS}/`,
@@ -74,7 +81,9 @@ describe('retrieveActiveParcelsForGateway', () => {
     };
     setMockParcelObjectStore(objectsByKey);
 
-    await asyncIterableToArray(store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS));
+    await asyncIterableToArray(
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
+    );
     expect(mockListObjectKeys).toBeCalledTimes(1);
     expect(mockListObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
     expect(mockGetObject).toBeCalledTimes(1);
@@ -98,7 +107,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
     );
 
     expect(activeParcels).toEqual([
@@ -111,9 +120,10 @@ describe('retrieveActiveParcelsForGateway', () => {
     const parcelObjectKey = 'prefix/active.parcel';
     const deletedObjectKey = 'prefix/deleted.parcel';
     mockListObjectKeys.mockReturnValue(arrayToAsyncIterable([deletedObjectKey, parcelObjectKey]));
+    const error = new Error('That was deleted');
     mockGetObject.mockImplementation((objectKey) => {
       if (objectKey !== parcelObjectKey) {
-        throw new Error('That was deleted');
+        throw error;
       }
       return {
         body: PARCEL_SERIALIZED,
@@ -122,14 +132,19 @@ describe('retrieveActiveParcelsForGateway', () => {
     });
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
-    expect(mockLogger.warn).toBeCalledTimes(1);
-    expect(mockLogger.warn).toBeCalledWith(
-      { parcelObjectKey: deletedObjectKey },
-      'Parcel object could not be found; it could have been deleted since keys were retrieved',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog(
+        'info',
+        'Parcel object could not be found; it could have been deleted since keys were retrieved',
+        {
+          err: expect.objectContaining({ message: error.message }),
+          parcelObjectKey: deletedObjectKey,
+        },
+      ),
     );
   });
 
@@ -147,7 +162,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
   });
@@ -167,14 +182,14 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
-    expect(mockLogger.error).toBeCalledTimes(1);
-    expect(mockLogger.error).toBeCalledWith(
-      { parcelObjectKey: invalidParcelKey },
-      'Parcel object does not have a valid expiry timestamp metadata',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Parcel object does not have a valid expiry timestamp metadata', {
+        parcelObjectKey: invalidParcelKey,
+      }),
     );
   });
 
@@ -193,14 +208,14 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS),
+      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, mockLogging.logger),
     );
     expect(activeParcels).toEqual([{ expiryDate: expect.anything(), message: PARCEL_SERIALIZED }]);
 
-    expect(mockLogger.error).toBeCalledTimes(1);
-    expect(mockLogger.error).toBeCalledWith(
-      { parcelObjectKey: invalidParcelKey },
-      'Parcel object does not have a valid expiry timestamp metadata',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Parcel object does not have a valid expiry timestamp metadata', {
+        parcelObjectKey: invalidParcelKey,
+      }),
     );
   });
 

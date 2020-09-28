@@ -1,7 +1,7 @@
 import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { Connection } from 'mongoose';
-import pino from 'pino';
+import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
@@ -9,8 +9,6 @@ import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage
 import { convertDateToTimestamp, sha256Hex } from '../utils';
 import { retrieveOwnCertificates } from './certs';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
-
-const LOGGER = pino();
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
@@ -31,7 +29,10 @@ export class ParcelStore {
 
   constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
-  public async *retrieveActiveParcelsForGateway(gatewayAddress: string): CargoMessageStream {
+  public async *retrieveActiveParcelsForGateway(
+    gatewayAddress: string,
+    logger: Logger,
+  ): CargoMessageStream {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
     const objectKeys = this.objectStoreClient.listObjectKeys(prefix, this.bucket);
     for await (const parcelObjectKey of objectKeys) {
@@ -39,9 +40,9 @@ export class ParcelStore {
       let parcelObject: StoreObject;
       try {
         parcelObject = await this.objectStoreClient.getObject(parcelObjectKey, this.bucket);
-      } catch (error) {
-        LOGGER.warn(
-          { parcelObjectKey },
+      } catch (err) {
+        logger.info(
+          { err, parcelObjectKey },
           'Parcel object could not be found; it could have been deleted since keys were retrieved',
         );
         continue;
@@ -49,7 +50,7 @@ export class ParcelStore {
 
       const parcelExpiryDate = getDateFromTimestamp(parcelObject.metadata[EXPIRY_METADATA_KEY]);
       if (parcelExpiryDate === null) {
-        LOGGER.error(
+        logger.warn(
           { parcelObjectKey },
           'Parcel object does not have a valid expiry timestamp metadata',
         );

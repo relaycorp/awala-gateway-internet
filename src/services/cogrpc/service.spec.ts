@@ -19,6 +19,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
 import * as grpc from 'grpc';
 import mongoose from 'mongoose';
+import { symbols as PinoSymbols } from 'pino';
 
 import {
   arrayToAsyncIterable,
@@ -656,7 +657,14 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+      PEER_GATEWAY_ADDRESS,
+      expect.objectContaining({
+        [PinoSymbols.formattersSym]: {
+          bindings: {
+            peerGatewayAddress: PEER_GATEWAY_ADDRESS,
+          },
+        },
+      }),
     );
   });
 

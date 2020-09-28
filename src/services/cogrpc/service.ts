@@ -217,7 +217,7 @@ async function collectCargo(
 
   const cargoMessageStream = await concatMessageStreams(
     generatePCAs(peerGatewayAddress, mongooseConnection),
-    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
+    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
   );
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);

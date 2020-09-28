@@ -54,7 +54,14 @@ export function mockPino(): pino.Logger {
 }
 
 // tslint:disable-next-line:readonly-array
-export function makeMockLogging(): { readonly logger: pino.Logger; readonly logs: object[] } {
+export type MockLogSet = object[];
+
+export interface MockLogging {
+  readonly logger: pino.Logger;
+  readonly logs: MockLogSet;
+}
+
+export function makeMockLogging(): MockLogging {
   // tslint:disable-next-line:readonly-array
   const logs: object[] = [];
   const stream = split2((data) => {

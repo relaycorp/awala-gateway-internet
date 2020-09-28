@@ -31,7 +31,8 @@ export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstanc
     },
     logger,
   );
-  parcelCollection(fastify.server);
+  // TODO: Connect fastify.server
+  parcelCollection(fastify.log);
   return fastify;
 }
 

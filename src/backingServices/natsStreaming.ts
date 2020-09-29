@@ -79,6 +79,8 @@ export class NatsStreamingClient {
       }
     } finally {
       subscription.close();
+      // Do NOT "unsubscribe" -- Otherwise, the durable subscription would be lost
+      // https://docs.nats.io/developing-with-nats-streaming/durables
     }
   }
 

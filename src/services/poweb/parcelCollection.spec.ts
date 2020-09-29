@@ -13,7 +13,7 @@ import { IncomingMessage } from 'http';
 import { Connection } from 'mongoose';
 import { Socket } from 'net';
 import uuid from 'uuid-random';
-import WebSocket, { Data as WSData, Server as WSServer } from 'ws';
+import { Data as WSData, Server as WSServer } from 'ws';
 
 import {
   arrayBufferFrom,
@@ -233,16 +233,12 @@ interface WebSocketCloseMessage {
 }
 
 // tslint:disable-next-line:max-classes-per-file
-class MockWebSocketConnection extends WebSocket {
+class MockWebSocketConnection extends EventEmitter {
   // tslint:disable-next-line:readonly-keyword
   public serverCloseFrame: WebSocketCloseMessage | null = null;
   // tslint:disable-next-line:readonly-array
   public readonly incomingMessages: WSData[] = [];
   public readonly serverEvents = new EventEmitter();
-
-  constructor() {
-    super('ws://test.local', null as any);
-  }
 
   public send(data: any, _cb?: any): void {
     this.incomingMessages.push(data);

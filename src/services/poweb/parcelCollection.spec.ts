@@ -1,4 +1,5 @@
 // tslint:disable:no-let
+
 import {
   CMSError,
   HandshakeChallenge,
@@ -63,7 +64,7 @@ describe('Logging', () => {
 });
 
 test('Requests with Origin header should be refused', async () => {
-  const client = new MockWebSocketClient(MOCK_WS_SERVER, 'https://invalid.local');
+  const client = new MockWebSocketClient(MOCK_WS_SERVER, 'on', 'https://invalid.local');
 
   await client.connect();
 
@@ -169,14 +170,10 @@ describe('Handshake', () => {
   });
 
   test('Handshake should fail if response contains at least one invalid certificate', async () => {
-    const client = new MockWebSocketClient(MOCK_WS_SERVER);
-    await client.connect();
-    const challenge = HandshakeChallenge.deserialize(client.receive() as ArrayBuffer);
-    const validSignature = await NONCE_SIGNER.sign(challenge.nonce);
-    const invalidResponse = new HandshakeResponse([validSignature]);
     MOCK_RETRIEVE_OWN_CERTIFICATES.mockResolvedValue([]);
+    const client = new MockWebSocketClient(MOCK_WS_SERVER);
 
-    await client.send(invalidResponse.serialize());
+    await completeHandshake(client);
 
     const closeFrame = await client.waitForClose();
     expect(closeFrame).toEqual({
@@ -192,17 +189,20 @@ describe('Handshake', () => {
 
   test('Handshake should complete successfully if all signatures are valid', async () => {
     const client = new MockWebSocketClient(MOCK_WS_SERVER);
-    await client.connect();
-    const challenge = HandshakeChallenge.deserialize(client.receive() as ArrayBuffer);
-    const response = new HandshakeResponse([await NONCE_SIGNER.sign(challenge.nonce)]);
 
-    await client.send(response.serialize());
+    await completeHandshake(client);
 
     await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
   });
 });
 
-test.todo('Server should close if there is not Keep-Alive and no parcel to receive');
+test('Server should close connection if Keep-Alive is off and there are no parcels', async () => {
+  const client = new MockWebSocketClient(MOCK_WS_SERVER, 'off');
+  await completeHandshake(client);
+
+  await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+  expect(client.receive()).toBeUndefined();
+});
 
 test.todo('Server should keep connection if Keep-Alive is on');
 
@@ -217,6 +217,15 @@ test.todo('Server should tell the client that it cannot accept binary acks');
 test.todo('Server should handle gracefully client closes with normal');
 
 test.todo('Server should handle gracefully client closes with another reason besides normal');
+
+async function completeHandshake(client: MockWebSocketClient): Promise<void> {
+  await client.connect();
+
+  const challenge = HandshakeChallenge.deserialize(client.receive() as ArrayBuffer);
+  const response = new HandshakeResponse([await NONCE_SIGNER.sign(challenge.nonce)]);
+
+  await client.send(response.serialize());
+}
 
 interface WebSocketCloseMessage {
   readonly code?: number;
@@ -251,7 +260,11 @@ class MockWebSocketClient extends EventEmitter {
   private readonly wsConnection: MockWebSocketConnection;
   private readonly socket: Socket;
 
-  constructor(private wsServer: WSServer, private origin?: string) {
+  constructor(
+    private wsServer: WSServer,
+    private keepAlive: string = 'on',
+    private origin?: string,
+  ) {
     super();
 
     this.socket = new Socket();
@@ -266,7 +279,11 @@ class MockWebSocketClient extends EventEmitter {
   public async connect(): Promise<void> {
     const incomingMessage = new IncomingMessage(this.socket);
     // tslint:disable-next-line:no-object-mutation
-    incomingMessage.headers.origin = this.origin;
+    incomingMessage.headers = {
+      ...incomingMessage.headers,
+      origin: this.origin,
+      'x-relaynet-keep-alive': this.keepAlive,
+    };
     return new Promise((resolve) => {
       this.wsServer.once('connection', resolve);
       this.wsServer.emit('connection', this.wsConnection, incomingMessage);

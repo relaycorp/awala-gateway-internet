@@ -102,3 +102,17 @@ export function sha256Hex(plaintext: string): string {
 export function sha256(plaintext: BinaryLike): Buffer {
   return makeSHA256Hash(plaintext).digest();
 }
+
+export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => AsyncIterable<T> {
+  return async function* (iterable: AsyncIterable<T>): AsyncIterable<T> {
+    // tslint:disable-next-line:no-let
+    let count = 0;
+    for await (const item of iterable) {
+      if (max <= count) {
+        break;
+      }
+      yield item;
+      count++;
+    }
+  };
+}

@@ -2,9 +2,10 @@
 
 import AbortController from 'abort-controller';
 import { EventEmitter } from 'events';
+import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
 
-import { arrayToAsyncIterable, asyncIterableToArray } from '../_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../_test_utils';
 import { configureMockEnvVars } from '../services/_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
@@ -343,7 +344,7 @@ describe('NatsStreamingClient', () => {
         ['setManualAckMode', [true]],
         ['setAckWait', [5_000]],
         ['setMaxInFlight', [1]],
-      ] as ReadonlyArray<readonly [keyof SubscriptionOptions, readonly any[]]>)(
+      ] as ReadonlyArray<readonly [keyof typeof mockSubscriptionOptions, readonly any[]]>)(
         'Option %s should be %s',
         async (optKey, optArgs) => {
           const consumer = stubClient.makeQueueConsumer(
@@ -391,22 +392,22 @@ describe('NatsStreamingClient', () => {
       );
       const stubMessage1 = { number: 1 };
       const stubMessage2 = { number: 2 };
-      setImmediate(() => {
-        mockConnection.emit('connect');
-      });
+      fakeConnection();
       setImmediate(() => {
         mockSubscription.emit('message', stubMessage1);
         mockSubscription.emit('message', stubMessage2);
       });
 
-      let messagesCount = 0;
-      for await (const _ of consumer) {
-        messagesCount += 1;
-        expect(messagesCount).toEqual(1);
+      const outputMessages = pipe(consumer, async function* (
+        messages: AsyncIterable<Message>,
+      ): AsyncIterable<Message> {
+        for await (const message of messages) {
+          yield message;
+          controller.abort(); // Do NOT use `break` instead: We want to test the signal
+        }
+      });
 
-        controller.abort();
-      }
-
+      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockSubscription.close).toBeCalledTimes(1);
     });
 
@@ -414,19 +415,15 @@ describe('NatsStreamingClient', () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const stubMessage1 = { number: 1 };
       const stubMessage2 = { number: 2 };
-      setImmediate(() => {
-        mockConnection.emit('connect');
-      });
+      fakeConnection();
       setImmediate(() => {
         mockSubscription.emit('message', stubMessage1);
         mockSubscription.emit('message', stubMessage2);
       });
 
-      for await (const message of consumer) {
-        expect(message).toBe(stubMessage1);
-        break;
-      }
+      const outputMessages = pipe(consumer, iterableTake(1));
 
+      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockSubscription.close).toBeCalledTimes(1);
     });
 
@@ -455,7 +452,7 @@ describe('NatsStreamingClient', () => {
     }
 
     function fakeConnection(): void {
-      mockConnection.emit('connect');
+      setImmediate(() => mockConnection.emit('connect'));
     }
   });
 

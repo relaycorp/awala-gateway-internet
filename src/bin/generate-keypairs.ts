@@ -1,6 +1,6 @@
 // tslint:disable:no-console
 
-// tslint:disable-next-line:no-var-requires no-console
+// tslint:disable-next-line:no-var-requires
 require('make-promises-safe');
 
 import {

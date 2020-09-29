@@ -1,3 +1,4 @@
+import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
 import { connect, Message, Stan } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
@@ -52,6 +53,7 @@ export class NatsStreamingClient {
     channel: string,
     queue: string,
     durableName: string,
+    abortSignal?: AbortSignal,
   ): AsyncIterable<Message> {
     const connection = await this.connect();
     const subscriptionOptions = connection
@@ -61,28 +63,22 @@ export class NatsStreamingClient {
       .setManualAckMode(true)
       .setAckWait(5_000)
       .setMaxInFlight(1);
-    const sourceStream = new PassThrough({ objectMode: true });
+    const messagesStream = new PassThrough({ objectMode: true });
 
-    function gracefullyEndWorker(): void {
-      sourceStream.destroy();
-      process.exit(0);
-    }
-    process.on('SIGINT', gracefullyEndWorker);
-    process.on('SIGTERM', gracefullyEndWorker);
+    const subscription = connection.subscribe(channel, queue, subscriptionOptions);
+    subscription.on('error', (error) => messagesStream.destroy(error));
+    subscription.on('message', (msg) => messagesStream.write(msg));
 
-    // tslint:disable-next-line:no-let
-    let subscription;
+    const messagesIterable = streamToIt.source(messagesStream);
+    const messages = abortSignal
+      ? makeSourceAbortable(messagesIterable, abortSignal, { returnOnAbort: true })
+      : messagesIterable;
     try {
-      subscription = connection.subscribe(channel, queue, subscriptionOptions);
-      subscription.on('error', (error) => sourceStream.destroy(error));
-      subscription.on('message', (msg) => sourceStream.write(msg));
-      for await (const msg of streamToIt.source(sourceStream)) {
+      for await (const msg of messages) {
         yield msg;
       }
     } finally {
-      subscription?.close();
-      process.removeListener('SIGINT', gracefullyEndWorker);
-      process.removeListener('SIGTERM', gracefullyEndWorker);
+      subscription.close();
     }
   }
 

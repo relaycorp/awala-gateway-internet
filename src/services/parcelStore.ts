@@ -1,9 +1,11 @@
 import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
+import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
+import { Message } from 'node-nats-streaming';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
 import { convertDateToTimestamp, sha256Hex } from '../utils';
@@ -20,6 +22,21 @@ export interface QueuedInternetBoundParcelMessage {
   readonly parcelExpiryDate: Date;
 }
 
+export interface ParcelObjectMetadata<Extra> {
+  readonly key: string;
+  readonly extra: Extra;
+}
+
+export interface ParcelObject<Extra> extends ParcelObjectMetadata<Extra> {
+  readonly body: Buffer;
+  readonly expiryDate: Date;
+}
+
+export interface ActiveParcelStream {
+  readonly ack: () => Promise<void>;
+  readonly parcelSerialized: Buffer;
+}
+
 export class ParcelStore {
   public static initFromEnv(): ParcelStore {
     const objectStoreClient = ObjectStoreClient.initFromEnv();
@@ -29,37 +46,54 @@ export class ParcelStore {
 
   constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
+  public async *streamActiveParcelsForGateway(
+    peerGatewayAddress: string,
+    natsStreamingClient: NatsStreamingClient,
+    abortSignal: AbortSignal,
+    logger: Logger,
+  ): AsyncIterable<ActiveParcelStream> {
+    const parcelMessages = natsStreamingClient.makeQueueConsumer(
+      calculatePeerGatewayNATSChannel(peerGatewayAddress),
+      'active-parcels',
+      peerGatewayAddress,
+      abortSignal,
+    );
+
+    const objectStoreClient = this.objectStoreClient;
+    const bucket = this.bucket;
+    async function* buildStream(
+      parcelObjects: AsyncIterable<ParcelObject<Message>>,
+    ): AsyncIterable<ActiveParcelStream> {
+      for await (const parcelObject of parcelObjects) {
+        yield {
+          async ack(): Promise<void> {
+            parcelObject.extra.ack();
+            await objectStoreClient.deleteObject(parcelObject.key, bucket);
+          },
+          parcelSerialized: parcelObject.body,
+        };
+      }
+    }
+
+    yield* await pipe(
+      parcelMessages,
+      buildParcelObjectMetadataFromNATSMessage,
+      this.makeActiveParcelRetriever(logger),
+      buildStream,
+    );
+  }
+
   public async *retrieveActiveParcelsForGateway(
-    gatewayAddress: string,
+    peerGatewayAddress: string,
     logger: Logger,
   ): CargoMessageStream {
-    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${gatewayAddress}/`;
-    const objectKeys = this.objectStoreClient.listObjectKeys(prefix, this.bucket);
-    for await (const parcelObjectKey of objectKeys) {
-      // tslint:disable-next-line:no-let
-      let parcelObject: StoreObject;
-      try {
-        parcelObject = await this.objectStoreClient.getObject(parcelObjectKey, this.bucket);
-      } catch (err) {
-        logger.info(
-          { err, parcelObjectKey },
-          'Parcel object could not be found; it could have been deleted since keys were retrieved',
-        );
-        continue;
-      }
-
-      const parcelExpiryDate = getDateFromTimestamp(parcelObject.metadata[EXPIRY_METADATA_KEY]);
-      if (parcelExpiryDate === null) {
-        logger.warn(
-          { parcelObjectKey },
-          'Parcel object does not have a valid expiry timestamp metadata',
-        );
-        continue;
-      } else if (parcelExpiryDate <= new Date()) {
-        continue;
-      }
-      yield { expiryDate: parcelExpiryDate, message: parcelObject.body };
-    }
+    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${peerGatewayAddress}/`;
+    yield* await pipe(
+      this.objectStoreClient.listObjectKeys(prefix, this.bucket),
+      buildParcelObjectMetadataFromString,
+      this.makeActiveParcelRetriever(logger),
+      convertParcelsToCargoMessageStream,
+    );
   }
 
   public async storeParcelFromPeerGateway(
@@ -106,7 +140,7 @@ export class ParcelStore {
 
     const recipientGatewayCert = certificationPath[certificationPath.length - 2];
     const privateGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
-    const key = calculatedGatewayBoundParcelObjectKey(
+    const key = calculateGatewayBoundParcelObjectKey(
       parcel.id,
       await parcel.senderCertificate.calculateSubjectPrivateAddress(),
       parcel.recipientAddress,
@@ -122,7 +156,10 @@ export class ParcelStore {
       this.bucket,
     );
 
-    await natsStreamingClient.publishMessage(key, `pdc-parcel.${privateGatewayAddress}`);
+    await natsStreamingClient.publishMessage(
+      key,
+      calculatePeerGatewayNATSChannel(privateGatewayAddress),
+    );
 
     return key;
   }
@@ -141,7 +178,7 @@ export class ParcelStore {
     recipientAddress: string,
     recipientGatewayAddress: string,
   ): Promise<void> {
-    const parcelKey = calculatedGatewayBoundParcelObjectKey(
+    const parcelKey = calculateGatewayBoundParcelObjectKey(
       parcelId,
       senderPrivateAddress,
       recipientAddress,
@@ -209,6 +246,91 @@ export class ParcelStore {
       this.bucket,
     );
   }
+
+  public makeActiveParcelRetriever<E>(
+    logger: Logger,
+  ): (
+    parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
+  ) => AsyncIterable<ParcelObject<E>> {
+    const objectStoreClient = this.objectStoreClient;
+    const bucket = this.bucket;
+
+    async function* retrieveObjects(
+      parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
+    ): AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }> {
+      for await (const parcelObjectMetadata of parcelObjectsMetadata) {
+        // tslint:disable-next-line:no-let
+        let parcelObject: StoreObject;
+        try {
+          parcelObject = await objectStoreClient.getObject(parcelObjectMetadata.key, bucket);
+        } catch (err) {
+          logger.info(
+            { err, parcelObjectKey: parcelObjectMetadata.key },
+            'Parcel object could not be found; it could have been deleted since keys were retrieved',
+          );
+          continue;
+        }
+
+        yield { ...parcelObjectMetadata, object: parcelObject };
+      }
+    }
+
+    async function* filterActiveParcels(
+      objects: AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }>,
+    ): AsyncIterable<ParcelObject<E>> {
+      for await (const parcelObject of objects) {
+        const parcelExpiryDate = getDateFromTimestamp(
+          parcelObject.object.metadata[EXPIRY_METADATA_KEY],
+        );
+        if (parcelExpiryDate === null) {
+          logger.warn(
+            { parcelObjectKey: parcelObject.key },
+            'Parcel object does not have a valid expiry timestamp',
+          );
+          continue;
+        } else if (parcelExpiryDate <= new Date()) {
+          logger.info(
+            { parcelObjectKey: parcelObject.key, parcelExpiryDate },
+            'Ignoring expired parcel',
+          );
+          continue;
+        }
+        yield {
+          body: parcelObject.object.body,
+          expiryDate: parcelExpiryDate,
+          extra: parcelObject.extra,
+          key: parcelObject.key,
+        };
+      }
+    }
+
+    return (parcelObjectsMetadata) =>
+      pipe(parcelObjectsMetadata, retrieveObjects, filterActiveParcels);
+  }
+}
+
+async function* buildParcelObjectMetadataFromNATSMessage(
+  messages: AsyncIterable<Message>,
+): AsyncIterable<ParcelObjectMetadata<Message>> {
+  for await (const message of messages) {
+    yield { key: message.getRawData().toString(), extra: message };
+  }
+}
+
+async function* buildParcelObjectMetadataFromString(
+  objectKeys: AsyncIterable<string>,
+): AsyncIterable<ParcelObjectMetadata<null>> {
+  for await (const key of objectKeys) {
+    yield { key, extra: null };
+  }
+}
+
+async function* convertParcelsToCargoMessageStream(
+  parcelObjects: AsyncIterable<ParcelObject<any>>,
+): CargoMessageStream {
+  for await (const parcelObject of parcelObjects) {
+    yield { expiryDate: parcelObject.expiryDate, message: parcelObject.body };
+  }
 }
 
 function getDateFromTimestamp(timestampString: string): Date | null {
@@ -225,7 +347,11 @@ function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-function calculatedGatewayBoundParcelObjectKey(
+function calculatePeerGatewayNATSChannel(peerGatewayAddress: string): string {
+  return `pdc-parcel.${peerGatewayAddress}`;
+}
+
+function calculateGatewayBoundParcelObjectKey(
   parcelId: string,
   senderPrivateAddress: string,
   recipientAddress: string,

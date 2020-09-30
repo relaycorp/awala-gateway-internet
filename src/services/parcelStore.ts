@@ -64,13 +64,15 @@ export class ParcelStore {
     async function* buildStream(
       parcelObjects: AsyncIterable<ParcelObject<Message>>,
     ): AsyncIterable<ActiveParcelStream> {
-      for await (const parcelObject of parcelObjects) {
+      for await (const { extra: natsMessage, key, body } of parcelObjects) {
         yield {
           async ack(): Promise<void> {
-            parcelObject.extra.ack();
-            await objectStoreClient.deleteObject(parcelObject.key, bucket);
+            // Make sure not to keep a reference to the parcel serialization to let the garbage
+            // collector do its magic.
+            natsMessage.ack();
+            await objectStoreClient.deleteObject(key, bucket);
           },
-          parcelSerialized: parcelObject.body,
+          parcelSerialized: body,
         };
       }
     }

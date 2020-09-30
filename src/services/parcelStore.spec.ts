@@ -58,16 +58,11 @@ const MOCK_NATS_CLIENT: natsStreaming.NatsStreamingClient = {
 
 const MOCK_MONGOOSE_CONNECTION: Connection = mockSpy(jest.fn()) as any;
 
-// TODO: RENAME
-const mockGetObject = mockSpy(jest.fn());
-const mockListObjectKeys = mockSpy(jest.fn(), () => arrayToAsyncIterable([]));
-const mockDeleteObject = mockSpy(jest.fn(), async () => null);
-const mockPutObject = mockSpy(jest.fn());
 const mockObjectStoreClient: ObjectStoreClient = {
-  deleteObject: mockDeleteObject,
-  getObject: mockGetObject,
-  listObjectKeys: mockListObjectKeys,
-  putObject: mockPutObject,
+  deleteObject: mockSpy(jest.fn(), async () => null),
+  getObject: mockSpy(jest.fn()),
+  listObjectKeys: mockSpy(jest.fn(), () => arrayToAsyncIterable([])),
+  putObject: mockSpy(jest.fn()),
 } as any;
 
 let MOCK_LOGGING: MockLogging;
@@ -212,8 +207,8 @@ describe('retrieveActiveParcelsForGateway', () => {
     await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
     );
-    expect(mockListObjectKeys).toBeCalledTimes(1);
-    expect(mockListObjectKeys).toBeCalledWith(
+    expect(mockObjectStoreClient.listObjectKeys).toBeCalledTimes(1);
+    expect(mockObjectStoreClient.listObjectKeys).toBeCalledWith(
       `parcels/gateway-bound/${PRIVATE_GATEWAY_ADDRESS}/`,
       expect.anything(),
     );
@@ -231,10 +226,10 @@ describe('retrieveActiveParcelsForGateway', () => {
     await asyncIterableToArray(
       store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
     );
-    expect(mockListObjectKeys).toBeCalledTimes(1);
-    expect(mockListObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
-    expect(mockGetObject).toBeCalledTimes(1);
-    expect(mockGetObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.listObjectKeys).toBeCalledTimes(1);
+    expect(mockObjectStoreClient.listObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.getObject).toBeCalledTimes(1);
+    expect(mockObjectStoreClient.getObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Active parcels should be output', async () => {
@@ -278,9 +273,12 @@ describe('retrieveActiveParcelsForGateway', () => {
   });
 
   function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
-    mockListObjectKeys.mockReturnValue(arrayToAsyncIterable(Object.keys(objectsByKey)));
-
-    mockGetObject.mockImplementation((objectKey) => objectsByKey[objectKey]);
+    getMockInstance(mockObjectStoreClient.listObjectKeys).mockReturnValue(
+      arrayToAsyncIterable(Object.keys(objectsByKey)),
+    );
+    getMockInstance(mockObjectStoreClient.getObject).mockImplementation(
+      (objectKey) => objectsByKey[objectKey],
+    );
   }
 });
 
@@ -368,7 +366,7 @@ describe('storeGatewayBoundParcel', () => {
         MOCK_NATS_CLIENT,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(mockPutObject).not.toBeCalled();
+    expect(mockObjectStoreClient.putObject).not.toBeCalled();
   });
 
   test('Parcel object key should be output', async () => {
@@ -398,7 +396,11 @@ describe('storeGatewayBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      BUCKET,
+    );
   });
 
   test('Parcel expiry date should be stored as object metadata', async () => {
@@ -409,7 +411,7 @@ describe('storeGatewayBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
       expect.objectContaining({
         metadata: { ['parcel-expiry']: getTimestamp(PARCEL.expiryDate).toString() },
       }),
@@ -426,7 +428,7 @@ describe('storeGatewayBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
       expect.objectContaining({ body: PARCEL_SERIALIZED }),
       expect.anything(),
       expect.anything(),
@@ -441,7 +443,11 @@ describe('storeGatewayBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(expect.anything(), key, expect.anything());
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+      expect.anything(),
+      key,
+      expect.anything(),
+    );
   });
 
   test('Parcel object key should be published to right NATS Streaming channel', async () => {
@@ -466,7 +472,7 @@ describe('deleteGatewayBoundParcel', () => {
   test('Object should be deleted from the right bucket', async () => {
     await store.deleteGatewayBoundParcel('', '', '', '');
 
-    expect(mockDeleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
@@ -481,7 +487,7 @@ describe('deleteGatewayBoundParcel', () => {
       recipientGatewayAddress,
     );
 
-    expect(mockDeleteObject).toBeCalledWith(
+    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
       [
         'parcels/gateway-bound',
         recipientGatewayAddress,
@@ -504,14 +510,17 @@ describe('retrieveEndpointBoundParcel', () => {
   test('Object should be retrieved from the right bucket', async () => {
     await store.retrieveEndpointBoundParcel('');
 
-    expect(mockGetObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.getObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Lookup object key should be prefixed', async () => {
     const key = 'thingy.parcel';
     await store.retrieveEndpointBoundParcel(key);
 
-    expect(mockGetObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
+    expect(mockObjectStoreClient.getObject).toBeCalledWith(
+      `parcels/endpoint-bound/${key}`,
+      expect.anything(),
+    );
   });
 
   test('Parcel should be returned', async () => {
@@ -553,7 +562,7 @@ describe('storeEndpointBoundParcel', () => {
         MOCK_NATS_CLIENT,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(mockPutObject).not.toBeCalled();
+    expect(mockObjectStoreClient.putObject).not.toBeCalled();
   });
 
   test('Parcel should be ignored if it was already processed', async () => {
@@ -569,7 +578,7 @@ describe('storeEndpointBoundParcel', () => {
       ),
     ).resolves.toBeNull();
 
-    expect(mockPutObject).not.toBeCalled();
+    expect(mockObjectStoreClient.putObject).not.toBeCalled();
     expect(mockWasParcelCollected).toBeCalledWith(
       PARCEL,
       PRIVATE_GATEWAY_ADDRESS,
@@ -618,7 +627,11 @@ describe('storeEndpointBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(expect.anything(), expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      BUCKET,
+    );
   });
 
   test('Parcel should be stored with generated object key', async () => {
@@ -630,7 +643,7 @@ describe('storeEndpointBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
       expect.anything(),
       `parcels/endpoint-bound/${key}`,
       expect.anything(),
@@ -646,7 +659,7 @@ describe('storeEndpointBoundParcel', () => {
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockPutObject).toBeCalledWith(
+    expect(mockObjectStoreClient.putObject).toBeCalledWith(
       expect.objectContaining({ body: PARCEL_SERIALIZED }),
       expect.anything(),
       expect.anything(),
@@ -680,14 +693,17 @@ describe('deleteEndpointBoundParcel', () => {
   test('Object should be deleted from the right bucket', async () => {
     await store.deleteEndpointBoundParcel('');
 
-    expect(mockDeleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
     const key = 'thingy.parcel';
     await store.deleteEndpointBoundParcel(key);
 
-    expect(mockDeleteObject).toBeCalledWith(`parcels/endpoint-bound/${key}`, expect.anything());
+    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
+      `parcels/endpoint-bound/${key}`,
+      expect.anything(),
+    );
   });
 });
 
@@ -827,7 +843,7 @@ describe('makeActiveParcelRetriever', () => {
       key: 'prefix/deleted.parcel',
     };
     const error = new Error('That was deleted');
-    mockGetObject.mockRejectedValue(error);
+    getMockInstance(mockObjectStoreClient.getObject).mockRejectedValue(error);
 
     await expect(
       pipe(
@@ -850,9 +866,13 @@ describe('makeActiveParcelRetriever', () => {
   });
 
   function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
-    mockListObjectKeys.mockReturnValue(arrayToAsyncIterable(Object.keys(objectsByKey)));
+    getMockInstance(mockObjectStoreClient.listObjectKeys).mockReturnValue(
+      arrayToAsyncIterable(Object.keys(objectsByKey)),
+    );
 
-    mockGetObject.mockImplementation((objectKey) => objectsByKey[objectKey]);
+    getMockInstance(mockObjectStoreClient.getObject).mockImplementation(
+      (objectKey) => objectsByKey[objectKey],
+    );
   }
 });
 

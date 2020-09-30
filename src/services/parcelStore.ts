@@ -1,4 +1,4 @@
-import { CargoMessageStream, Parcel } from '@relaycorp/relaynet-core';
+import { Parcel } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
@@ -32,8 +32,8 @@ export interface ParcelObject<Extra> extends ParcelObjectMetadata<Extra> {
   readonly expiryDate: Date;
 }
 
-export interface ActiveParcelStream {
-  readonly ack: () => Promise<void>;
+export interface ParcelStreamMessage {
+  readonly deleteParcel: () => Promise<void>;
   readonly parcelSerialized: Buffer;
 }
 
@@ -46,12 +46,22 @@ export class ParcelStore {
 
   constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
-  public async *streamActiveParcelsForGateway(
+  /**
+   * Output existing and new parcels for `peerGatewayAddress` until `abortSignal` is triggered.
+   *
+   * @param peerGatewayAddress
+   * @param natsStreamingClient
+   * @param abortSignal
+   * @param logger
+   */
+  public async *liveStreamActiveParcelsForGateway(
     peerGatewayAddress: string,
     natsStreamingClient: NatsStreamingClient,
     abortSignal: AbortSignal,
     logger: Logger,
-  ): AsyncIterable<ActiveParcelStream> {
+  ): AsyncIterable<ParcelStreamMessage> {
+    const peerAwareLogger = logger.child({ peerGatewayAddress });
+
     const parcelMessages = natsStreamingClient.makeQueueConsumer(
       calculatePeerGatewayNATSChannel(peerGatewayAddress),
       'active-parcels',
@@ -61,14 +71,16 @@ export class ParcelStore {
 
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
+
     async function* buildStream(
       parcelObjects: AsyncIterable<ParcelObject<Message>>,
-    ): AsyncIterable<ActiveParcelStream> {
+    ): AsyncIterable<ParcelStreamMessage> {
       for await (const { extra: natsMessage, key, body } of parcelObjects) {
         yield {
-          async ack(): Promise<void> {
+          async deleteParcel(): Promise<void> {
             // Make sure not to keep a reference to the parcel serialization to let the garbage
             // collector do its magic.
+            peerAwareLogger.info({ parcelObjectKey: key }, 'Deleting live streamed parcel');
             natsMessage.ack();
             await objectStoreClient.deleteObject(key, bucket);
           },
@@ -80,21 +92,65 @@ export class ParcelStore {
     yield* await pipe(
       parcelMessages,
       buildParcelObjectMetadataFromNATSMessage,
-      this.makeActiveParcelRetriever(logger),
+      this.makeActiveParcelRetriever(peerAwareLogger),
       buildStream,
     );
   }
 
+  /**
+   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * the lifespan of the function call, and giving the option to delete the parcel from each item
+   * in the result.
+   *
+   * @param peerGatewayAddress
+   * @param logger
+   */
+  public async *streamActiveParcelsForGateway(
+    peerGatewayAddress: string,
+    logger: Logger,
+  ): AsyncIterable<ParcelStreamMessage> {
+    const peerAwareLogger = logger.child({ peerGatewayAddress });
+
+    const objectStoreClient = this.objectStoreClient;
+    const bucket = this.bucket;
+    async function* buildStream(
+      parcelObjects: AsyncIterable<ParcelObject<Message>>,
+    ): AsyncIterable<ParcelStreamMessage> {
+      for await (const { key, body } of parcelObjects) {
+        yield {
+          async deleteParcel(): Promise<void> {
+            // Make sure not to keep a reference to the parcel serialization to let the garbage
+            // collector do its magic.
+            peerAwareLogger.info({ parcelObjectKey: key }, 'Deleting streamed parcel');
+            await objectStoreClient.deleteObject(key, bucket);
+          },
+          parcelSerialized: body,
+        };
+      }
+    }
+
+    yield* await pipe(
+      this.retrieveActiveParcelsForGateway(peerGatewayAddress, logger),
+      buildStream,
+    );
+  }
+
+  /**
+   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * the lifespan of the function call.
+   *
+   * @param peerGatewayAddress
+   * @param logger
+   */
   public async *retrieveActiveParcelsForGateway(
     peerGatewayAddress: string,
     logger: Logger,
-  ): CargoMessageStream {
+  ): AsyncIterable<ParcelObject<null>> {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${peerGatewayAddress}/`;
     yield* await pipe(
       this.objectStoreClient.listObjectKeys(prefix, this.bucket),
       buildParcelObjectMetadataFromString,
       this.makeActiveParcelRetriever(logger),
-      convertParcelsToCargoMessageStream,
     );
   }
 
@@ -324,14 +380,6 @@ async function* buildParcelObjectMetadataFromString(
 ): AsyncIterable<ParcelObjectMetadata<null>> {
   for await (const key of objectKeys) {
     yield { key, extra: null };
-  }
-}
-
-async function* convertParcelsToCargoMessageStream(
-  parcelObjects: AsyncIterable<ParcelObject<any>>,
-): CargoMessageStream {
-  for await (const parcelObject of parcelObjects) {
-    yield { expiryDate: parcelObject.expiryDate, message: parcelObject.body };
   }
 }
 

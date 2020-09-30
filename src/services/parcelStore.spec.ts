@@ -91,7 +91,7 @@ describe('streamActiveParcelsForGateway', () => {
     setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
     const activeParcels = pipe(
-      STORE.streamActiveParcelsForGateway(
+      STORE.liveStreamActiveParcelsForGateway(
         PRIVATE_GATEWAY_ADDRESS,
         MOCK_NATS_CLIENT,
         abortController.signal,
@@ -101,7 +101,7 @@ describe('streamActiveParcelsForGateway', () => {
     );
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
-      { ack: expect.any(Function), parcelSerialized: PARCEL_SERIALIZED },
+      { deleteParcel: expect.any(Function), parcelSerialized: PARCEL_SERIALIZED },
     ]);
   });
 
@@ -115,7 +115,7 @@ describe('streamActiveParcelsForGateway', () => {
     );
 
     const activeParcels = pipe(
-      STORE.streamActiveParcelsForGateway(
+      STORE.liveStreamActiveParcelsForGateway(
         PRIVATE_GATEWAY_ADDRESS,
         MOCK_NATS_CLIENT,
         abortController.signal,
@@ -131,7 +131,7 @@ describe('streamActiveParcelsForGateway', () => {
     getMockInstance(MOCK_NATS_CLIENT.makeQueueConsumer).mockReturnValue(arrayToAsyncIterable([]));
 
     await asyncIterableToArray(
-      STORE.streamActiveParcelsForGateway(
+      STORE.liveStreamActiveParcelsForGateway(
         PRIVATE_GATEWAY_ADDRESS,
         MOCK_NATS_CLIENT,
         abortController.signal,
@@ -152,7 +152,7 @@ describe('streamActiveParcelsForGateway', () => {
       const stanMessage = setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
       const [activeParcel] = await pipe(
-        STORE.streamActiveParcelsForGateway(
+        STORE.liveStreamActiveParcelsForGateway(
           PRIVATE_GATEWAY_ADDRESS,
           MOCK_NATS_CLIENT,
           abortController.signal,
@@ -162,7 +162,7 @@ describe('streamActiveParcelsForGateway', () => {
         asyncIterableToArray,
       );
 
-      await activeParcel.ack();
+      await activeParcel.deleteParcel();
 
       expect(stanMessage.ack).toBeCalled();
     });
@@ -171,7 +171,7 @@ describe('streamActiveParcelsForGateway', () => {
       setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
       const [activeParcel] = await pipe(
-        STORE.streamActiveParcelsForGateway(
+        STORE.liveStreamActiveParcelsForGateway(
           PRIVATE_GATEWAY_ADDRESS,
           MOCK_NATS_CLIENT,
           abortController.signal,
@@ -181,9 +181,15 @@ describe('streamActiveParcelsForGateway', () => {
         asyncIterableToArray,
       );
 
-      await activeParcel.ack();
+      await activeParcel.deleteParcel();
 
       expect(mockObjectStoreClient.deleteObject).toBeCalledWith(activeParcelKey, BUCKET);
+      expect(MOCK_LOGGING.logs).toContainEqual(
+        partialPinoLog('info', 'Deleting live streamed parcel', {
+          parcelObjectKey: activeParcelKey,
+          peerGatewayAddress: PRIVATE_GATEWAY_ADDRESS,
+        }),
+      );
     });
   });
 
@@ -198,6 +204,61 @@ describe('streamActiveParcelsForGateway', () => {
     });
     return stanMessage;
   }
+});
+
+describe('streamActiveParcelsForGateway', () => {
+  test('Only existing, active parcels should be retrieved', async () => {
+    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+    const parcelRetrieverSpy = jest.spyOn(store, 'retrieveActiveParcelsForGateway').mockReturnValue(
+      arrayToAsyncIterable([
+        {
+          body: PARCEL_SERIALIZED,
+          expiryDate: getDateRelativeToNow(1),
+          extra: null,
+          key: 'prefix/1.parcel',
+        },
+      ]),
+    );
+
+    const activeParcels = store.streamActiveParcelsForGateway(
+      PRIVATE_GATEWAY_ADDRESS,
+      MOCK_LOGGING.logger,
+    );
+
+    await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
+      { deleteParcel: expect.any(Function), parcelSerialized: PARCEL_SERIALIZED },
+    ]);
+    expect(parcelRetrieverSpy).toBeCalledWith(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger);
+  });
+
+  test('Each item should have the option to delete its respective parcel', async () => {
+    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+    const parcelObjectKey = 'prefix/1.parcel';
+    jest.spyOn(store, 'retrieveActiveParcelsForGateway').mockReturnValue(
+      arrayToAsyncIterable([
+        {
+          body: PARCEL_SERIALIZED,
+          expiryDate: getDateRelativeToNow(1),
+          extra: null,
+          key: parcelObjectKey,
+        },
+      ]),
+    );
+
+    const [message] = await asyncIterableToArray(
+      store.streamActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
+    );
+
+    expect(mockObjectStoreClient.deleteObject).not.toBeCalled();
+    await message.deleteParcel();
+    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(parcelObjectKey, BUCKET);
+    expect(MOCK_LOGGING.logs).toContainEqual(
+      partialPinoLog('info', 'Deleting streamed parcel', {
+        parcelObjectKey,
+        peerGatewayAddress: PRIVATE_GATEWAY_ADDRESS,
+      }),
+    );
+  });
 });
 
 describe('retrieveActiveParcelsForGateway', () => {
@@ -233,15 +294,17 @@ describe('retrieveActiveParcelsForGateway', () => {
   });
 
   test('Active parcels should be output', async () => {
+    const parcel1Key = 'prefix/1.parcel';
     const parcel1ExpiryDate = getDateRelativeToNow(1);
+    const parcel2Key = 'prefix/2.parcel';
     const parcel2ExpiryDate = getDateRelativeToNow(2);
     const parcel2Body = Buffer.from('Another parcel');
     setMockParcelObjectStore({
-      'prefix/1.parcel': {
+      [parcel1Key]: {
         body: PARCEL_SERIALIZED,
         metadata: { 'parcel-expiry': getTimestamp(parcel1ExpiryDate).toString() },
       },
-      'prefix/2.parcel': {
+      [parcel2Key]: {
         body: parcel2Body,
         metadata: { 'parcel-expiry': getTimestamp(parcel2ExpiryDate).toString() },
       },
@@ -252,8 +315,8 @@ describe('retrieveActiveParcelsForGateway', () => {
     );
 
     expect(activeParcels).toEqual([
-      { expiryDate: parcel1ExpiryDate, message: PARCEL_SERIALIZED },
-      { expiryDate: parcel2ExpiryDate, message: parcel2Body },
+      { key: parcel1Key, expiryDate: parcel1ExpiryDate, body: PARCEL_SERIALIZED, extra: null },
+      { key: parcel2Key, expiryDate: parcel2ExpiryDate, body: parcel2Body, extra: null },
     ]);
   });
 

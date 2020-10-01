@@ -137,10 +137,7 @@ export async function generateStubParcel(options: StubParcelOptions): Promise<Pa
   );
 }
 
-export function expectBuffersToEqual(
-  buffer1: Buffer | ArrayBuffer,
-  buffer2: Buffer | ArrayBuffer,
-): void {
+export function expectBuffersToEqual<T extends Buffer | ArrayBuffer>(buffer1: T, buffer2: T): void {
   if (buffer1 instanceof Buffer) {
     expect(buffer2).toBeInstanceOf(Buffer);
     expect(buffer1.equals(buffer2 as Buffer)).toBeTrue();

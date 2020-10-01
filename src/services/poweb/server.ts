@@ -1,6 +1,7 @@
 import { UnboundKeyPair } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
+import pino from 'pino';
 
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { configureFastify, FastifyLogger } from '../fastifyUtils';
@@ -32,7 +33,8 @@ export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstanc
     logger,
   );
   // TODO: Connect fastify.server
-  parcelCollection(fastify.log);
+  // TODO: Retrieve actual reqId header
+  parcelCollection('foo', pino());
   return fastify;
 }
 

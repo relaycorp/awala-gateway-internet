@@ -1,8 +1,10 @@
 import { Certificate } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
-import pino from 'pino';
+import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
+
+export const UUID4_REGEX = expect.stringMatching(/^[0-9a-f-]+$/);
 
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
   for (const item of array) {
@@ -69,6 +71,12 @@ export function makeMockLogging(): MockLogging {
   });
   const logger = pino({ level: 'debug' }, stream);
   return { logger, logs };
+}
+
+export function partialPinoLogger(bindings: { readonly [key: string]: any }): object {
+  return expect.objectContaining({
+    [PinoSymbols.formattersSym]: { bindings },
+  });
 }
 
 export function partialPinoLog(level: pino.Level, message: string, extraAttributes?: any): object {

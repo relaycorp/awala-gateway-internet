@@ -19,14 +19,15 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
 import * as grpc from 'grpc';
 import mongoose from 'mongoose';
-import { symbols as PinoSymbols } from 'pino';
 
 import {
   arrayToAsyncIterable,
   makeMockLogging,
   mockSpy,
   partialPinoLog,
+  partialPinoLogger,
   PdaChain,
+  UUID4_REGEX,
 } from '../../_test_utils';
 import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
@@ -621,13 +622,7 @@ describe('collectCargo', () => {
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
       PEER_GATEWAY_ADDRESS,
-      expect.objectContaining({
-        [PinoSymbols.formattersSym]: {
-          bindings: {
-            peerGatewayAddress: PEER_GATEWAY_ADDRESS,
-          },
-        },
-      }),
+      partialPinoLogger({ peerGatewayAddress: PEER_GATEWAY_ADDRESS }),
     );
   });
 
@@ -835,7 +830,7 @@ describe('collectCargo', () => {
     cargoDelivery: CargoDelivery,
     expectedMessagesSerialized: readonly Buffer[],
   ): Promise<void> {
-    expect(cargoDelivery).toHaveProperty('id', expect.stringMatching(/^[0-9a-f-]+$/));
+    expect(cargoDelivery).toHaveProperty('id', UUID4_REGEX);
 
     expect(cargoDelivery).toHaveProperty('cargo');
     const cargoMessageSet = await unwrapCargoMessages(cargoDelivery.cargo);

@@ -95,11 +95,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   }
 
   const queueConsumer = natsStreamingClient.makeQueueConsumer('crc-cargo', 'worker', 'worker');
-  try {
-    await pipe(queueConsumer, processCargo);
-  } finally {
-    natsStreamingClient.disconnect();
-  }
+  await pipe(queueConsumer, processCargo);
 }
 
 async function unwrapCargo(

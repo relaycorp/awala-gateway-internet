@@ -143,8 +143,6 @@ async function deliverCargo(
     logger.error({ err }, 'Failed to store cargo');
     call.emit('error', INTERNAL_SERVER_ERROR);
     return;
-  } finally {
-    natsClient.disconnect();
   }
 
   logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');

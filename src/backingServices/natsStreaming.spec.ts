@@ -193,16 +193,25 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Previous connection should be reused if active', async () => {
-      const publisher1 = stubClient.makePublisher(STUB_CHANNEL);
+    test('Connection should be closed at the end', async () => {
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher1([STUB_MESSAGE_1]));
 
-      const publisher2 = stubClient.makePublisher(STUB_CHANNEL);
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
+
+      expect(mockConnection.close).toBeCalled();
+    });
+
+    test('Connection should be closed if publishing fails', async () => {
+      mockConnection.publish.mockImplementation(
+        (_channel: any, _data: any, cb: AckHandlerCallback) => cb(new Error(), ''),
+      );
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher2([STUB_MESSAGE_1]));
 
-      expect(mockNatsConnect).toBeCalledTimes(1);
+      await expect(asyncIterableToArray(publisher([STUB_MESSAGE_1]))).toReject();
+
+      expect(mockConnection.close).toBeCalled();
     });
   });
 
@@ -365,24 +374,9 @@ describe('NatsStreamingClient', () => {
           expect(mockSubscriptionOptions[optKey]).toBeCalledWith(...optArgs);
         },
       );
-
-      test('Errors thrown while establishing subscription should be propagated', async () => {
-        const error = new Error('Nope');
-        mockConnection.subscribe.mockImplementationOnce(() => {
-          throw error;
-        });
-        const consumer = stubClient.makeQueueConsumer(
-          STUB_CHANNEL,
-          STUB_QUEUE,
-          STUB_DURABLE_NAME,
-          abortController.signal,
-        );
-
-        await expect(consumeQueue(consumer)).rejects.toEqual(error);
-      });
     });
 
-    test('Subscription should be closed after abort signal is received', async () => {
+    test('Subscription and connection should be closed after abort signal', async () => {
       const controller = new AbortController();
       const consumer = stubClient.makeQueueConsumer(
         STUB_CHANNEL,
@@ -408,10 +402,11 @@ describe('NatsStreamingClient', () => {
       });
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
-      expect(mockSubscription.close).toBeCalledTimes(1);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
     });
 
-    test('Subscription should be closed when sink breaks', async () => {
+    test('Subscription and connection should be closed when sink breaks', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const stubMessage1 = { number: 1 };
       const stubMessage2 = { number: 2 };
@@ -424,10 +419,11 @@ describe('NatsStreamingClient', () => {
       const outputMessages = pipe(consumer, iterableTake(1));
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
-      expect(mockSubscription.close).toBeCalledTimes(1);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
     });
 
-    test('Subscription should be closed after a subscription error', async () => {
+    test('Subscription and connection should be closed after a subscription error', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const error = new Error('Whoops, my bad');
       setImmediate(() => {
@@ -439,7 +435,8 @@ describe('NatsStreamingClient', () => {
 
       await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
 
-      expect(mockSubscription.close).toBeCalledTimes(1);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
     });
 
     async function consumeQueue(consumer: AsyncIterable<Message>): Promise<readonly Message[]> {
@@ -454,37 +451,6 @@ describe('NatsStreamingClient', () => {
     function fakeConnection(): void {
       setImmediate(() => mockConnection.emit('connect'));
     }
-  });
-
-  describe('disconnect', () => {
-    test('Disconnecting before connecting should be a no-op', () => {
-      stubClient.disconnect();
-    });
-
-    test('Connection should be closed when disconnecting', async () => {
-      const publisher = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
-
-      expect(mockConnection.close).not.toBeCalled();
-      stubClient.disconnect();
-
-      expect(mockConnection.close).toBeCalledTimes(1);
-    });
-
-    test('New connection should be created if previous one cannot be reused', async () => {
-      const publisher1 = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher1([STUB_MESSAGE_1]));
-
-      stubClient.disconnect();
-
-      const publisher2 = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher2([STUB_MESSAGE_1]));
-
-      expect(mockNatsConnect).toBeCalledTimes(2);
-    });
   });
 
   describe('NATS Streaming connection', () => {

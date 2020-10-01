@@ -151,7 +151,6 @@ describe('deliverCargo', () => {
       }
     }
     NATS_CLIENT = ({
-      disconnect: jest.fn(),
       makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
     } as unknown) as natsStreaming.NatsStreamingClient;
   });
@@ -361,42 +360,6 @@ describe('deliverCargo', () => {
         expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
         cb();
-      });
-
-      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-    });
-
-    test('NATS Streaming connection should be closed upon completion', async () => {
-      CALL.output.push({
-        cargo: CARGO_SERIALIZATION,
-        id: DELIVERY_ID,
-      });
-
-      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-
-      expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
-    });
-
-    test('NATS Streaming connection should be closed upon error', async (cb) => {
-      async function* throwError(
-        messages: AsyncIterable<natsStreaming.PublisherMessage>,
-      ): AsyncIterable<string> {
-        for await (const message of messages) {
-          yield message.id;
-        }
-        throw new Error('Denied');
-      }
-      getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(throwError);
-      CALL.output.push({
-        cargo: CARGO_SERIALIZATION,
-        id: DELIVERY_ID,
-      });
-
-      CALL.on('error', () => {
-        setImmediate(() => {
-          expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
-          cb();
-        });
       });
 
       await SERVICE.deliverCargo(CALL.convertToGrpcStream());

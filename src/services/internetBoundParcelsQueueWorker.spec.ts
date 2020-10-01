@@ -17,7 +17,6 @@ const OWN_POHTTP_ADDRESS = 'https://gateway.endpoint/';
 const WORKER_NAME = 'the-worker';
 
 const MOCK_NATS_CLIENT = {
-  disconnect: mockSpy(jest.fn()),
   makeQueueConsumer: mockSpy(jest.fn()),
 };
 const MOCK_NATS_CLIENT_INIT = mockSpy(
@@ -178,27 +177,6 @@ describe('processInternetBoundParcels', () => {
       await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
       expect(MOCK_NATS_CLIENT_INIT).toBeCalledWith(WORKER_NAME);
-    });
-
-    test('NATS connection should be closed upon successful completion', async () => {
-      MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
-        arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
-      );
-
-      await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
-
-      expect(MOCK_NATS_CLIENT.disconnect).toBeCalled();
-    });
-
-    test('NATS connection should be closed upon error', async () => {
-      MOCK_DELIVER_PARCEL.mockRejectedValue(new pohttp.PoHTTPError('Server is down'));
-      MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
-        arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
-      );
-
-      await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
-
-      expect(MOCK_NATS_CLIENT.disconnect).toBeCalled();
     });
   });
 

@@ -51,7 +51,7 @@ beforeAll(async () => {
 const STUB_NATS_SERVER_URL = 'nats://example.com';
 const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
 const mockNatsClient: natsStreaming.NatsStreamingClient = {
-  disconnect: mockSpy(jest.fn()),
+  what: 'The NATS Streaming client',
 } as any;
 const mockNatsClientClass = mockSpy(
   jest.spyOn(natsStreaming, 'NatsStreamingClient'),
@@ -201,19 +201,5 @@ describe('receiveParcel', () => {
       STUB_NATS_CLUSTER_ID,
       expect.stringMatching(/^pohttp-req-\d+$/),
     );
-  });
-
-  test('NATS connection should be closed upon successful completion', async () => {
-    await serverInstance.inject(validRequestOptions);
-
-    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-  });
-
-  test('NATS connection should be closed upon failure', async () => {
-    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValue(new Error('Oops'));
-
-    await serverInstance.inject(validRequestOptions);
-
-    expect(mockNatsClient.disconnect).toBeCalledTimes(1);
   });
 });

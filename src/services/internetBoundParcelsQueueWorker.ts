@@ -93,9 +93,5 @@ export async function processInternetBoundParcels(
     'worker',
     'worker',
   );
-  try {
-    await pipe(queueConsumer, parseMessages, deliverParcels);
-  } finally {
-    natsStreamingClient.disconnect();
-  }
+  await pipe(queueConsumer, parseMessages, deliverParcels);
 }

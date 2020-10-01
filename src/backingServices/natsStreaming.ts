@@ -17,9 +17,6 @@ export class NatsStreamingClient {
     return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
   }
 
-  // tslint:disable-next-line:readonly-keyword
-  protected connection?: Stan;
-
   constructor(
     public readonly serverUrl: string,
     public readonly clusterId: string,
@@ -35,10 +32,13 @@ export class NatsStreamingClient {
     return async function* (messages): AsyncIterable<string> {
       const connection = await promisedConnection;
       const publishPromisified = promisify(connection.publish).bind(connection);
-
-      for await (const message of messages) {
-        await publishPromisified(channel, message.data);
-        yield message.id;
+      try {
+        for await (const message of messages) {
+          await publishPromisified(channel, message.data);
+          yield message.id;
+        }
+      } finally {
+        connection.close();
       }
     };
   }
@@ -78,33 +78,22 @@ export class NatsStreamingClient {
         yield msg;
       }
     } finally {
+      // Close the subscription. Do NOT "unsubscribe" from it -- Otherwise, the durable
+      // subscription would be lost: https://docs.nats.io/developing-with-nats-streaming/durables
       subscription.close();
-      // Do NOT "unsubscribe" -- Otherwise, the durable subscription would be lost
-      // https://docs.nats.io/developing-with-nats-streaming/durables
-    }
-  }
 
-  public disconnect(): void {
-    this.connection?.close();
+      connection.close();
+    }
   }
 
   /**
    * Create a new connection or reuse an existing one.
    */
   protected async connect(): Promise<Stan> {
-    return new Promise<Stan>((resolve, _reject) => {
-      if (this.connection) {
-        return resolve(this.connection);
-      }
-
-      // tslint:disable-next-line:no-object-mutation
-      this.connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
-      this.connection.on('connect', () => {
-        resolve(this.connection);
-      });
-      this.connection.on('close', () => {
-        // tslint:disable-next-line:no-object-mutation
-        this.connection = undefined;
+    return new Promise<Stan>((resolve) => {
+      const connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
+      connection.on('connect', () => {
+        resolve(connection);
       });
     });
   }

@@ -94,7 +94,13 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     }
   }
 
-  const queueConsumer = natsStreamingClient.makeQueueConsumer('crc-cargo', 'worker', 'worker');
+  const queueConsumer = natsStreamingClient.makeQueueConsumer(
+    'crc-cargo',
+    'worker',
+    'worker',
+    undefined,
+    '-consumer',
+  );
   await pipe(queueConsumer, processCargo);
 }
 

@@ -1,5 +1,6 @@
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
+import pipe from 'it-pipe';
 import { connect, Message, Stan } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
 import * as streamToIt from 'stream-to-it';
@@ -25,10 +26,11 @@ export class NatsStreamingClient {
 
   public makePublisher(
     channel: string,
+    clientIdSuffix?: string,
   ): (
     messages: AsyncIterable<PublisherMessage> | readonly PublisherMessage[],
   ) => AsyncIterable<string> {
-    const promisedConnection = this.connect();
+    const promisedConnection = this.connect(clientIdSuffix);
     return async function* (messages): AsyncIterable<string> {
       const connection = await promisedConnection;
       const publishPromisified = promisify(connection.publish).bind(connection);
@@ -43,10 +45,12 @@ export class NatsStreamingClient {
     };
   }
 
-  public async publishMessage(messageData: Buffer | string, channel: string): Promise<void> {
-    const connection = await this.connect();
-    const publishPromisified = promisify(connection.publish).bind(connection);
-    await publishPromisified(channel, messageData);
+  public async publishMessage(
+    messageData: Buffer | string,
+    channel: string,
+    clientIdSuffix?: string,
+  ): Promise<void> {
+    await pipe([{ data: messageData }], this.makePublisher(channel, clientIdSuffix), drainIterable);
   }
 
   public async *makeQueueConsumer(
@@ -54,8 +58,9 @@ export class NatsStreamingClient {
     queue: string,
     durableName: string,
     abortSignal?: AbortSignal,
+    clientIdSuffix?: string,
   ): AsyncIterable<Message> {
-    const connection = await this.connect();
+    const connection = await this.connect(clientIdSuffix);
     const subscriptionOptions = connection
       .subscriptionOptions()
       .setDurableName(durableName)
@@ -89,12 +94,19 @@ export class NatsStreamingClient {
   /**
    * Create a new connection or reuse an existing one.
    */
-  protected async connect(): Promise<Stan> {
+  protected async connect(clientIdSuffix: string = ''): Promise<Stan> {
+    const clientId = `${this.clientId}${clientIdSuffix}`;
     return new Promise<Stan>((resolve) => {
-      const connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
+      const connection = connect(this.clusterId, clientId, { url: this.serverUrl });
       connection.on('connect', () => {
         resolve(connection);
       });
     });
+  }
+}
+
+async function drainIterable(iterable: AsyncIterable<any>): Promise<void> {
+  for await (const _ of iterable) {
+    // Do nothing
   }
 }

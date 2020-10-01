@@ -139,6 +139,8 @@ describe('Queue subscription', () => {
       'crc-cargo',
       expect.anything(),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -148,6 +150,8 @@ describe('Queue subscription', () => {
     expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
       expect.anything(),
       'worker',
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -159,6 +163,20 @@ describe('Queue subscription', () => {
       expect.anything(),
       expect.anything(),
       'worker',
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  test('Subscription should use a client id suffix', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      '-consumer',
     );
   });
 });

@@ -26,7 +26,7 @@ import {
 } from './services';
 import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep, TOMORROW } from './utils';
 
-configureServices();
+configureServices(['cogrpc', 'crc-queue-worker', 'pohttp']);
 
 let GW_PDA_CHAIN: PdaChain;
 beforeEach(async () => {
@@ -38,7 +38,7 @@ beforeEach(async () => {
 });
 
 test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
-  const pongEndpointSessionCertificate = await generatePongEndpointKeypairs();
+  const pongEndpointSessionCertificate = await generatePongEndpointKeyPairs();
 
   const pingId = Buffer.from(uuid());
   const pingParcelData = await makePingParcel(
@@ -73,7 +73,7 @@ test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
   );
 });
 
-async function generatePongEndpointKeypairs(): Promise<{
+async function generatePongEndpointKeyPairs(): Promise<{
   readonly sessionCert: Certificate;
   readonly identityCert: Certificate;
 }> {

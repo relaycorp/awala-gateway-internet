@@ -98,6 +98,21 @@ describe('NatsStreamingClient', () => {
       expect(mockNatsConnect).toBeCalledWith(expect.anything(), STUB_CLIENT_ID, expect.anything());
     });
 
+    test('Any client id suffix should be honored', async () => {
+      const clientIdSuffix = '-foo';
+      const publisher = stubClient.makePublisher(STUB_CHANNEL, clientIdSuffix);
+      setImmediate(() => mockConnection.emit('connect'));
+
+      await publisher([]);
+
+      expect(mockNatsConnect).toBeCalledTimes(1);
+      expect(mockNatsConnect).toBeCalledWith(
+        expect.anything(),
+        `${STUB_CLIENT_ID}${clientIdSuffix}`,
+        expect.anything(),
+      );
+    });
+
     test('Publishing should only be done once the connection has been established', async (done) => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => {
@@ -215,18 +230,31 @@ describe('NatsStreamingClient', () => {
     });
   });
 
-  test('publishMessage() should send a single message via a dedicated connection', async () => {
-    const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
-    jest.spyOn(client, 'makePublisher');
-    setImmediate(() => mockConnection.emit('connect'));
+  describe('publishMessage', () => {
+    test('A single message should be published via a dedicated connection', async () => {
+      const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+      setImmediate(() => mockConnection.emit('connect'));
 
-    await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
+      await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
 
-    expect(mockConnection.publish).toBeCalledWith(
-      STUB_CHANNEL,
-      STUB_MESSAGE_1.data,
-      expect.any(Function),
-    );
+      expect(mockConnection.publish).toBeCalledWith(
+        STUB_CHANNEL,
+        STUB_MESSAGE_1.data,
+        expect.any(Function),
+      );
+      expect(mockConnection.close).toBeCalled();
+    });
+
+    test('Any client id suffix should be honored', async () => {
+      const clientIdSuffix = '-suffix';
+      const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+      jest.spyOn(client, 'makePublisher');
+      setImmediate(() => mockConnection.emit('connect'));
+
+      await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL, clientIdSuffix);
+
+      expect(client.makePublisher).toBeCalledWith(expect.anything(), clientIdSuffix);
+    });
   });
 
   describe('makeQueueConsumer', () => {
@@ -305,6 +333,26 @@ describe('NatsStreamingClient', () => {
         expect(mockNatsConnect).toBeCalledWith(
           expect.anything(),
           STUB_CLIENT_ID,
+          expect.anything(),
+        );
+      });
+
+      test('Any client id suffix should be honored', async () => {
+        const clientIdSuffix = '-suffix';
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+          clientIdSuffix,
+        );
+
+        await consumeQueue(consumer);
+
+        expect(mockNatsConnect).toBeCalledTimes(1);
+        expect(mockNatsConnect).toBeCalledWith(
+          expect.anything(),
+          `${STUB_CLIENT_ID}${clientIdSuffix}`,
           expect.anything(),
         );
       });

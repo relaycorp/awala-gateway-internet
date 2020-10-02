@@ -33,7 +33,7 @@ export interface ParcelObject<Extra> extends ParcelObjectMetadata<Extra> {
 }
 
 export interface ParcelStreamMessage {
-  readonly deleteParcel: () => Promise<void>;
+  readonly ack: () => Promise<void>;
   readonly parcelSerialized: Buffer;
 }
 
@@ -76,8 +76,9 @@ export class ParcelStore {
       parcelObjects: AsyncIterable<ParcelObject<Message>>,
     ): AsyncIterable<ParcelStreamMessage> {
       for await (const { extra: natsMessage, key, body } of parcelObjects) {
+        peerAwareLogger.info({ parcelObjectKey: key }, 'Live streaming parcel');
         yield {
-          async deleteParcel(): Promise<void> {
+          async ack(): Promise<void> {
             // Make sure not to keep a reference to the parcel serialization to let the garbage
             // collector do its magic.
             peerAwareLogger.info({ parcelObjectKey: key }, 'Deleting live streamed parcel');
@@ -117,8 +118,9 @@ export class ParcelStore {
       parcelObjects: AsyncIterable<ParcelObject<Message>>,
     ): AsyncIterable<ParcelStreamMessage> {
       for await (const { key, body } of parcelObjects) {
+        peerAwareLogger.info({ parcelObjectKey: key }, 'Streaming parcel');
         yield {
-          async deleteParcel(): Promise<void> {
+          async ack(): Promise<void> {
             // Make sure not to keep a reference to the parcel serialization to let the garbage
             // collector do its magic.
             peerAwareLogger.info({ parcelObjectKey: key }, 'Deleting streamed parcel');

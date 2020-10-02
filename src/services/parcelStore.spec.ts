@@ -28,27 +28,32 @@ import {
 } from './_test_utils';
 import * as certs from './certs';
 import * as parcelCollection from './parcelCollection';
-import { ParcelObjectMetadata, ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
+import {
+  ParcelObject,
+  ParcelObjectMetadata,
+  ParcelStore,
+  QueuedInternetBoundParcelMessage,
+} from './parcelStore';
 
 const BUCKET = 'the-bucket-name';
 
-let PDA_CHAIN: PdaChain;
-let PRIVATE_GATEWAY_ADDRESS: string;
+let pdaChain: PdaChain;
+let peerGatewayAddress: string;
 beforeAll(async () => {
-  PDA_CHAIN = await generatePdaChain();
-  PRIVATE_GATEWAY_ADDRESS = await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
+  pdaChain = await generatePdaChain();
+  peerGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
-let PARCEL: Parcel;
-let PARCEL_SERIALIZED: Buffer;
+let parcel: Parcel;
+let parcelSerialized: Buffer;
 beforeAll(async () => {
-  PARCEL = new Parcel(
-    await PDA_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
-    PDA_CHAIN.pdaCert,
+  parcel = new Parcel(
+    await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    pdaChain.pdaCert,
     Buffer.from([]),
-    { senderCaCertificateChain: [PDA_CHAIN.peerEndpointCert, PDA_CHAIN.privateGatewayCert] },
+    { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
   );
-  PARCEL_SERIALIZED = Buffer.from(await PARCEL.serialize(PDA_CHAIN.pdaGranteePrivateKey));
+  parcelSerialized = Buffer.from(await parcel.serialize(pdaChain.pdaGranteePrivateKey));
 });
 
 const MOCK_NATS_CLIENT: natsStreaming.NatsStreamingClient = {
@@ -58,20 +63,20 @@ const MOCK_NATS_CLIENT: natsStreaming.NatsStreamingClient = {
 
 const MOCK_MONGOOSE_CONNECTION: Connection = mockSpy(jest.fn()) as any;
 
-const mockObjectStoreClient: ObjectStoreClient = {
+const MOCK_OBJECT_STORE_CLIENT: ObjectStoreClient = {
   deleteObject: mockSpy(jest.fn(), async () => null),
   getObject: mockSpy(jest.fn()),
   listObjectKeys: mockSpy(jest.fn(), () => arrayToAsyncIterable([])),
   putObject: mockSpy(jest.fn()),
 } as any;
 
-let MOCK_LOGGING: MockLogging;
+let mockLogging: MockLogging;
 beforeEach(() => {
-  MOCK_LOGGING = makeMockLogging();
+  mockLogging = makeMockLogging();
 });
 
-describe('streamActiveParcelsForGateway', () => {
-  const STORE = new ParcelStore(mockObjectStoreClient, BUCKET);
+describe('liveStreamActiveParcelsForGateway', () => {
+  const STORE = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   let abortController: AbortController;
   beforeEach(() => {
@@ -82,7 +87,7 @@ describe('streamActiveParcelsForGateway', () => {
   let activeParcelObject: StoreObject;
   beforeAll(() => {
     activeParcelObject = {
-      body: PARCEL_SERIALIZED,
+      body: parcelSerialized,
       metadata: { 'parcel-expiry': getTimestamp(getDateRelativeToNow(10)).toString() },
     };
   });
@@ -92,23 +97,29 @@ describe('streamActiveParcelsForGateway', () => {
 
     const activeParcels = pipe(
       STORE.liveStreamActiveParcelsForGateway(
-        PRIVATE_GATEWAY_ADDRESS,
+        peerGatewayAddress,
         MOCK_NATS_CLIENT,
         abortController.signal,
-        MOCK_LOGGING.logger,
+        mockLogging.logger,
       ),
       iterableTake(1),
     );
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
-      { deleteParcel: expect.any(Function), parcelSerialized: PARCEL_SERIALIZED },
+      { ack: expect.any(Function), parcelSerialized },
     ]);
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Live streaming parcel', {
+        parcelObjectKey: activeParcelKey,
+        peerGatewayAddress,
+      }),
+    );
   });
 
   test('Expired parcels should be filtered out', async () => {
     setMockParcelObjectStore(
       {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(getDateRelativeToNow(0)).toString() },
       },
       'prefix/expired.parcel',
@@ -116,10 +127,10 @@ describe('streamActiveParcelsForGateway', () => {
 
     const activeParcels = pipe(
       STORE.liveStreamActiveParcelsForGateway(
-        PRIVATE_GATEWAY_ADDRESS,
+        peerGatewayAddress,
         MOCK_NATS_CLIENT,
         abortController.signal,
-        MOCK_LOGGING.logger,
+        mockLogging.logger,
       ),
       iterableTake(1),
     );
@@ -132,17 +143,17 @@ describe('streamActiveParcelsForGateway', () => {
 
     await asyncIterableToArray(
       STORE.liveStreamActiveParcelsForGateway(
-        PRIVATE_GATEWAY_ADDRESS,
+        peerGatewayAddress,
         MOCK_NATS_CLIENT,
         abortController.signal,
-        MOCK_LOGGING.logger,
+        mockLogging.logger,
       ),
     );
 
     expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
-      `pdc-parcel.${PRIVATE_GATEWAY_ADDRESS}`,
+      `pdc-parcel.${peerGatewayAddress}`,
       'active-parcels',
-      PRIVATE_GATEWAY_ADDRESS,
+      peerGatewayAddress,
       abortController.signal,
     );
   });
@@ -153,16 +164,16 @@ describe('streamActiveParcelsForGateway', () => {
 
       const [activeParcel] = await pipe(
         STORE.liveStreamActiveParcelsForGateway(
-          PRIVATE_GATEWAY_ADDRESS,
+          peerGatewayAddress,
           MOCK_NATS_CLIENT,
           abortController.signal,
-          MOCK_LOGGING.logger,
+          mockLogging.logger,
         ),
         iterableTake(1),
         asyncIterableToArray,
       );
 
-      await activeParcel.deleteParcel();
+      await activeParcel.ack();
 
       expect(stanMessage.ack).toBeCalled();
     });
@@ -172,22 +183,40 @@ describe('streamActiveParcelsForGateway', () => {
 
       const [activeParcel] = await pipe(
         STORE.liveStreamActiveParcelsForGateway(
-          PRIVATE_GATEWAY_ADDRESS,
+          peerGatewayAddress,
           MOCK_NATS_CLIENT,
           abortController.signal,
-          MOCK_LOGGING.logger,
+          mockLogging.logger,
         ),
         iterableTake(1),
         asyncIterableToArray,
       );
 
-      await activeParcel.deleteParcel();
+      await activeParcel.ack();
 
-      expect(mockObjectStoreClient.deleteObject).toBeCalledWith(activeParcelKey, BUCKET);
-      expect(MOCK_LOGGING.logs).toContainEqual(
+      expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(activeParcelKey, BUCKET);
+    });
+
+    test('Call should be logged', async () => {
+      setMockParcelObjectStore(activeParcelObject, activeParcelKey);
+
+      const [activeParcel] = await pipe(
+        STORE.liveStreamActiveParcelsForGateway(
+          peerGatewayAddress,
+          MOCK_NATS_CLIENT,
+          abortController.signal,
+          mockLogging.logger,
+        ),
+        iterableTake(1),
+        asyncIterableToArray,
+      );
+
+      await activeParcel.ack();
+
+      expect(mockLogging.logs).toContainEqual(
         partialPinoLog('info', 'Deleting live streamed parcel', {
           parcelObjectKey: activeParcelKey,
-          peerGatewayAddress: PRIVATE_GATEWAY_ADDRESS,
+          peerGatewayAddress,
         }),
       );
     });
@@ -198,7 +227,7 @@ describe('streamActiveParcelsForGateway', () => {
     getMockInstance(MOCK_NATS_CLIENT.makeQueueConsumer).mockReturnValue(
       arrayToAsyncIterable([stanMessage]),
     );
-    getMockInstance(mockObjectStoreClient.getObject).mockImplementation((key) => {
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockImplementation((key) => {
       expect(key).toEqual(objectKey);
       return storeObject;
     });
@@ -207,70 +236,86 @@ describe('streamActiveParcelsForGateway', () => {
 });
 
 describe('streamActiveParcelsForGateway', () => {
+  let parcelObject: ParcelObject<null>;
+  beforeEach(() => {
+    parcelObject = {
+      body: parcelSerialized,
+      expiryDate: getDateRelativeToNow(1),
+      extra: null,
+      key: 'prefix/1.parcel',
+    };
+  });
+
   test('Only existing, active parcels should be retrieved', async () => {
-    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-    const parcelRetrieverSpy = jest.spyOn(store, 'retrieveActiveParcelsForGateway').mockReturnValue(
-      arrayToAsyncIterable([
-        {
-          body: PARCEL_SERIALIZED,
-          expiryDate: getDateRelativeToNow(1),
-          extra: null,
-          key: 'prefix/1.parcel',
-        },
-      ]),
-    );
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+    const parcelRetrieverSpy = jest
+      .spyOn(store, 'retrieveActiveParcelsForGateway')
+      .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
     const activeParcels = store.streamActiveParcelsForGateway(
-      PRIVATE_GATEWAY_ADDRESS,
-      MOCK_LOGGING.logger,
+      peerGatewayAddress,
+      mockLogging.logger,
     );
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
-      { deleteParcel: expect.any(Function), parcelSerialized: PARCEL_SERIALIZED },
+      { ack: expect.any(Function), parcelSerialized },
     ]);
-    expect(parcelRetrieverSpy).toBeCalledWith(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger);
-  });
-
-  test('Each item should have the option to delete its respective parcel', async () => {
-    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-    const parcelObjectKey = 'prefix/1.parcel';
-    jest.spyOn(store, 'retrieveActiveParcelsForGateway').mockReturnValue(
-      arrayToAsyncIterable([
-        {
-          body: PARCEL_SERIALIZED,
-          expiryDate: getDateRelativeToNow(1),
-          extra: null,
-          key: parcelObjectKey,
-        },
-      ]),
-    );
-
-    const [message] = await asyncIterableToArray(
-      store.streamActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
-    );
-
-    expect(mockObjectStoreClient.deleteObject).not.toBeCalled();
-    await message.deleteParcel();
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(parcelObjectKey, BUCKET);
-    expect(MOCK_LOGGING.logs).toContainEqual(
-      partialPinoLog('info', 'Deleting streamed parcel', {
-        parcelObjectKey,
-        peerGatewayAddress: PRIVATE_GATEWAY_ADDRESS,
+    expect(parcelRetrieverSpy).toBeCalledWith(peerGatewayAddress, mockLogging.logger);
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Streaming parcel', {
+        parcelObjectKey: parcelObject.key,
+        peerGatewayAddress,
       }),
     );
+  });
+
+  describe('Acknowledgement callback', () => {
+    test('Parcel should be deleted from store when callback is called', async () => {
+      const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+      jest
+        .spyOn(store, 'retrieveActiveParcelsForGateway')
+        .mockReturnValue(arrayToAsyncIterable([parcelObject]));
+
+      const [message] = await asyncIterableToArray(
+        store.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+      );
+
+      expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).not.toBeCalled();
+      await message.ack();
+      expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(parcelObject.key, BUCKET);
+    });
+
+    test('Call should be logged', async () => {
+      const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+      jest
+        .spyOn(store, 'retrieveActiveParcelsForGateway')
+        .mockReturnValue(arrayToAsyncIterable([parcelObject]));
+
+      const [message] = await asyncIterableToArray(
+        store.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+      );
+
+      await message.ack();
+      expect(mockLogging.logs).toContainEqual(
+        partialPinoLog('info', 'Deleting streamed parcel', {
+          parcelObjectKey: parcelObject.key,
+          peerGatewayAddress,
+        }),
+      );
+    });
   });
 });
 
 describe('retrieveActiveParcelsForGateway', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   test('Parcels should be limited to those for the specified gateway', async () => {
     await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
+      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
     );
-    expect(mockObjectStoreClient.listObjectKeys).toBeCalledTimes(1);
-    expect(mockObjectStoreClient.listObjectKeys).toBeCalledWith(
-      `parcels/gateway-bound/${PRIVATE_GATEWAY_ADDRESS}/`,
+    expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
+    expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(
+      `parcels/gateway-bound/${peerGatewayAddress}/`,
       expect.anything(),
     );
   });
@@ -278,19 +323,19 @@ describe('retrieveActiveParcelsForGateway', () => {
   test('Operations should be limited to the specified bucket', async () => {
     const objectsByKey = {
       'prefix/1.parcel': {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestampRelativeToNow(1) },
       },
     };
     setMockParcelObjectStore(objectsByKey);
 
     await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
+      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
     );
-    expect(mockObjectStoreClient.listObjectKeys).toBeCalledTimes(1);
-    expect(mockObjectStoreClient.listObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
-    expect(mockObjectStoreClient.getObject).toBeCalledTimes(1);
-    expect(mockObjectStoreClient.getObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
+    expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
+    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledTimes(1);
+    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Active parcels should be output', async () => {
@@ -301,7 +346,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     const parcel2Body = Buffer.from('Another parcel');
     setMockParcelObjectStore({
       [parcel1Key]: {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(parcel1ExpiryDate).toString() },
       },
       [parcel2Key]: {
@@ -311,11 +356,11 @@ describe('retrieveActiveParcelsForGateway', () => {
     });
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
+      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
     );
 
     expect(activeParcels).toEqual([
-      { key: parcel1Key, expiryDate: parcel1ExpiryDate, body: PARCEL_SERIALIZED, extra: null },
+      { key: parcel1Key, expiryDate: parcel1ExpiryDate, body: parcelSerialized, extra: null },
       { key: parcel2Key, expiryDate: parcel2ExpiryDate, body: parcel2Body, extra: null },
     ]);
   });
@@ -330,16 +375,16 @@ describe('retrieveActiveParcelsForGateway', () => {
 
     await expect(
       asyncIterableToArray(
-        store.retrieveActiveParcelsForGateway(PRIVATE_GATEWAY_ADDRESS, MOCK_LOGGING.logger),
+        store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
       ),
     ).resolves.toHaveLength(0);
   });
 
   function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
-    getMockInstance(mockObjectStoreClient.listObjectKeys).mockReturnValue(
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).mockReturnValue(
       arrayToAsyncIterable(Object.keys(objectsByKey)),
     );
-    getMockInstance(mockObjectStoreClient.getObject).mockImplementation(
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockImplementation(
       (objectKey) => objectsByKey[objectKey],
     );
   }
@@ -349,60 +394,62 @@ describe('storeParcelFromPeerGateway', () => {
   const dummyObjectKey = 'the object key';
 
   test('Parcel should be bound for private gateway if recipient is private', async () => {
-    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
     const spiedStoreGatewayBoundParcel = jest
       .spyOn(store, 'storeGatewayBoundParcel')
       .mockImplementationOnce(async () => dummyObjectKey);
 
     // Make sure the shared fixture remains valid for this test:
-    expect(PARCEL.isRecipientAddressPrivate).toBeTrue();
+    expect(parcel.isRecipientAddressPrivate).toBeTrue();
 
     await expect(
       store.storeParcelFromPeerGateway(
-        PARCEL,
-        PARCEL_SERIALIZED,
-        await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+        parcel,
+        parcelSerialized,
+        await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
     expect(spiedStoreGatewayBoundParcel).toBeCalledWith(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
   });
 
   test('Parcel should be bound for public endpoint if recipient is public', async () => {
-    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
     const spiedStoreEndpointBoundParcel = jest
       .spyOn(store, 'storeEndpointBoundParcel')
       .mockImplementationOnce(async () => dummyObjectKey);
 
-    const parcel = new Parcel(
+    const parcelForPublicEndpoint = new Parcel(
       'https://endpoint.relaycorp.tech',
-      PDA_CHAIN.pdaCert,
+      pdaChain.pdaCert,
       Buffer.from([]),
-      { senderCaCertificateChain: [PDA_CHAIN.peerEndpointCert, PDA_CHAIN.privateGatewayCert] },
+      { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
     );
-    const parcelSerialized = Buffer.from(await parcel.serialize(PDA_CHAIN.pdaGranteePrivateKey));
+    const parcelForPublicEndpointSerialized = Buffer.from(
+      await parcelForPublicEndpoint.serialize(pdaChain.pdaGranteePrivateKey),
+    );
 
     await expect(
       store.storeParcelFromPeerGateway(
-        parcel,
-        parcelSerialized,
-        await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+        parcelForPublicEndpoint,
+        parcelForPublicEndpointSerialized,
+        await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
     expect(spiedStoreEndpointBoundParcel).toBeCalledWith(
-      parcel,
-      parcelSerialized,
-      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+      parcelForPublicEndpoint,
+      parcelForPublicEndpointSerialized,
+      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
@@ -410,11 +457,11 @@ describe('storeParcelFromPeerGateway', () => {
 });
 
 describe('storeGatewayBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   const mockRetrieveOwnCertificates = mockSpy(
     jest.spyOn(certs, 'retrieveOwnCertificates'),
-    async () => [PDA_CHAIN.publicGatewayCert],
+    async () => [pdaChain.publicGatewayCert],
   );
 
   test('Parcel should be refused if sender is not trusted', async () => {
@@ -423,19 +470,19 @@ describe('storeGatewayBoundParcel', () => {
 
     await expect(
       store.storeGatewayBoundParcel(
-        PARCEL,
-        PARCEL_SERIALIZED,
+        parcel,
+        parcelSerialized,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(mockObjectStoreClient.putObject).not.toBeCalled();
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
   });
 
   test('Parcel object key should be output', async () => {
     const key = await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
@@ -443,23 +490,23 @@ describe('storeGatewayBoundParcel', () => {
     const expectedObjectKey = [
       'parcels',
       'gateway-bound',
-      PRIVATE_GATEWAY_ADDRESS,
-      PARCEL.recipientAddress,
-      await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
-      sha256Hex(PARCEL.id),
+      peerGatewayAddress,
+      parcel.recipientAddress,
+      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      sha256Hex(parcel.id),
     ].join('/');
     expect(key).toEqual(expectedObjectKey);
   });
 
   test('Parcel should be put in the right bucket', async () => {
     await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.anything(),
       expect.anything(),
       BUCKET,
@@ -468,15 +515,15 @@ describe('storeGatewayBoundParcel', () => {
 
   test('Parcel expiry date should be stored as object metadata', async () => {
     await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.objectContaining({
-        metadata: { ['parcel-expiry']: getTimestamp(PARCEL.expiryDate).toString() },
+        metadata: { ['parcel-expiry']: getTimestamp(parcel.expiryDate).toString() },
       }),
       expect.anything(),
       expect.anything(),
@@ -485,14 +532,14 @@ describe('storeGatewayBoundParcel', () => {
 
   test('Parcel serialization should be stored', async () => {
     await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
-      expect.objectContaining({ body: PARCEL_SERIALIZED }),
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
+      expect.objectContaining({ body: parcelSerialized }),
       expect.anything(),
       expect.anything(),
     );
@@ -500,13 +547,13 @@ describe('storeGatewayBoundParcel', () => {
 
   test('Parcel object key should be unique for the parcel, sender and recipient', async () => {
     const key = await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.anything(),
       key,
       expect.anything(),
@@ -515,8 +562,8 @@ describe('storeGatewayBoundParcel', () => {
 
   test('Parcel object key should be published to right NATS Streaming channel', async () => {
     const key = await store.storeGatewayBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
+      parcel,
+      parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
@@ -524,18 +571,18 @@ describe('storeGatewayBoundParcel', () => {
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledTimes(1);
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       key,
-      `pdc-parcel.${await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress()}`,
+      `pdc-parcel.${await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
     );
   });
 });
 
 describe('deleteGatewayBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   test('Object should be deleted from the right bucket', async () => {
     await store.deleteGatewayBoundParcel('', '', '', '');
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
@@ -550,7 +597,7 @@ describe('deleteGatewayBoundParcel', () => {
       recipientGatewayAddress,
     );
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(
       [
         'parcels/gateway-bound',
         recipientGatewayAddress,
@@ -564,37 +611,39 @@ describe('deleteGatewayBoundParcel', () => {
 });
 
 describe('retrieveEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   beforeEach(() => {
-    getMockInstance(mockObjectStoreClient.getObject).mockResolvedValue({ body: PARCEL_SERIALIZED });
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue({
+      body: parcelSerialized,
+    });
   });
 
   test('Object should be retrieved from the right bucket', async () => {
     await store.retrieveEndpointBoundParcel('');
 
-    expect(mockObjectStoreClient.getObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Lookup object key should be prefixed', async () => {
     const key = 'thingy.parcel';
     await store.retrieveEndpointBoundParcel(key);
 
-    expect(mockObjectStoreClient.getObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(
       `parcels/endpoint-bound/${key}`,
       expect.anything(),
     );
   });
 
   test('Parcel should be returned', async () => {
-    const parcelSerialized = await store.retrieveEndpointBoundParcel('key');
+    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
 
-    expect(parcelSerialized).toEqual(PARCEL_SERIALIZED);
+    expect(retrievedParcelSerialized).toEqual(parcelSerialized);
   });
 });
 
 describe('storeEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   const mockWasParcelCollected = mockSpy(
     jest.spyOn(parcelCollection, 'wasParcelCollected'),
@@ -606,26 +655,26 @@ describe('storeEndpointBoundParcel', () => {
   );
 
   test('Parcel should be refused if it is invalid', async () => {
-    const invalidParcelCreationDate = new Date(PDA_CHAIN.pdaCert.startDate.getTime());
+    const invalidParcelCreationDate = new Date(pdaChain.pdaCert.startDate.getTime());
     invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() - 1);
     const invalidParcel = new Parcel(
-      await PDA_CHAIN.peerEndpointCert.calculateSubjectPrivateAddress(),
-      PDA_CHAIN.pdaCert,
+      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+      pdaChain.pdaCert,
       Buffer.from([]),
       { creationDate: invalidParcelCreationDate },
     );
-    const invalidParcelSerialized = await invalidParcel.serialize(PDA_CHAIN.pdaGranteePrivateKey);
+    const invalidParcelSerialized = await invalidParcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     await expect(
       store.storeEndpointBoundParcel(
         invalidParcel,
         Buffer.from(invalidParcelSerialized),
-        PRIVATE_GATEWAY_ADDRESS,
+        peerGatewayAddress,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(mockObjectStoreClient.putObject).not.toBeCalled();
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
   });
 
   test('Parcel should be ignored if it was already processed', async () => {
@@ -633,64 +682,62 @@ describe('storeEndpointBoundParcel', () => {
 
     await expect(
       store.storeEndpointBoundParcel(
-        PARCEL,
-        PARCEL_SERIALIZED,
-        PRIVATE_GATEWAY_ADDRESS,
+        parcel,
+        parcelSerialized,
+        peerGatewayAddress,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
       ),
     ).resolves.toBeNull();
 
-    expect(mockObjectStoreClient.putObject).not.toBeCalled();
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
     expect(mockWasParcelCollected).toBeCalledWith(
-      PARCEL,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
     );
   });
 
   test('The processing of the parcel should be recorded if successful', async () => {
     await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
     expect(mockRecordParcelCollection).toBeCalledWith(
-      PARCEL,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
     );
   });
 
   test('Generated object key should be output', async () => {
     const key = await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    const senderPrivateAddress = await PARCEL.senderCertificate.calculateSubjectPrivateAddress();
-    const expectedKey = new RegExp(
-      `^${PRIVATE_GATEWAY_ADDRESS}/${senderPrivateAddress}/[0-9a-f-]+$`,
-    );
+    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
+    const expectedKey = new RegExp(`^${peerGatewayAddress}/${senderPrivateAddress}/[0-9a-f-]+$`);
     expect(key).toMatch(expectedKey);
   });
 
   test('Object should be put in the right bucket', async () => {
     await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.anything(),
       expect.anything(),
       BUCKET,
@@ -699,14 +746,14 @@ describe('storeEndpointBoundParcel', () => {
 
   test('Parcel should be stored with generated object key', async () => {
     const key = await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.anything(),
       `parcels/endpoint-bound/${key}`,
       expect.anything(),
@@ -715,15 +762,15 @@ describe('storeEndpointBoundParcel', () => {
 
   test('Parcel serialization should be stored', async () => {
     await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
-      expect.objectContaining({ body: PARCEL_SERIALIZED }),
+    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
+      expect.objectContaining({ body: parcelSerialized }),
       expect.anything(),
       expect.anything(),
     );
@@ -731,17 +778,17 @@ describe('storeEndpointBoundParcel', () => {
 
   test('Parcel data should be published to right NATS Streaming channel', async () => {
     const key = await store.storeEndpointBoundParcel(
-      PARCEL,
-      PARCEL_SERIALIZED,
-      PRIVATE_GATEWAY_ADDRESS,
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
     );
 
     const expectedMessageData: QueuedInternetBoundParcelMessage = {
-      parcelExpiryDate: PARCEL.expiryDate,
+      parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey: key!!,
-      parcelRecipientAddress: PARCEL.recipientAddress,
+      parcelRecipientAddress: parcel.recipientAddress,
     };
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       JSON.stringify(expectedMessageData),
@@ -751,19 +798,19 @@ describe('storeEndpointBoundParcel', () => {
 });
 
 describe('deleteEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   test('Object should be deleted from the right bucket', async () => {
     await store.deleteEndpointBoundParcel('');
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
     const key = 'thingy.parcel';
     await store.deleteEndpointBoundParcel(key);
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
+    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(
       `parcels/endpoint-bound/${key}`,
       expect.anything(),
     );
@@ -776,7 +823,7 @@ describe('initFromEnv', () => {
   };
   const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 
-  jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(mockObjectStoreClient);
+  jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(MOCK_OBJECT_STORE_CLIENT);
 
   test('OBJECT_STORE_BUCKET should be required', () => {
     mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });
@@ -788,12 +835,12 @@ describe('initFromEnv', () => {
     const store = ParcelStore.initFromEnv();
 
     expect(store.bucket).toEqual(requiredEnvVars.OBJECT_STORE_BUCKET);
-    expect(store.objectStoreClient).toBe(mockObjectStoreClient);
+    expect(store.objectStoreClient).toBe(MOCK_OBJECT_STORE_CLIENT);
   });
 });
 
 describe('makeActiveParcelRetriever', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   test('Active parcels should be output', async () => {
     const parcelObjectMetadata: ParcelObjectMetadata<{ readonly foo: string }> = {
@@ -803,7 +850,7 @@ describe('makeActiveParcelRetriever', () => {
     const expiryDate = getDateRelativeToNow(1);
     setMockParcelObjectStore({
       [parcelObjectMetadata.key]: {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
       },
     });
@@ -811,10 +858,10 @@ describe('makeActiveParcelRetriever', () => {
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(MOCK_LOGGING.logger),
+        store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
-    ).resolves.toEqual([{ ...parcelObjectMetadata, body: PARCEL_SERIALIZED, expiryDate }]);
+    ).resolves.toEqual([{ ...parcelObjectMetadata, body: parcelSerialized, expiryDate }]);
   });
 
   test('Expired parcels should be filtered out', async () => {
@@ -825,7 +872,7 @@ describe('makeActiveParcelRetriever', () => {
     const expiryDate = getDateRelativeToNow(0);
     setMockParcelObjectStore({
       [parcelObjectMetadata.key]: {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
       },
     });
@@ -833,12 +880,12 @@ describe('makeActiveParcelRetriever', () => {
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(MOCK_LOGGING.logger),
+        store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
 
-    expect(MOCK_LOGGING.logs).toContainEqual(
+    expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Ignoring expired parcel', {
         parcelExpiryDate: expiryDate.toISOString(),
         parcelObjectKey: parcelObjectMetadata.key,
@@ -853,7 +900,7 @@ describe('makeActiveParcelRetriever', () => {
     };
     setMockParcelObjectStore({
       [parcelObjectMetadata.key]: {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: {},
       },
     });
@@ -861,12 +908,12 @@ describe('makeActiveParcelRetriever', () => {
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(MOCK_LOGGING.logger),
+        store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
 
-    expect(MOCK_LOGGING.logs).toContainEqual(
+    expect(mockLogging.logs).toContainEqual(
       partialPinoLog('warn', 'Parcel object does not have a valid expiry timestamp', {
         parcelObjectKey: parcelObjectMetadata.key,
       }),
@@ -880,7 +927,7 @@ describe('makeActiveParcelRetriever', () => {
     };
     setMockParcelObjectStore({
       [parcelObjectMetadata.key]: {
-        body: PARCEL_SERIALIZED,
+        body: parcelSerialized,
         metadata: { 'parcel-expiry': 'I have seen many numbers in my life. This is not one.' },
       },
     });
@@ -888,12 +935,12 @@ describe('makeActiveParcelRetriever', () => {
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(MOCK_LOGGING.logger),
+        store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
 
-    expect(MOCK_LOGGING.logs).toContainEqual(
+    expect(mockLogging.logs).toContainEqual(
       partialPinoLog('warn', 'Parcel object does not have a valid expiry timestamp', {
         parcelObjectKey: parcelObjectMetadata.key,
       }),
@@ -906,17 +953,17 @@ describe('makeActiveParcelRetriever', () => {
       key: 'prefix/deleted.parcel',
     };
     const error = new Error('That was deleted');
-    getMockInstance(mockObjectStoreClient.getObject).mockRejectedValue(error);
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockRejectedValue(error);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(MOCK_LOGGING.logger),
+        store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
 
-    expect(MOCK_LOGGING.logs).toContainEqual(
+    expect(mockLogging.logs).toContainEqual(
       partialPinoLog(
         'info',
         'Parcel object could not be found; it could have been deleted since keys were retrieved',
@@ -929,11 +976,11 @@ describe('makeActiveParcelRetriever', () => {
   });
 
   function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
-    getMockInstance(mockObjectStoreClient.listObjectKeys).mockReturnValue(
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).mockReturnValue(
       arrayToAsyncIterable(Object.keys(objectsByKey)),
     );
 
-    getMockInstance(mockObjectStoreClient.getObject).mockImplementation(
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockImplementation(
       (objectKey) => objectsByKey[objectKey],
     );
   }

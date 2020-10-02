@@ -369,7 +369,7 @@ test.todo('Connection should be closed gracefully if client closes it with a nor
 test.todo('Server should handle gracefully client closes with another reason besides normal');
 
 function mockParcelStreamMessage(parcelSerialized: Buffer): ParcelStreamMessage {
-  return { deleteParcel: jest.fn(), parcelSerialized };
+  return { ack: jest.fn(), parcelSerialized };
 }
 
 async function completeHandshake(client: MockWebSocketClient): Promise<void> {

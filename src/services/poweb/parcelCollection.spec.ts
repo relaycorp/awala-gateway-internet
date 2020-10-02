@@ -117,12 +117,11 @@ describe('Request id', () => {
 });
 
 test('Requests with Origin header should be refused', async () => {
-  const client = new MockWebSocketClient(mockWSServer, 'on', 'https://invalid.local');
+  const client = new MockWebSocketClient(mockWSServer, 'off', 'https://invalid.local');
 
   await client.connect();
 
-  const closeFrame = await client.waitForClose();
-  expect(closeFrame).toEqual({
+  await expect(client.waitForClose()).resolves.toEqual({
     code: WebSocketCode.VIOLATED_POLICY,
     reason: 'Web browser requests are disabled for security reasons',
   });
@@ -287,7 +286,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should complete successfully if all signatures are valid', async () => {
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
 
     await completeHandshake(client);
 
@@ -303,7 +302,7 @@ describe('Handshake', () => {
 
 describe('Keep alive', () => {
   test('Connection should be closed upon completion if Keep-Alive is off', async () => {
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
@@ -356,7 +355,7 @@ describe('Keep alive', () => {
 });
 
 test('Server should send parcel to client', async () => {
-  const client = new MockWebSocketClient(mockWSServer, 'off');
+  const client = new MockWebSocketClient(mockWSServer);
   MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
     arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
   );
@@ -377,7 +376,7 @@ test('Server should send parcel to client', async () => {
 
 describe('Acknowledgements', () => {
   test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
       arrayToAsyncIterable([
         mockParcelStreamMessage(parcelSerialization),
@@ -400,7 +399,7 @@ describe('Acknowledgements', () => {
   test('Parcel should be deleted when client acknowledges its receipt', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     await receiveAndACKDelivery(client);
@@ -418,7 +417,7 @@ describe('Acknowledgements', () => {
   test('Parcel should not be deleted if client never acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but don't ACK it
@@ -432,7 +431,7 @@ describe('Acknowledgements', () => {
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but acknowledge it with a different id
@@ -455,7 +454,7 @@ describe('Acknowledgements', () => {
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but acknowledge it with a different id
@@ -487,7 +486,7 @@ describe('Acknowledgements', () => {
       await new Promise((resolve) => ackAlert.once('done', resolve));
       yield mockParcelStreamMessage(parcelSerialization); // parcel2
     });
-    const client = new MockWebSocketClient(mockWSServer, 'off');
+    const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     await receiveAndACKDelivery(client); // parcel1
@@ -596,7 +595,7 @@ class MockWebSocketClient extends EventEmitter {
 
   constructor(
     private wsServer: WSServer,
-    private keepAlive: string = 'on',
+    private keepAlive: string = 'off',
     private origin?: string,
     private requestId?: string,
   ) {

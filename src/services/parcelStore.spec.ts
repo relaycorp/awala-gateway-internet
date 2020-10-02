@@ -106,14 +106,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
     );
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
-      { ack: expect.any(Function), parcelSerialized },
+      { ack: expect.any(Function), parcelObjectKey: activeParcelKey, parcelSerialized },
     ]);
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('info', 'Live streaming parcel', {
-        parcelObjectKey: activeParcelKey,
-        peerGatewayAddress,
-      }),
-    );
   });
 
   test('Expired parcels should be filtered out', async () => {
@@ -196,30 +190,6 @@ describe('liveStreamActiveParcelsForGateway', () => {
 
       expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(activeParcelKey, BUCKET);
     });
-
-    test('Call should be logged', async () => {
-      setMockParcelObjectStore(activeParcelObject, activeParcelKey);
-
-      const [activeParcel] = await pipe(
-        STORE.liveStreamActiveParcelsForGateway(
-          peerGatewayAddress,
-          MOCK_NATS_CLIENT,
-          abortController.signal,
-          mockLogging.logger,
-        ),
-        iterableTake(1),
-        asyncIterableToArray,
-      );
-
-      await activeParcel.ack();
-
-      expect(mockLogging.logs).toContainEqual(
-        partialPinoLog('info', 'Deleting live streamed parcel', {
-          parcelObjectKey: activeParcelKey,
-          peerGatewayAddress,
-        }),
-      );
-    });
   });
 
   function setMockParcelObjectStore(storeObject: StoreObject, objectKey: string): Message {
@@ -258,15 +228,9 @@ describe('streamActiveParcelsForGateway', () => {
     );
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
-      { ack: expect.any(Function), parcelSerialized },
+      { ack: expect.any(Function), parcelObjectKey: parcelObject.key, parcelSerialized },
     ]);
     expect(parcelRetrieverSpy).toBeCalledWith(peerGatewayAddress, mockLogging.logger);
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('info', 'Streaming parcel', {
-        parcelObjectKey: parcelObject.key,
-        peerGatewayAddress,
-      }),
-    );
   });
 
   describe('Acknowledgement callback', () => {
@@ -283,25 +247,6 @@ describe('streamActiveParcelsForGateway', () => {
       expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).not.toBeCalled();
       await message.ack();
       expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(parcelObject.key, BUCKET);
-    });
-
-    test('Call should be logged', async () => {
-      const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
-      jest
-        .spyOn(store, 'retrieveActiveParcelsForGateway')
-        .mockReturnValue(arrayToAsyncIterable([parcelObject]));
-
-      const [message] = await asyncIterableToArray(
-        store.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
-      );
-
-      await message.ack();
-      expect(mockLogging.logs).toContainEqual(
-        partialPinoLog('info', 'Deleting streamed parcel', {
-          parcelObjectKey: parcelObject.key,
-          peerGatewayAddress,
-        }),
-      );
     });
   });
 });

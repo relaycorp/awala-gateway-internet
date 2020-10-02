@@ -163,29 +163,40 @@ describe('Handshake', () => {
     expectBuffersToEqual(bufferToArray(uuidBinSpy.mock.results[0].value), challenge.nonce);
 
     expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Sending handshake challenge', { reqId: expect.anything() }),
+      partialPinoLog('debug', 'Sending handshake challenge', { reqId: UUID4_REGEX }),
     );
   });
 
-  test.todo('Handshake should fail if response is a text frame');
-
-  test('Handshake should fail if response is invalid', async () => {
+  test('Handshake should fail if response is malformed', async () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
-    client.getLastMessage(); // Discard challenge
 
     await client.send(arrayBufferFrom('invalid handshake response'));
 
-    const closeFrame = await client.waitForClose();
-    expect(closeFrame).toEqual({
+    await expect(client.waitForClose()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Invalid handshake response',
     });
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing malformed handshake response', {
         err: expect.objectContaining({ type: InvalidMessageError.name }),
-        reqId: expect.anything(),
+        reqId: UUID4_REGEX,
       }),
+    );
+  });
+
+  test('Handshake should fail if response is a text frame', async () => {
+    const client = new MockWebSocketClient(mockWSServer);
+    await client.connect();
+
+    await client.send('invalid handshake response');
+
+    await expect(client.waitForClose()).resolves.toEqual({
+      code: WebSocketCode.CANNOT_ACCEPT,
+      reason: 'Invalid handshake response',
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Refusing malformed handshake response'),
     );
   });
 
@@ -205,7 +216,7 @@ describe('Handshake', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid number of signatures', {
         nonceSignaturesCount: 0,
-        reqId: expect.anything(),
+        reqId: UUID4_REGEX,
       }),
     );
   });
@@ -214,14 +225,11 @@ describe('Handshake', () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
     client.getLastMessage(); // Discard challenge
-    const response = new HandshakeResponse([
+    const invalidResponse = new HandshakeResponse([
       arrayBufferFrom('signature 1'),
       arrayBufferFrom('signature 2'),
     ]);
 
-    await client.send(response.serialize());
-
-    const invalidResponse = new HandshakeResponse([]);
     await client.send(invalidResponse.serialize());
 
     const closeFrame = await client.waitForClose();
@@ -232,7 +240,7 @@ describe('Handshake', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid number of signatures', {
         nonceSignaturesCount: 2,
-        reqId: expect.anything(),
+        reqId: UUID4_REGEX,
       }),
     );
   });
@@ -254,7 +262,7 @@ describe('Handshake', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid signature', {
         err: expect.objectContaining({ type: CMSError.name }),
-        reqId: expect.anything(),
+        reqId: UUID4_REGEX,
       }),
     );
   });
@@ -273,7 +281,7 @@ describe('Handshake', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid signature', {
         err: expect.objectContaining({ type: CMSError.name }),
-        reqId: expect.anything(),
+        reqId: UUID4_REGEX,
       }),
     );
   });
@@ -284,6 +292,12 @@ describe('Handshake', () => {
     await completeHandshake(client);
 
     await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Handshake completed successfully', {
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
   });
 });
 
@@ -298,45 +312,46 @@ describe('Keep alive', () => {
       peerGatewayAddress,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'All parcels were acknowledged shortly after the last one was sent', {
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
 
     expect(MOCK_PARCEL_LIVE_STREAM).not.toBeCalled();
     expect(NatsStreamingClient.initFromEnv).not.toBeCalled();
   });
 
-  test('Connection should be kept alive indefinitely if Keep-Alive is on', async (cb) => {
+  test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
     const reqId = 'the-request-id';
     const client = new MockWebSocketClient(mockWSServer, 'on', undefined, reqId);
     const abortController = new AbortController();
+
     await completeHandshake(client);
 
-    setTimeout(async () => {
-      expect(MOCK_PARCEL_LIVE_STREAM).toBeCalledWith(
-        peerGatewayAddress,
-        MOCK_NATS_STREAMING_CLIENT,
-        abortController.signal,
-        partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
-      );
-      expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
-      expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
+    await sleep(500);
+    expect(MOCK_PARCEL_LIVE_STREAM).toBeCalledWith(
+      peerGatewayAddress,
+      MOCK_NATS_STREAMING_CLIENT,
+      abortController.signal,
+      partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
+    );
+    expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
+    expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
 
-      expect(client.wasConnectionClosed).toBeFalse();
-      client.disconnect();
-
-      cb();
-    }, 500);
+    expect(client.wasConnectionClosed).toBeFalse();
+    client.disconnect();
   });
 
-  test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async (cb) => {
+  test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
     const client = new MockWebSocketClient(mockWSServer, 'THIS IS NOT A VALID VALUE');
     await completeHandshake(client);
 
-    setTimeout(async () => {
-      expect(MOCK_PARCEL_LIVE_STREAM).toBeCalled();
-      expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
-      client.disconnect();
-
-      cb();
-    }, 100);
+    await sleep(500);
+    expect(MOCK_PARCEL_LIVE_STREAM).toBeCalled();
+    expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
+    client.disconnect();
   });
 });
 
@@ -354,22 +369,160 @@ test('Server should send parcel to client', async () => {
   );
   expect(parcelDelivery).toHaveProperty('deliveryId', UUID4_REGEX);
   expectBuffersToEqual(parcelSerialization, Buffer.from(parcelDelivery.parcelSerialized));
+
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Sending parcel', { reqId: UUID4_REGEX, peerGatewayAddress }),
+  );
 });
 
 describe('Acknowledgements', () => {
-  test.todo('Parcel should be deleted when client acknowledges its receipt');
+  test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+      arrayToAsyncIterable([
+        mockParcelStreamMessage(parcelSerialization),
+        mockParcelStreamMessage(parcelSerialization),
+      ]),
+    );
+    await completeHandshake(client);
 
-  test.todo('Connection should be closed with an error if client sends unknown ACK');
+    const parcelDelivery1Serialized = await client.receive();
+    const parcelDelivery1 = ParcelDelivery.deserialize(
+      bufferToArray(parcelDelivery1Serialized as Buffer),
+    );
+    const parcelDelivery2Serialized = await client.receive();
+    const parcelDelivery2 = ParcelDelivery.deserialize(
+      bufferToArray(parcelDelivery2Serialized as Buffer),
+    );
+    expect(parcelDelivery1.deliveryId).not.toEqual(parcelDelivery2.deliveryId);
+  });
 
-  test.todo('Connection should be closed with an error if client sends a binary ACK');
+  test('Parcel should be deleted when client acknowledges its receipt', async () => {
+    const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
+    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    await completeHandshake(client);
+
+    await receiveAndACKDelivery(client);
+
+    expect(parcelStreamMessage.ack).toBeCalled();
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Acknowledgement received', {
+        parcelObjectKey: parcelStreamMessage.parcelObjectKey,
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
+
+  test('Parcel should not be deleted if client never acknowledges it', async () => {
+    const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
+    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    await completeHandshake(client);
+
+    // Get the parcel but don't ACK it
+    await client.receive();
+
+    await sleep(500);
+    expect(parcelStreamMessage.ack).not.toBeCalled();
+  });
+
+  test('Connection should be closed with an error if client sends unknown ACK', async () => {
+    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+      arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
+    );
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    await completeHandshake(client);
+
+    // Get the parcel but acknowledge it with a different id
+    await client.receive();
+    await client.send('unknown delivery id');
+
+    await expect(client.waitForClose()).resolves.toEqual({
+      code: WebSocketCode.CANNOT_ACCEPT,
+      reason: 'Unknown delivery id sent as acknowledgement',
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
+
+  test('Connection should be closed with an error if client sends a binary ACK', async () => {
+    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+      arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
+    );
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    await completeHandshake(client);
+
+    // Get the parcel but acknowledge it with a different id
+    await client.receive();
+    await client.send(Buffer.from('invalid ACK'));
+
+    await expect(client.waitForClose()).resolves.toEqual({
+      code: WebSocketCode.CANNOT_ACCEPT,
+      reason: 'Unknown delivery id sent as acknowledgement',
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
+
+  test('Connection should be closed when all parcels have been delivered and ACKed', async () => {
+    // Send two parcels, but not at the same time: Send parcel1 and get an ack1, then send parcel2.
+    // The connection shouldn't be closed when ack1 is received just because there's no other parcel
+    // in-flight.
+
+    const ackAlert = new EventEmitter();
+    MOCK_PARCEL_NON_LIVE_STREAM.mockImplementation(async function* (): AsyncIterable<
+      ParcelStreamMessage
+    > {
+      yield mockParcelStreamMessage(parcelSerialization); // parcel1
+      await new Promise((resolve) => ackAlert.once('done', resolve));
+      yield mockParcelStreamMessage(parcelSerialization); // parcel2
+    });
+    const client = new MockWebSocketClient(mockWSServer, 'off');
+    await completeHandshake(client);
+
+    await receiveAndACKDelivery(client); // parcel1
+    ackAlert.emit('done');
+
+    const parcel2DeliverySerialized = (await client.receive()) as Buffer;
+    expect(client.wasConnectionClosed).toBeFalse();
+    const parcel2Delivery = ParcelDelivery.deserialize(bufferToArray(parcel2DeliverySerialized));
+    await client.send(parcel2Delivery.deliveryId);
+    await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Closing connection after all parcels have been acknowledged', {
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
+
+  async function receiveAndACKDelivery(client: MockWebSocketClient): Promise<void> {
+    const parcelDeliverySerialized = (await client.receive()) as Buffer;
+    const parcelDelivery = ParcelDelivery.deserialize(bufferToArray(parcelDeliverySerialized));
+    await client.send(parcelDelivery.deliveryId);
+  }
 });
 
-test.todo('Connection should be closed gracefully if client closes it with a normal reason');
+test.todo('Client-initiated WebSocket connection closure should be handled gracefully');
 
-test.todo('Server should handle gracefully client closes with another reason besides normal');
+test.todo('Abrupt TCP connection closure should be handled gracefully');
 
-function mockParcelStreamMessage(parcelSerialized: Buffer): ParcelStreamMessage {
-  return { ack: jest.fn(), parcelSerialized };
+function mockParcelStreamMessage(
+  parcelSerialized: Buffer,
+  parcelObjectKey: string = 'prefix/id.parcel',
+): ParcelStreamMessage {
+  return { ack: jest.fn(), parcelObjectKey, parcelSerialized };
 }
 
 async function completeHandshake(client: MockWebSocketClient): Promise<void> {
@@ -379,6 +532,10 @@ async function completeHandshake(client: MockWebSocketClient): Promise<void> {
   const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
 
   await client.send(response.serialize());
+}
+
+export async function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 //region WebSocket utilities
@@ -477,7 +634,8 @@ class MockWebSocketClient extends EventEmitter {
     this.wsConnection.emit('close', code, reason);
   }
 
-  public async send(message: ArrayBuffer): Promise<void> {
+  public async send(message: WSData): Promise<void> {
+    expect(this.wasConnectionClosed).toBeFalse();
     return new Promise((resolve) => {
       this.wsConnection.once('message', resolve);
       this.wsConnection.emit('message', message);
@@ -485,6 +643,7 @@ class MockWebSocketClient extends EventEmitter {
   }
 
   public async receive(): Promise<WSData> {
+    expect(this.wasConnectionClosed).toBeFalse();
     return new Promise((resolve) => {
       this.wsConnection.serverEvents.once('messageSent', resolve);
     });

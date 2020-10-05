@@ -16,7 +16,7 @@ import { Connection } from 'mongoose';
 import { Socket } from 'net';
 import { Duplex } from 'stream';
 import uuid from 'uuid-random';
-import WS, { Data as WSData, Server as WSServer } from 'ws';
+import WS, { Server as WSServer } from 'ws';
 
 import {
   arrayBufferFrom,
@@ -151,7 +151,7 @@ describe('Handshake', () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
 
-    await client.send(arrayBufferFrom('invalid handshake response'));
+    await client.send(Buffer.from('invalid handshake response'));
 
     await expect(client.waitForClose()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
@@ -186,7 +186,7 @@ describe('Handshake', () => {
     await client.receive(); // Discard challenge
 
     const invalidResponse = new HandshakeResponse([]);
-    await client.send(invalidResponse.serialize());
+    await client.send(Buffer.from(invalidResponse.serialize()));
 
     const closeFrame = await client.waitForClose();
     expect(closeFrame).toEqual({
@@ -210,7 +210,7 @@ describe('Handshake', () => {
       arrayBufferFrom('signature 2'),
     ]);
 
-    await client.send(invalidResponse.serialize());
+    await client.send(Buffer.from(invalidResponse.serialize()));
 
     const closeFrame = await client.waitForClose();
     expect(closeFrame).toEqual({
@@ -232,7 +232,7 @@ describe('Handshake', () => {
     await client.receive(); // Discard challenge
     const invalidResponse = new HandshakeResponse([arrayBufferFrom('invalid')]);
 
-    await client.send(invalidResponse.serialize());
+    await client.send(Buffer.from(invalidResponse.serialize()));
 
     const closeFrame = await client.waitForClose();
     expect(closeFrame).toEqual({
@@ -564,7 +564,7 @@ async function completeHandshake(client: MockWebSocketClient): Promise<void> {
   const challenge = HandshakeChallenge.deserialize((await client.receive()) as ArrayBuffer);
   const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
 
-  await client.send(response.serialize());
+  await client.send(Buffer.from(response.serialize()));
 }
 
 async function sleep(milliseconds: number): Promise<void> {
@@ -591,7 +591,7 @@ class MockWebSocketConnection extends EventEmitter {
   // tslint:disable-next-line:readonly-keyword
   public serverCloseFrame: WebSocketCloseMessage | null = null;
   // tslint:disable-next-line:readonly-array
-  public readonly messagesSentByServer: WSData[] = [];
+  public readonly messagesSentByServer: Array<Buffer | string> = [];
   public readonly serverEvents = new EventEmitter();
 
   public send(data: any): void {
@@ -678,7 +678,7 @@ class MockWebSocketClient extends EventEmitter {
     this.wsConnection.emit('error', error);
   }
 
-  public async send(message: WSData): Promise<void> {
+  public async send(message: Buffer | string): Promise<void> {
     expect(this.wasConnectionClosed).toBeFalse();
     return new Promise((resolve) => {
       this.wsConnection.once('message', resolve);
@@ -686,7 +686,7 @@ class MockWebSocketClient extends EventEmitter {
     });
   }
 
-  public async receive(): Promise<WSData> {
+  public async receive(): Promise<Buffer | string> {
     expect(this.wasConnectionClosed).toBeFalse();
 
     const lastMessage = this.getLastMessage();
@@ -694,14 +694,17 @@ class MockWebSocketClient extends EventEmitter {
       return lastMessage;
     }
 
-    const message = await waitForEvent<WSData>('messageSent', this.wsConnection.serverEvents);
+    const message = await waitForEvent<Buffer | string>(
+      'messageSent',
+      this.wsConnection.serverEvents,
+    );
     const index = this.wsConnection.messagesSentByServer.indexOf(message);
     this.wsConnection.messagesSentByServer.splice(index, 1);
     return message;
   }
 
-  public getLastMessage(): ArrayBuffer | undefined {
-    return this.wsConnection.messagesSentByServer.pop() as ArrayBuffer | undefined;
+  public getLastMessage(): Buffer | string | undefined {
+    return this.wsConnection.messagesSentByServer.pop() as Buffer | string;
   }
 
   public async waitForClose(): Promise<WebSocketCloseMessage> {

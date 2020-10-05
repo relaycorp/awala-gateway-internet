@@ -96,11 +96,11 @@ async function doHandshake(wsConnection: WebSocket, logger: Logger): Promise<str
   const nonce = bufferToArray(uuid.bin() as Buffer);
 
   return new Promise((resolve) => {
-    wsConnection.once('message', async (message) => {
+    wsConnection.once('message', async (message: Buffer) => {
       // tslint:disable-next-line:no-let
       let handshakeResponse: HandshakeResponse;
       try {
-        handshakeResponse = HandshakeResponse.deserialize(message as ArrayBuffer);
+        handshakeResponse = HandshakeResponse.deserialize(bufferToArray(message));
       } catch (err) {
         logger.info({ err }, 'Refusing malformed handshake response');
         wsConnection.close(WebSocketCode.CANNOT_ACCEPT, 'Invalid handshake response');

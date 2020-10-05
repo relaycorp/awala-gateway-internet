@@ -7,7 +7,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { IncomingMessage } from 'http';
+import { IncomingHttpHeaders, IncomingMessage } from 'http';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { duplex } from 'stream-to-it';
@@ -52,36 +52,64 @@ function makeConnectionHandler(
       );
       return;
     }
+    const abortController = makeAbortController(wsConnection, requestAwareLogger);
 
-    const abortController = new AbortController();
-    wsConnection.once('close', (closeCode, closeReason) => {
-      requestAwareLogger.info({ closeCode, closeReason }, 'Closing connection');
-      abortController.abort();
-    });
-    wsConnection.once('error', (err) => {
-      requestAwareLogger.info({ err }, 'Closing connection due to error');
-      abortController.abort();
-    });
+    const peerGatewayAddress = await doHandshake(wsConnection, requestAwareLogger);
+    if (!peerGatewayAddress) {
+      return;
+    }
+    const peerAwareLogger = requestAwareLogger.child({ peerGatewayAddress });
+    peerAwareLogger.debug('Handshake completed successfully');
 
-    // "on" or any value other than "off" should keep the connection alive
-    const keepAlive = request.headers['x-relaynet-keep-alive'] !== 'off';
+    const tracker = new CollectionTracker();
 
-    const nonce = bufferToArray(uuid.bin() as Buffer);
+    await pipe(
+      streamActiveParcels(
+        parcelStore,
+        peerGatewayAddress,
+        peerAwareLogger,
+        reqId,
+        request.headers,
+        abortController.signal,
+      ),
+      makeDeliveryStream(wsConnection, tracker, peerAwareLogger),
+      duplex(createWebSocketStream(wsConnection)),
+      makeACKProcessor(wsConnection, tracker, peerAwareLogger),
+    );
+  };
+}
 
+function makeAbortController(wsConnection: WebSocket, logger: Logger): AbortController {
+  const abortController = new AbortController();
+  wsConnection.once('close', (closeCode, closeReason) => {
+    logger.info({ closeCode, closeReason }, 'Closing connection');
+    abortController.abort();
+  });
+  wsConnection.once('error', (err) => {
+    logger.info({ err }, 'Closing connection due to error');
+    abortController.abort();
+  });
+  return abortController;
+}
+
+async function doHandshake(wsConnection: WebSocket, logger: Logger): Promise<string | null> {
+  const nonce = bufferToArray(uuid.bin() as Buffer);
+
+  return new Promise((resolve) => {
     wsConnection.once('message', async (message) => {
       // tslint:disable-next-line:no-let
       let handshakeResponse: HandshakeResponse;
       try {
         handshakeResponse = HandshakeResponse.deserialize(message as ArrayBuffer);
       } catch (err) {
-        requestAwareLogger.info({ err }, 'Refusing malformed handshake response');
+        logger.info({ err }, 'Refusing malformed handshake response');
         wsConnection.close(WebSocketCode.CANNOT_ACCEPT, 'Invalid handshake response');
-        return;
+        return resolve(null);
       }
 
       const nonceSignaturesCount = handshakeResponse.nonceSignatures.length;
       if (nonceSignaturesCount !== 1) {
-        requestAwareLogger.info(
+        logger.info(
           { nonceSignaturesCount },
           'Refusing handshake response with invalid number of signatures',
         );
@@ -90,7 +118,7 @@ function makeConnectionHandler(
           'Handshake response did not include exactly one nonce signature ' +
             `(got ${nonceSignaturesCount})`,
         );
-        return;
+        return resolve(null);
       }
 
       const mongooseConnection = await createMongooseConnectionFromEnv();
@@ -107,114 +135,35 @@ function makeConnectionHandler(
           trustedCertificates,
         );
       } catch (err) {
-        requestAwareLogger.info({ err }, 'Refusing handshake response with invalid signature');
+        logger.info({ err }, 'Refusing handshake response with invalid signature');
         wsConnection.close(WebSocketCode.CANNOT_ACCEPT, 'Nonce signature is invalid');
-        return;
+        return resolve(null);
       }
 
-      const peerGatewayAddress = await peerGatewayCertificate.calculateSubjectPrivateAddress();
-      const peerAwareLogger = requestAwareLogger.child({ peerGatewayAddress });
-
-      peerAwareLogger.debug('Handshake completed successfully');
-
-      const stream = createWebSocketStream(wsConnection);
-      const connectionDuplex = duplex(stream);
-
-      // tslint:disable-next-line:readonly-keyword
-      const pendingACKs: { [key: string]: PendingACK } = {};
-      // tslint:disable-next-line:no-let
-      let allParcelsDelivered = false;
-
-      async function processAcknowledgements(ackMessages: AsyncIterable<string>): Promise<void> {
-        for await (const ackMessage of ackMessages) {
-          const pendingACK = pendingACKs[ackMessage];
-          if (!pendingACK) {
-            peerAwareLogger.info('Closing connection due to unknown acknowledgement');
-            wsConnection.close(
-              WebSocketCode.CANNOT_ACCEPT,
-              'Unknown delivery id sent as acknowledgement',
-            );
-            break;
-          }
-          // tslint:disable-next-line:no-delete no-object-mutation
-          delete pendingACKs[ackMessage];
-          peerAwareLogger.info(
-            { parcelObjectKey: pendingACK.parcelObjectKey },
-            'Acknowledgement received',
-          );
-          await pendingACK.ack();
-
-          if (Object.keys(pendingACKs).length === 0 && allParcelsDelivered) {
-            peerAwareLogger.info('Closing connection after all parcels have been acknowledged');
-            wsConnection.close(WebSocketCode.NORMAL);
-            break;
-          }
-        }
-      }
-
-      const activeParcelsForGateway = streamActiveParcels(
-        keepAlive,
-        parcelStore,
-        peerGatewayAddress,
-        peerAwareLogger,
-        reqId,
-        abortController.signal,
-      );
-
-      async function* streamDeliveries(
-        parcelMessages: AsyncIterable<ParcelStreamMessage>,
-      ): AsyncIterable<Buffer> {
-        for await (const parcelMessage of parcelMessages) {
-          peerAwareLogger.info(
-            { parcelObjectKey: parcelMessage.parcelObjectKey },
-            'Sending parcel',
-          );
-          const parcelDelivery = new ParcelDelivery(
-            uuid(),
-            bufferToArray(parcelMessage.parcelSerialized),
-          );
-
-          // tslint:disable-next-line:no-object-mutation
-          pendingACKs[parcelDelivery.deliveryId] = {
-            ack: parcelMessage.ack,
-            parcelObjectKey: parcelMessage.parcelObjectKey,
-          };
-
-          yield Buffer.from(parcelDelivery.serialize());
-        }
-        allParcelsDelivered = true;
-
-        if (Object.keys(pendingACKs).length === 0) {
-          peerAwareLogger.info('All parcels were acknowledged shortly after the last one was sent');
-          wsConnection.close(WebSocketCode.NORMAL);
-        }
-      }
-
-      await pipe(
-        activeParcelsForGateway,
-        streamDeliveries,
-        connectionDuplex,
-        processAcknowledgements,
-      );
+      resolve(await peerGatewayCertificate.calculateSubjectPrivateAddress());
     });
 
-    requestAwareLogger.debug('Sending handshake challenge');
+    logger.debug('Sending handshake challenge');
     const challenge = new HandshakeChallenge(nonce);
     wsConnection.send(challenge.serialize());
-  };
+  });
 }
 
 function streamActiveParcels(
-  keepAlive: boolean,
   parcelStore: ParcelStore,
   peerGatewayAddress: string,
   logger: Logger,
   requestId: string,
+  requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
 ): AsyncIterable<ParcelStreamMessage> {
+  // "on" or any value other than "off" should keep the connection alive
+  const keepAlive = requestHeaders['x-relaynet-keep-alive'] !== 'off';
+
   if (!keepAlive) {
     return parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
   }
+
   const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
   return parcelStore.liveStreamActiveParcelsForGateway(
     peerGatewayAddress,
@@ -222,4 +171,93 @@ function streamActiveParcels(
     abortSignal,
     logger,
   );
+}
+
+function makeDeliveryStream(
+  wsConnection: WebSocket,
+  tracker: CollectionTracker,
+  logger: Logger,
+): (parcelMessages: AsyncIterable<ParcelStreamMessage>) => AsyncIterable<Buffer> {
+  return async function* (
+    parcelMessages: AsyncIterable<ParcelStreamMessage>,
+  ): AsyncIterable<Buffer> {
+    for await (const parcelMessage of parcelMessages) {
+      logger.info({ parcelObjectKey: parcelMessage.parcelObjectKey }, 'Sending parcel');
+      const parcelDelivery = new ParcelDelivery(
+        uuid(),
+        bufferToArray(parcelMessage.parcelSerialized),
+      );
+
+      tracker.addPendingACK(parcelDelivery.deliveryId, {
+        ack: parcelMessage.ack,
+        parcelObjectKey: parcelMessage.parcelObjectKey,
+      });
+
+      yield Buffer.from(parcelDelivery.serialize());
+    }
+    tracker.markAllParcelsDelivered();
+
+    if (tracker.isCollectionComplete) {
+      logger.info('All parcels were acknowledged shortly after the last one was sent');
+      wsConnection.close(WebSocketCode.NORMAL);
+    }
+  };
+}
+
+function makeACKProcessor(
+  wsConnection: WebSocket,
+  tracker: CollectionTracker,
+  logger: Logger,
+): (ackMessages: AsyncIterable<string>) => Promise<void> {
+  return async (ackMessages: AsyncIterable<string>) => {
+    for await (const ackMessage of ackMessages) {
+      const pendingACK = tracker.popPendingACK(ackMessage);
+      if (!pendingACK) {
+        logger.info('Closing connection due to unknown acknowledgement');
+        wsConnection.close(
+          WebSocketCode.CANNOT_ACCEPT,
+          'Unknown delivery id sent as acknowledgement',
+        );
+        break;
+      }
+      logger.info({ parcelObjectKey: pendingACK.parcelObjectKey }, 'Acknowledgement received');
+      await pendingACK.ack();
+
+      if (tracker.isCollectionComplete) {
+        logger.info('Closing connection after all parcels have been acknowledged');
+        wsConnection.close(WebSocketCode.NORMAL);
+        break;
+      }
+    }
+  };
+}
+
+class CollectionTracker {
+  // tslint:disable-next-line:readonly-keyword
+  private wereAllParcelsDelivered = false;
+  // tslint:disable-next-line:readonly-keyword
+  private pendingACKs: { [key: string]: PendingACK } = {};
+
+  get isCollectionComplete(): boolean {
+    return this.wereAllParcelsDelivered && Object.keys(this.pendingACKs).length === 0;
+  }
+
+  public markAllParcelsDelivered(): void {
+    // tslint:disable-next-line:no-object-mutation
+    this.wereAllParcelsDelivered = true;
+  }
+
+  public addPendingACK(deliveryId: string, pendingACK: PendingACK): void {
+    // tslint:disable-next-line:no-object-mutation
+    this.pendingACKs[deliveryId] = pendingACK;
+  }
+
+  public popPendingACK(deliveryId: string): PendingACK | undefined {
+    const pendingACK = this.pendingACKs[deliveryId];
+    if (pendingACK) {
+      // tslint:disable-next-line:no-delete no-object-mutation
+      delete this.pendingACKs[deliveryId];
+    }
+    return pendingACK;
+  }
 }

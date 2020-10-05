@@ -571,11 +571,11 @@ class MockWebSocketConnection extends EventEmitter {
   // tslint:disable-next-line:readonly-keyword
   public serverCloseFrame: WebSocketCloseMessage | null = null;
   // tslint:disable-next-line:readonly-array
-  public readonly incomingMessages: WSData[] = [];
+  public readonly messagesSentByServer: WSData[] = [];
   public readonly serverEvents = new EventEmitter();
 
   public send(data: any): void {
-    this.incomingMessages.push(data);
+    this.messagesSentByServer.push(data);
     this.serverEvents.emit('messageSent', data);
   }
 
@@ -590,6 +590,11 @@ class MockWebSocketConnection extends EventEmitter {
     const connection = this;
     const duplex = new Duplex({
       objectMode: true,
+      read(_size: number): void {
+        connection.on('message', (message) => {
+          duplex.push(message);
+        });
+      },
       write(chunk: any, _encoding: string, callback: (error?: Error | null) => void): void {
         connection.send(chunk);
         callback();
@@ -675,7 +680,7 @@ class MockWebSocketClient extends EventEmitter {
   }
 
   public getLastMessage(): ArrayBuffer | undefined {
-    return this.wsConnection.incomingMessages.pop() as ArrayBuffer | undefined;
+    return this.wsConnection.messagesSentByServer.pop() as ArrayBuffer | undefined;
   }
 
   public async waitForClose(): Promise<WebSocketCloseMessage> {

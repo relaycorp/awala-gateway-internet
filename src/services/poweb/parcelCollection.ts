@@ -8,9 +8,11 @@ import {
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { IncomingMessage } from 'http';
+import pipe from 'it-pipe';
 import { Logger } from 'pino';
+import { duplex } from 'stream-to-it';
 import uuid from 'uuid-random';
-import WebSocket, { Server as WSServer } from 'ws';
+import WebSocket, { createWebSocketStream, Server as WSServer } from 'ws';
 
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
@@ -115,6 +117,9 @@ function makeConnectionHandler(
 
       peerAwareLogger.debug('Handshake completed successfully');
 
+      const stream = createWebSocketStream(wsConnection);
+      const connectionDuplex = duplex(stream);
+
       // tslint:disable-next-line:readonly-keyword
       const pendingACKs: { [key: string]: PendingACK } = {};
       // tslint:disable-next-line:no-let
@@ -152,20 +157,30 @@ function makeConnectionHandler(
         reqId,
         abortController.signal,
       );
-      for await (const parcelMessage of activeParcelsForGateway) {
-        peerAwareLogger.info({ parcelObjectKey: parcelMessage.parcelObjectKey }, 'Sending parcel');
-        const parcelDelivery = new ParcelDelivery(
-          uuid(),
-          bufferToArray(parcelMessage.parcelSerialized),
-        );
-        wsConnection.send(Buffer.from(parcelDelivery.serialize()));
-        // tslint:disable-next-line:no-object-mutation
-        pendingACKs[parcelDelivery.deliveryId] = {
-          ack: parcelMessage.ack,
-          parcelObjectKey: parcelMessage.parcelObjectKey,
-        };
+
+      async function* streamDeliveries(
+        parcelMessages: AsyncIterable<ParcelStreamMessage>,
+      ): AsyncIterable<Buffer> {
+        for await (const parcelMessage of parcelMessages) {
+          peerAwareLogger.info(
+            { parcelObjectKey: parcelMessage.parcelObjectKey },
+            'Sending parcel',
+          );
+          const parcelDelivery = new ParcelDelivery(
+            uuid(),
+            bufferToArray(parcelMessage.parcelSerialized),
+          );
+          yield Buffer.from(parcelDelivery.serialize());
+          // tslint:disable-next-line:no-object-mutation
+          pendingACKs[parcelDelivery.deliveryId] = {
+            ack: parcelMessage.ack,
+            parcelObjectKey: parcelMessage.parcelObjectKey,
+          };
+        }
+        allParcelsDelivered = true;
       }
-      allParcelsDelivered = true;
+
+      await pipe(activeParcelsForGateway, streamDeliveries, connectionDuplex.sink);
 
       if (Object.keys(pendingACKs).length === 0) {
         peerAwareLogger.info('All parcels were acknowledged shortly after the last one was sent');

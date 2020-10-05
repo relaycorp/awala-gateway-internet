@@ -136,7 +136,7 @@ describe('Handshake', () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
 
-    const challengeSerialized = client.getLastMessage();
+    const challengeSerialized = await client.receive();
     expect(challengeSerialized).toBeInstanceOf(ArrayBuffer);
     const challenge = HandshakeChallenge.deserialize(challengeSerialized as ArrayBuffer);
     expect(uuidBinSpy).toBeCalledTimes(1);
@@ -183,7 +183,7 @@ describe('Handshake', () => {
   test('Handshake should fail if response contains zero signatures', async () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
-    client.getLastMessage(); // Discard challenge
+    await client.receive(); // Discard challenge
 
     const invalidResponse = new HandshakeResponse([]);
     await client.send(invalidResponse.serialize());
@@ -204,7 +204,7 @@ describe('Handshake', () => {
   test('Handshake should fail if response contains multiple signatures', async () => {
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
-    client.getLastMessage(); // Discard challenge
+    await client.receive(); // Discard challenge
     const invalidResponse = new HandshakeResponse([
       arrayBufferFrom('signature 1'),
       arrayBufferFrom('signature 2'),
@@ -229,7 +229,7 @@ describe('Handshake', () => {
     // Send two signatures: One valid and the other invalid
     const client = new MockWebSocketClient(mockWSServer);
     await client.connect();
-    client.getLastMessage(); // Discard challenge
+    await client.receive(); // Discard challenge
     const invalidResponse = new HandshakeResponse([arrayBufferFrom('invalid')]);
 
     await client.send(invalidResponse.serialize());
@@ -385,7 +385,7 @@ describe('Acknowledgements', () => {
     expect(parcelDelivery1.deliveryId).not.toEqual(parcelDelivery2.deliveryId);
   });
 
-  test('Parcel should be deleted when client acknowledges its receipt', async () => {
+  test('Parcel should be acknowledged in store when client acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
     MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
     const client = new MockWebSocketClient(mockWSServer);
@@ -393,6 +393,7 @@ describe('Acknowledgements', () => {
 
     await receiveAndACKDelivery(client);
 
+    await waitForSetImmediate();
     expect(parcelStreamMessage.ack).toBeCalled();
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Acknowledgement received', {
@@ -471,15 +472,22 @@ describe('Acknowledgements', () => {
     MOCK_PARCEL_NON_LIVE_STREAM.mockImplementation(async function* (): AsyncIterable<
       ParcelStreamMessage
     > {
-      yield mockParcelStreamMessage(parcelSerialization); // parcel1
-      await new Promise((resolve) => ackAlert.once('done', resolve));
-      yield mockParcelStreamMessage(parcelSerialization); // parcel2
+      // parcel1
+      yield mockParcelStreamMessage(parcelSerialization, () => ackAlert.emit('ackProcessed'));
+
+      await Promise.all([
+        waitForEvent('ackSent', ackAlert),
+        waitForEvent('ackProcessed', ackAlert),
+      ]);
+
+      // parcel2
+      yield mockParcelStreamMessage(parcelSerialization);
     });
     const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
     await receiveAndACKDelivery(client); // parcel1
-    ackAlert.emit('done');
+    ackAlert.emit('ackSent');
 
     const parcel2DeliverySerialized = (await client.receive()) as Buffer;
     expect(client.wasConnectionClosed).toBeFalse();
@@ -541,22 +549,34 @@ test('Abrupt TCP connection closure should be handled gracefully', async () => {
 
 function mockParcelStreamMessage(
   parcelSerialized: Buffer,
-  parcelObjectKey: string = 'prefix/id.parcel',
+  ackCallback: () => void = () => undefined,
 ): ParcelStreamMessage {
-  return { ack: jest.fn(), parcelObjectKey, parcelSerialized };
+  return {
+    ack: jest.fn().mockImplementation(ackCallback),
+    parcelObjectKey: 'prefix/id.parcel',
+    parcelSerialized,
+  };
 }
 
 async function completeHandshake(client: MockWebSocketClient): Promise<void> {
   await client.connect();
 
-  const challenge = HandshakeChallenge.deserialize(client.getLastMessage() as ArrayBuffer);
+  const challenge = HandshakeChallenge.deserialize((await client.receive()) as ArrayBuffer);
   const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
 
   await client.send(response.serialize());
 }
 
-export async function sleep(milliseconds: number): Promise<void> {
+async function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function waitForSetImmediate(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+async function waitForEvent<T>(eventName: string, eventEmitter: EventEmitter): Promise<T> {
+  return new Promise((resolve) => eventEmitter.once(eventName, resolve));
 }
 
 //region WebSocket utilities
@@ -599,12 +619,6 @@ class MockWebSocketConnection extends EventEmitter {
         connection.send(chunk);
         callback();
       },
-    });
-
-    this.on('message', (message) => {
-      if (!duplex.push(message)) {
-        duplex.pause();
-      }
     });
 
     this.on('close', () => duplex.push(null));
@@ -674,9 +688,16 @@ class MockWebSocketClient extends EventEmitter {
 
   public async receive(): Promise<WSData> {
     expect(this.wasConnectionClosed).toBeFalse();
-    return new Promise((resolve) => {
-      this.wsConnection.serverEvents.once('messageSent', resolve);
-    });
+
+    const lastMessage = this.getLastMessage();
+    if (lastMessage) {
+      return lastMessage;
+    }
+
+    const message = await waitForEvent<WSData>('messageSent', this.wsConnection.serverEvents);
+    const index = this.wsConnection.messagesSentByServer.indexOf(message);
+    this.wsConnection.messagesSentByServer.splice(index, 1);
+    return message;
   }
 
   public getLastMessage(): ArrayBuffer | undefined {
@@ -684,13 +705,10 @@ class MockWebSocketClient extends EventEmitter {
   }
 
   public async waitForClose(): Promise<WebSocketCloseMessage> {
-    return new Promise((resolve) => {
-      if (this.wsConnection.serverCloseFrame) {
-        resolve(this.wsConnection.serverCloseFrame);
-        return;
-      }
-      this.wsConnection.serverEvents.once('close', resolve);
-    });
+    if (this.wsConnection.serverCloseFrame) {
+      return this.wsConnection.serverCloseFrame;
+    }
+    return waitForEvent('close', this.wsConnection.serverEvents);
   }
 }
 

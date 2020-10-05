@@ -125,29 +125,32 @@ function makeConnectionHandler(
       // tslint:disable-next-line:no-let
       let allParcelsDelivered = false;
 
-      wsConnection.on('message', async (ackMessage) => {
-        const pendingACK = pendingACKs[ackMessage as string];
-        if (!pendingACK) {
-          peerAwareLogger.info('Closing connection due to unknown acknowledgement');
-          wsConnection.close(
-            WebSocketCode.CANNOT_ACCEPT,
-            'Unknown delivery id sent as acknowledgement',
+      async function processAcknowledgements(ackMessages: AsyncIterable<string>): Promise<void> {
+        for await (const ackMessage of ackMessages) {
+          const pendingACK = pendingACKs[ackMessage];
+          if (!pendingACK) {
+            peerAwareLogger.info('Closing connection due to unknown acknowledgement');
+            wsConnection.close(
+              WebSocketCode.CANNOT_ACCEPT,
+              'Unknown delivery id sent as acknowledgement',
+            );
+            break;
+          }
+          // tslint:disable-next-line:no-delete no-object-mutation
+          delete pendingACKs[ackMessage];
+          peerAwareLogger.info(
+            { parcelObjectKey: pendingACK.parcelObjectKey },
+            'Acknowledgement received',
           );
-          return;
-        }
-        // tslint:disable-next-line:no-delete no-object-mutation
-        delete pendingACKs[ackMessage as string];
-        peerAwareLogger.info(
-          { parcelObjectKey: pendingACK.parcelObjectKey },
-          'Acknowledgement received',
-        );
-        await pendingACK.ack();
+          await pendingACK.ack();
 
-        if (Object.keys(pendingACKs).length === 0 && allParcelsDelivered) {
-          peerAwareLogger.info('Closing connection after all parcels have been acknowledged');
-          wsConnection.close(WebSocketCode.NORMAL);
+          if (Object.keys(pendingACKs).length === 0 && allParcelsDelivered) {
+            peerAwareLogger.info('Closing connection after all parcels have been acknowledged');
+            wsConnection.close(WebSocketCode.NORMAL);
+            break;
+          }
         }
-      });
+      }
 
       const activeParcelsForGateway = streamActiveParcels(
         keepAlive,
@@ -170,22 +173,29 @@ function makeConnectionHandler(
             uuid(),
             bufferToArray(parcelMessage.parcelSerialized),
           );
-          yield Buffer.from(parcelDelivery.serialize());
+
           // tslint:disable-next-line:no-object-mutation
           pendingACKs[parcelDelivery.deliveryId] = {
             ack: parcelMessage.ack,
             parcelObjectKey: parcelMessage.parcelObjectKey,
           };
+
+          yield Buffer.from(parcelDelivery.serialize());
         }
         allParcelsDelivered = true;
+
+        if (Object.keys(pendingACKs).length === 0) {
+          peerAwareLogger.info('All parcels were acknowledged shortly after the last one was sent');
+          wsConnection.close(WebSocketCode.NORMAL);
+        }
       }
 
-      await pipe(activeParcelsForGateway, streamDeliveries, connectionDuplex.sink);
-
-      if (Object.keys(pendingACKs).length === 0) {
-        peerAwareLogger.info('All parcels were acknowledged shortly after the last one was sent');
-        wsConnection.close(WebSocketCode.NORMAL);
-      }
+      await pipe(
+        activeParcelsForGateway,
+        streamDeliveries,
+        connectionDuplex,
+        processAcknowledgements,
+      );
     });
 
     requestAwareLogger.debug('Sending handshake challenge');

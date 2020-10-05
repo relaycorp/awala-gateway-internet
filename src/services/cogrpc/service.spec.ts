@@ -25,7 +25,9 @@ import {
   makeMockLogging,
   mockSpy,
   partialPinoLog,
+  partialPinoLogger,
   PdaChain,
+  UUID4_REGEX,
 } from '../../_test_utils';
 import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
@@ -150,7 +152,6 @@ describe('deliverCargo', () => {
       }
     }
     NATS_CLIENT = ({
-      disconnect: jest.fn(),
       makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
     } as unknown) as natsStreaming.NatsStreamingClient;
   });
@@ -365,42 +366,6 @@ describe('deliverCargo', () => {
       await SERVICE.deliverCargo(CALL.convertToGrpcStream());
     });
 
-    test('NATS Streaming connection should be closed upon completion', async () => {
-      CALL.output.push({
-        cargo: CARGO_SERIALIZATION,
-        id: DELIVERY_ID,
-      });
-
-      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-
-      expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
-    });
-
-    test('NATS Streaming connection should be closed upon error', async (cb) => {
-      async function* throwError(
-        messages: AsyncIterable<natsStreaming.PublisherMessage>,
-      ): AsyncIterable<string> {
-        for await (const message of messages) {
-          yield message.id;
-        }
-        throw new Error('Denied');
-      }
-      getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(throwError);
-      CALL.output.push({
-        cargo: CARGO_SERIALIZATION,
-        id: DELIVERY_ID,
-      });
-
-      CALL.on('error', () => {
-        setImmediate(() => {
-          expect(NATS_CLIENT.disconnect).toBeCalledTimes(1);
-          cb();
-        });
-      });
-
-      await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-    });
-
     test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {
       // Even if multiple cargoes are received
       CALL.output.push(
@@ -433,7 +398,7 @@ describe('collectCargo', () => {
 
   const MOCK_RETRIEVE_ACTIVE_PARCELS = mockSpy(
     jest.spyOn(ParcelStore.prototype, 'retrieveActiveParcelsForGateway'),
-    async () => arrayToAsyncIterable([]),
+    () => arrayToAsyncIterable([]),
   );
   const MOCK_GENERATE_PCAS = mockSpy(
     jest.spyOn(parcelCollectionAck, 'generatePCAs'),
@@ -656,7 +621,8 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-      await PDA_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
+      PEER_GATEWAY_ADDRESS,
+      partialPinoLogger({ peerGatewayAddress: PEER_GATEWAY_ADDRESS }),
     );
   });
 
@@ -672,8 +638,15 @@ describe('collectCargo', () => {
   test('One cargo should be returned if all messages fit in it', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
-    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
-      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
+    MOCK_RETRIEVE_ACTIVE_PARCELS.mockReturnValue(
+      arrayToAsyncIterable([
+        {
+          body: DUMMY_PARCEL_SERIALIZED,
+          expiryDate: TOMORROW,
+          extra: null,
+          key: 'prefix/1.parcel',
+        },
+      ]),
     );
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -690,8 +663,15 @@ describe('collectCargo', () => {
   test('Call should end after cargo has been delivered', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
-    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
-      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
+    MOCK_RETRIEVE_ACTIVE_PARCELS.mockReturnValue(
+      arrayToAsyncIterable([
+        {
+          body: DUMMY_PARCEL_SERIALIZED,
+          expiryDate: TOMORROW,
+          extra: null,
+          key: 'prefix/1.parcel',
+        },
+      ]),
     );
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -714,8 +694,15 @@ describe('collectCargo', () => {
   test('PCAs should be included in payload', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
-    MOCK_RETRIEVE_ACTIVE_PARCELS.mockImplementation(() =>
-      arrayToAsyncIterable([{ expiryDate: TOMORROW, message: DUMMY_PARCEL_SERIALIZED }]),
+    MOCK_RETRIEVE_ACTIVE_PARCELS.mockReturnValue(
+      arrayToAsyncIterable([
+        {
+          body: DUMMY_PARCEL_SERIALIZED,
+          expiryDate: TOMORROW,
+          extra: null,
+          key: 'prefix/1.parcel',
+        },
+      ]),
     );
     const pca = new ParcelCollectionAck('0beef', 'https://endpoint.example/', 'the-id');
     const pcaSerialized = Buffer.from(pca.serialize());
@@ -843,7 +830,7 @@ describe('collectCargo', () => {
     cargoDelivery: CargoDelivery,
     expectedMessagesSerialized: readonly Buffer[],
   ): Promise<void> {
-    expect(cargoDelivery).toHaveProperty('id', expect.stringMatching(/^[0-9a-f-]+$/));
+    expect(cargoDelivery).toHaveProperty('id', UUID4_REGEX);
 
     expect(cargoDelivery).toHaveProperty('cargo');
     const cargoMessageSet = await unwrapCargoMessages(cargoDelivery.cargo);

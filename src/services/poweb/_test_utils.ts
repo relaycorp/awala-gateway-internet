@@ -3,7 +3,7 @@
 import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import { mockSpy, PdaChain } from '../../_test_utils';
+import { arrayToAsyncIterable, mockSpy, PdaChain } from '../../_test_utils';
 import * as privateKeyStore from '../../backingServices/privateKeyStore';
 import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
 import { ParcelStore } from '../parcelStore';
@@ -20,11 +20,22 @@ export function setUpCommonFixtures(): () => FixtureSet {
   mockFastifyMongoose({ db: mockMongooseConnection });
 
   const mockParcelStore: ParcelStore = {
+    liveStreamActiveParcelsForGateway: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'liveStreamActiveParcelsForGateway'),
+      async function* (): AsyncIterable<any> {
+        // tslint:disable-next-line:no-unused-expression
+        await new Promise(() => 'A promise that never resolves');
+      },
+    ),
     storeParcelFromPeerGateway: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),
       async (parcel: Parcel) => {
         return `parcels/${parcel.id}`;
       },
+    ),
+    streamActiveParcelsForGateway: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'streamActiveParcelsForGateway'),
+      () => arrayToAsyncIterable([]),
     ),
   } as any;
   mockSpy(jest.spyOn(ParcelStore, 'initFromEnv'), () => mockParcelStore);

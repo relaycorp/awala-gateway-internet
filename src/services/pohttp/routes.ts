@@ -57,7 +57,7 @@ export default async function registerRoutes(
           .send({ message: 'Parcel recipient should be specified as a private address' });
       }
 
-      // TODO: Try to reuse the NATS client within the process, if the client is concurrency-safe
+      // TODO: Use NatsStreamingClient.initFromEnv() outside this handler closure
       const natsClient = new NatsStreamingClient(
         natsServerUrl,
         natsClusterId,
@@ -79,8 +79,6 @@ export default async function registerRoutes(
             .code(500)
             .send({ message: 'Parcel could not be stored; please try again later' });
         }
-      } finally {
-        natsClient.disconnect();
       }
 
       return reply.code(202).send({});

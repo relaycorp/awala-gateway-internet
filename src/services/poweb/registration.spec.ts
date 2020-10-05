@@ -9,7 +9,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 
-import { sha256 } from '../../_test_utils';
+import { arrayBufferFrom, sha256 } from '../../_test_utils';
 import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
@@ -54,7 +54,7 @@ test('HTTP 400 should be returned if the authorization in the PNRR is invalid', 
   const fixtures = getFixtures();
   const pnrr = new PrivateNodeRegistrationRequest(
     await fixtures.privateGatewayCert.getPublicKey(),
-    bufferToArray(Buffer.from('invalid')),
+    arrayBufferFrom('invalid'),
   );
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 

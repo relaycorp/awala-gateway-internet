@@ -4,12 +4,14 @@ import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { configureFastify, FastifyLogger } from '../fastifyUtils';
+import parcelCollection from './parcelCollection';
 import parcelDelivery from './parcelDelivery';
 import preRegistrationRoutes from './preRegistration';
 import registrationRoutes from './registration';
 import RouteOptions from './RouteOptions';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
+  parcelCollection,
   parcelDelivery,
   preRegistrationRoutes,
   registrationRoutes,

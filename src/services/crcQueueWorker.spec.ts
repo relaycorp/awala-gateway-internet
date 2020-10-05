@@ -53,7 +53,6 @@ beforeEach(() => {
   }
 
   mockNatsClient = castMock<NatsStreamingClient>({
-    disconnect: jest.fn(),
     makeQueueConsumer: jest.fn().mockImplementation(mockMakeQueueConsumer),
   });
 });
@@ -140,6 +139,8 @@ describe('Queue subscription', () => {
       'crc-cargo',
       expect.anything(),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -149,6 +150,8 @@ describe('Queue subscription', () => {
     expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
       expect.anything(),
       'worker',
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -160,6 +163,20 @@ describe('Queue subscription', () => {
       expect.anything(),
       expect.anything(),
       'worker',
+      undefined,
+      expect.anything(),
+    );
+  });
+
+  test('Subscription should use a client id suffix', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockNatsClient.makeQueueConsumer).toBeCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      '-consumer',
     );
   });
 });
@@ -399,25 +416,6 @@ test('Cargo should be acknowledged after messages have been processed', async ()
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
   expect(stanMessage.ack).toBeCalledTimes(1);
-});
-
-test('NATS connection should be closed upon successful completion', async () => {
-  await processIncomingCrcCargo(STUB_WORKER_NAME);
-
-  expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-  expect(mockNatsClient.disconnect).toBeCalledWith();
-});
-
-test('NATS connection should be closed upon error', async () => {
-  const error = new Error('Not on my watch');
-  getMockInstance(mockNatsClient.makeQueueConsumer).mockImplementation(function* (): Iterable<any> {
-    throw error;
-  });
-
-  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
-
-  expect(mockNatsClient.disconnect).toBeCalledTimes(1);
-  expect(mockNatsClient.disconnect).toBeCalledWith();
 });
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {

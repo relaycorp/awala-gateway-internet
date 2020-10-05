@@ -1,7 +1,10 @@
 import { Certificate } from '@relaycorp/relaynet-core';
+import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
-import pino from 'pino';
+import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
+
+export const UUID4_REGEX = expect.stringMatching(/^[0-9a-f-]+$/);
 
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
   for (const item of array) {
@@ -16,6 +19,10 @@ export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promi
     values.push(item);
   }
   return values;
+}
+
+export function arrayBufferFrom(value: string): ArrayBuffer {
+  return bufferToArray(Buffer.from(value));
 }
 
 // tslint:disable-next-line:readonly-array
@@ -49,7 +56,14 @@ export function mockPino(): pino.Logger {
 }
 
 // tslint:disable-next-line:readonly-array
-export function makeMockLogging(): { readonly logger: pino.Logger; readonly logs: object[] } {
+export type MockLogSet = object[];
+
+export interface MockLogging {
+  readonly logger: pino.Logger;
+  readonly logs: MockLogSet;
+}
+
+export function makeMockLogging(): MockLogging {
   // tslint:disable-next-line:readonly-array
   const logs: object[] = [];
   const stream = split2((data) => {
@@ -57,6 +71,12 @@ export function makeMockLogging(): { readonly logger: pino.Logger; readonly logs
   });
   const logger = pino({ level: 'debug' }, stream);
   return { logger, logs };
+}
+
+export function partialPinoLogger(bindings: { readonly [key: string]: any }): object {
+  return expect.objectContaining({
+    [PinoSymbols.formattersSym]: { bindings },
+  });
 }
 
 export function partialPinoLog(level: pino.Level, message: string, extraAttributes?: any): object {
@@ -89,4 +109,18 @@ export function sha256Hex(plaintext: string): string {
 
 export function sha256(plaintext: BinaryLike): Buffer {
   return makeSHA256Hash(plaintext).digest();
+}
+
+export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => AsyncIterable<T> {
+  return async function* (iterable: AsyncIterable<T>): AsyncIterable<T> {
+    // tslint:disable-next-line:no-let
+    let count = 0;
+    for await (const item of iterable) {
+      if (max <= count) {
+        break;
+      }
+      yield item;
+      count++;
+    }
+  };
 }

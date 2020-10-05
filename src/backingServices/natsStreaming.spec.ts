@@ -1,9 +1,11 @@
 /* tslint:disable:no-let max-classes-per-file */
 
+import AbortController from 'abort-controller';
 import { EventEmitter } from 'events';
-import { AckHandlerCallback, SubscriptionOptions } from 'node-nats-streaming';
+import pipe from 'it-pipe';
+import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
 
-import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../_test_utils';
 import { configureMockEnvVars } from '../services/_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
@@ -94,6 +96,21 @@ describe('NatsStreamingClient', () => {
 
       expect(mockNatsConnect).toBeCalledTimes(1);
       expect(mockNatsConnect).toBeCalledWith(expect.anything(), STUB_CLIENT_ID, expect.anything());
+    });
+
+    test('Any client id suffix should be honored', async () => {
+      const clientIdSuffix = '-foo';
+      const publisher = stubClient.makePublisher(STUB_CHANNEL, clientIdSuffix);
+      setImmediate(() => mockConnection.emit('connect'));
+
+      await publisher([]);
+
+      expect(mockNatsConnect).toBeCalledTimes(1);
+      expect(mockNatsConnect).toBeCalledWith(
+        expect.anything(),
+        `${STUB_CLIENT_ID}${clientIdSuffix}`,
+        expect.anything(),
+      );
     });
 
     test('Publishing should only be done once the connection has been established', async (done) => {
@@ -191,31 +208,53 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Previous connection should be reused if active', async () => {
-      const publisher1 = stubClient.makePublisher(STUB_CHANNEL);
+    test('Connection should be closed at the end', async () => {
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher1([STUB_MESSAGE_1]));
 
-      const publisher2 = stubClient.makePublisher(STUB_CHANNEL);
+      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
+
+      expect(mockConnection.close).toBeCalled();
+    });
+
+    test('Connection should be closed if publishing fails', async () => {
+      mockConnection.publish.mockImplementation(
+        (_channel: any, _data: any, cb: AckHandlerCallback) => cb(new Error(), ''),
+      );
+      const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher2([STUB_MESSAGE_1]));
 
-      expect(mockNatsConnect).toBeCalledTimes(1);
+      await expect(asyncIterableToArray(publisher([STUB_MESSAGE_1]))).toReject();
+
+      expect(mockConnection.close).toBeCalled();
     });
   });
 
-  test('publishMessage() should send a single message via a dedicated connection', async () => {
-    const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
-    jest.spyOn(client, 'makePublisher');
-    setImmediate(() => mockConnection.emit('connect'));
+  describe('publishMessage', () => {
+    test('A single message should be published via a dedicated connection', async () => {
+      const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+      setImmediate(() => mockConnection.emit('connect'));
 
-    await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
+      await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL);
 
-    expect(mockConnection.publish).toBeCalledWith(
-      STUB_CHANNEL,
-      STUB_MESSAGE_1.data,
-      expect.any(Function),
-    );
+      expect(mockConnection.publish).toBeCalledWith(
+        STUB_CHANNEL,
+        STUB_MESSAGE_1.data,
+        expect.any(Function),
+      );
+      expect(mockConnection.close).toBeCalled();
+    });
+
+    test('Any client id suffix should be honored', async () => {
+      const clientIdSuffix = '-suffix';
+      const client = new NatsStreamingClient(STUB_SERVER_URL, STUB_CLUSTER_ID, STUB_CLIENT_ID);
+      jest.spyOn(client, 'makePublisher');
+      setImmediate(() => mockConnection.emit('connect'));
+
+      await client.publishMessage(STUB_MESSAGE_1.data, STUB_CHANNEL, clientIdSuffix);
+
+      expect(client.makePublisher).toBeCalledWith(expect.anything(), clientIdSuffix);
+    });
   });
 
   describe('makeQueueConsumer', () => {
@@ -238,14 +277,21 @@ describe('NatsStreamingClient', () => {
       mockConnection.subscriptionOptions.mockReturnValue(mockSubscriptionOptions);
     });
 
-    const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'), () => undefined);
+    let abortController: AbortController;
+    beforeEach(() => {
+      abortController = new AbortController();
+    });
 
     describe('Connection', () => {
       test('Server URL should be the specified one', async () => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+        );
 
-        await asyncIterableToArray(consumer);
+        await consumeQueue(consumer);
 
         expect(mockNatsConnect).toBeCalledTimes(1);
         expect(mockNatsConnect).toBeCalledWith(
@@ -256,10 +302,14 @@ describe('NatsStreamingClient', () => {
       });
 
       test('Cluster id should be the specified one', async () => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+        );
 
-        await asyncIterableToArray(consumer);
+        await consumeQueue(consumer);
 
         expect(mockNatsConnect).toBeCalledTimes(1);
         expect(mockNatsConnect).toBeCalledWith(
@@ -270,10 +320,14 @@ describe('NatsStreamingClient', () => {
       });
 
       test('Client id should be the specified one', async () => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+        );
 
-        await asyncIterableToArray(consumer);
+        await consumeQueue(consumer);
 
         expect(mockNatsConnect).toBeCalledTimes(1);
         expect(mockNatsConnect).toBeCalledWith(
@@ -282,28 +336,38 @@ describe('NatsStreamingClient', () => {
           expect.anything(),
         );
       });
+
+      test('Any client id suffix should be honored', async () => {
+        const clientIdSuffix = '-suffix';
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+          clientIdSuffix,
+        );
+
+        await consumeQueue(consumer);
+
+        expect(mockNatsConnect).toBeCalledTimes(1);
+        expect(mockNatsConnect).toBeCalledWith(
+          expect.anything(),
+          `${STUB_CLIENT_ID}${clientIdSuffix}`,
+          expect.anything(),
+        );
+      });
     });
 
     describe('Subscription creation', () => {
-      test('Subscription should start once the connection has been established', async (done) => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        setImmediate(() => {
-          // "connect" event was never emitted, so no message should've been published
-          expect(mockConnection.on).toBeCalledWith('connect', expect.any(Function));
-
-          expect(mockConnection.subscribe).not.toBeCalled();
-
-          done();
-        });
-
-        await asyncIterableToArray(consumer);
-      });
-
       test('Channel should be the specified one', async () => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+        );
 
-        await asyncIterableToArray(consumer);
+        await consumeQueue(consumer);
 
         expect(mockConnection.subscribe).toBeCalledTimes(1);
         expect(mockConnection.subscribe).toBeCalledWith(
@@ -314,10 +378,14 @@ describe('NatsStreamingClient', () => {
       });
 
       test('Queue should be the specified one', async () => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
+        const consumer = stubClient.makeQueueConsumer(
+          STUB_CHANNEL,
+          STUB_QUEUE,
+          STUB_DURABLE_NAME,
+          abortController.signal,
+        );
 
-        await asyncIterableToArray(consumer);
+        await consumeQueue(consumer);
 
         expect(mockConnection.subscribe).toBeCalledTimes(1);
         expect(mockConnection.subscribe).toBeCalledWith(
@@ -333,17 +401,17 @@ describe('NatsStreamingClient', () => {
         ['setManualAckMode', [true]],
         ['setAckWait', [5_000]],
         ['setMaxInFlight', [1]],
-      ] as ReadonlyArray<readonly [keyof SubscriptionOptions, readonly any[]]>)(
+      ] as ReadonlyArray<readonly [keyof typeof mockSubscriptionOptions, readonly any[]]>)(
         'Option %s should be %s',
         async (optKey, optArgs) => {
           const consumer = stubClient.makeQueueConsumer(
             STUB_CHANNEL,
             STUB_QUEUE,
             STUB_DURABLE_NAME,
+            abortController.signal,
           );
-          fakeConnectionThenInterrupt();
 
-          await asyncIterableToArray(consumer);
+          await consumeQueue(consumer);
 
           expect(mockConnection.subscribe).toBeCalledTimes(1);
           expect(mockConnection.subscribe).toBeCalledWith(
@@ -354,36 +422,56 @@ describe('NatsStreamingClient', () => {
           expect(mockSubscriptionOptions[optKey]).toBeCalledWith(...optArgs);
         },
       );
-
-      test('Errors thrown while establishing subscription should be propagated', async () => {
-        const error = new Error('Nope');
-        mockConnection.subscribe.mockImplementationOnce(() => {
-          throw error;
-        });
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        fakeConnectionThenInterrupt();
-
-        await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
-      });
     });
 
-    test('Incoming messages should be yielded until subscription ends', async () => {
-      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+    test('Subscription and connection should be closed after abort signal', async () => {
+      const controller = new AbortController();
+      const consumer = stubClient.makeQueueConsumer(
+        STUB_CHANNEL,
+        STUB_QUEUE,
+        STUB_DURABLE_NAME,
+        controller.signal,
+      );
       const stubMessage1 = { number: 1 };
       const stubMessage2 = { number: 2 };
-      setImmediate(() => {
-        mockConnection.emit('connect');
-      });
+      fakeConnection();
       setImmediate(() => {
         mockSubscription.emit('message', stubMessage1);
         mockSubscription.emit('message', stubMessage2);
       });
-      setImmediate(interruptCurrentProcess);
 
-      await expect(asyncIterableToArray(consumer)).resolves.toEqual([stubMessage1, stubMessage2]);
+      const outputMessages = pipe(consumer, async function* (
+        messages: AsyncIterable<Message>,
+      ): AsyncIterable<Message> {
+        for await (const message of messages) {
+          yield message;
+          controller.abort(); // Do NOT use `break` instead: We want to test the signal
+        }
+      });
+
+      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
     });
 
-    test('Subscription should be closed after a subscription error', async () => {
+    test('Subscription and connection should be closed when sink breaks', async () => {
+      const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
+      const stubMessage1 = { number: 1 };
+      const stubMessage2 = { number: 2 };
+      fakeConnection();
+      setImmediate(() => {
+        mockSubscription.emit('message', stubMessage1);
+        mockSubscription.emit('message', stubMessage2);
+      });
+
+      const outputMessages = pipe(consumer, iterableTake(1));
+
+      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
+    });
+
+    test('Subscription and connection should be closed after a subscription error', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const error = new Error('Whoops, my bad');
       setImmediate(() => {
@@ -395,68 +483,22 @@ describe('NatsStreamingClient', () => {
 
       await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
 
-      expect(mockSubscription.close).toBeCalledTimes(1);
+      expect(mockSubscription.close).toBeCalled();
+      expect(mockConnection.close).toBeCalled();
     });
 
-    test.each(['SIGINT', 'SIGTERM'])(
-      '%s should close the subscription and end the process',
-      async (signal) => {
-        const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-        setImmediate(() => mockConnection.emit('connect'));
-        setImmediate(() => {
-          // @ts-ignore
-          process.emit(signal);
-        });
+    async function consumeQueue(consumer: AsyncIterable<Message>): Promise<readonly Message[]> {
+      return new Promise((resolve, reject) => {
+        asyncIterableToArray(consumer).then(resolve).catch(reject);
 
-        await asyncIterableToArray(consumer);
-
-        expect(mockSubscription.close).toBeCalledTimes(1);
-
-        expect(mockProcessExit).toBeCalledTimes(1);
-        expect(mockProcessExit).toBeCalledWith(0);
-      },
-    );
-
-    function fakeConnectionThenInterrupt(): void {
-      setImmediate(() => mockConnection.emit('connect'));
-      setImmediate(interruptCurrentProcess);
+        fakeConnection();
+        abortController.abort();
+      });
     }
 
-    function interruptCurrentProcess(): void {
-      // @ts-ignore
-      process.emit('SIGINT');
+    function fakeConnection(): void {
+      setImmediate(() => mockConnection.emit('connect'));
     }
-  });
-
-  describe('disconnect', () => {
-    test('Disconnecting before connecting should be a no-op', () => {
-      stubClient.disconnect();
-    });
-
-    test('Connection should be closed when disconnecting', async () => {
-      const publisher = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
-
-      expect(mockConnection.close).not.toBeCalled();
-      stubClient.disconnect();
-
-      expect(mockConnection.close).toBeCalledTimes(1);
-    });
-
-    test('New connection should be created if previous one cannot be reused', async () => {
-      const publisher1 = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher1([STUB_MESSAGE_1]));
-
-      stubClient.disconnect();
-
-      const publisher2 = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => mockConnection.emit('connect'));
-      await asyncIterableToArray(publisher2([STUB_MESSAGE_1]));
-
-      expect(mockNatsConnect).toBeCalledTimes(2);
-    });
   });
 
   describe('NATS Streaming connection', () => {

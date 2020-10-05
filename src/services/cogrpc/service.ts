@@ -22,7 +22,7 @@ import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
 import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { generatePCAs } from '../parcelCollection';
-import { ParcelStore } from '../parcelStore';
+import { ParcelObject, ParcelStore } from '../parcelStore';
 
 const INTERNAL_SERVER_ERROR = {
   code: grpc.status.UNAVAILABLE,
@@ -143,8 +143,6 @@ async function deliverCargo(
     logger.error({ err }, 'Failed to store cargo');
     call.emit('error', INTERNAL_SERVER_ERROR);
     return;
-  } finally {
-    natsClient.disconnect();
   }
 
   logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');
@@ -215,9 +213,13 @@ async function collectCargo(
     }
   }
 
+  const activeParcels = pipe(
+    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+    convertParcelsToCargoMessageStream,
+  );
   const cargoMessageStream = await concatMessageStreams(
     generatePCAs(peerGatewayAddress, mongooseConnection),
-    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress),
+    activeParcels,
   );
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
@@ -260,6 +262,14 @@ async function parseAndValidateCCAFromMetadata(
     return await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
   } catch (_) {
     return new Error('CCA is malformed');
+  }
+}
+
+async function* convertParcelsToCargoMessageStream(
+  parcelObjects: AsyncIterable<ParcelObject<null>>,
+): CargoMessageStream {
+  for await (const parcelObject of parcelObjects) {
+    yield { expiryDate: parcelObject.expiryDate, message: parcelObject.body };
   }
 }
 

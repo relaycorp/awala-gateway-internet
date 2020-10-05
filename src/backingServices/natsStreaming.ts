@@ -1,4 +1,6 @@
+import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
+import pipe from 'it-pipe';
 import { connect, Message, Stan } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
 import * as streamToIt from 'stream-to-it';
@@ -16,9 +18,6 @@ export class NatsStreamingClient {
     return new NatsStreamingClient(natsServerUrl, natsClusterId, clientId);
   }
 
-  // tslint:disable-next-line:readonly-keyword
-  protected connection?: Stan;
-
   constructor(
     public readonly serverUrl: string,
     public readonly clusterId: string,
@@ -27,33 +26,41 @@ export class NatsStreamingClient {
 
   public makePublisher(
     channel: string,
+    clientIdSuffix?: string,
   ): (
     messages: AsyncIterable<PublisherMessage> | readonly PublisherMessage[],
   ) => AsyncIterable<string> {
-    const promisedConnection = this.connect();
+    const promisedConnection = this.connect(clientIdSuffix);
     return async function* (messages): AsyncIterable<string> {
       const connection = await promisedConnection;
       const publishPromisified = promisify(connection.publish).bind(connection);
-
-      for await (const message of messages) {
-        await publishPromisified(channel, message.data);
-        yield message.id;
+      try {
+        for await (const message of messages) {
+          await publishPromisified(channel, message.data);
+          yield message.id;
+        }
+      } finally {
+        connection.close();
       }
     };
   }
 
-  public async publishMessage(messageData: Buffer | string, channel: string): Promise<void> {
-    const connection = await this.connect();
-    const publishPromisified = promisify(connection.publish).bind(connection);
-    await publishPromisified(channel, messageData);
+  public async publishMessage(
+    messageData: Buffer | string,
+    channel: string,
+    clientIdSuffix?: string,
+  ): Promise<void> {
+    await pipe([{ data: messageData }], this.makePublisher(channel, clientIdSuffix), drainIterable);
   }
 
   public async *makeQueueConsumer(
     channel: string,
     queue: string,
     durableName: string,
+    abortSignal?: AbortSignal,
+    clientIdSuffix?: string,
   ): AsyncIterable<Message> {
-    const connection = await this.connect();
+    const connection = await this.connect(clientIdSuffix);
     const subscriptionOptions = connection
       .subscriptionOptions()
       .setDurableName(durableName)
@@ -61,53 +68,45 @@ export class NatsStreamingClient {
       .setManualAckMode(true)
       .setAckWait(5_000)
       .setMaxInFlight(1);
-    const sourceStream = new PassThrough({ objectMode: true });
+    const messagesStream = new PassThrough({ objectMode: true });
 
-    function gracefullyEndWorker(): void {
-      sourceStream.destroy();
-      process.exit(0);
-    }
-    process.on('SIGINT', gracefullyEndWorker);
-    process.on('SIGTERM', gracefullyEndWorker);
+    const subscription = connection.subscribe(channel, queue, subscriptionOptions);
+    subscription.on('error', (error) => messagesStream.destroy(error));
+    subscription.on('message', (msg) => messagesStream.write(msg));
 
-    // tslint:disable-next-line:no-let
-    let subscription;
+    const messagesIterable = streamToIt.source(messagesStream);
+    const messages = abortSignal
+      ? makeSourceAbortable(messagesIterable, abortSignal, { returnOnAbort: true })
+      : messagesIterable;
     try {
-      subscription = connection.subscribe(channel, queue, subscriptionOptions);
-      subscription.on('error', (error) => sourceStream.destroy(error));
-      subscription.on('message', (msg) => sourceStream.write(msg));
-      for await (const msg of streamToIt.source(sourceStream)) {
+      for await (const msg of messages) {
         yield msg;
       }
     } finally {
-      subscription?.close();
-      process.removeListener('SIGINT', gracefullyEndWorker);
-      process.removeListener('SIGTERM', gracefullyEndWorker);
-    }
-  }
+      // Close the subscription. Do NOT "unsubscribe" from it -- Otherwise, the durable
+      // subscription would be lost: https://docs.nats.io/developing-with-nats-streaming/durables
+      subscription.close();
 
-  public disconnect(): void {
-    this.connection?.close();
+      connection.close();
+    }
   }
 
   /**
    * Create a new connection or reuse an existing one.
    */
-  protected async connect(): Promise<Stan> {
-    return new Promise<Stan>((resolve, _reject) => {
-      if (this.connection) {
-        return resolve(this.connection);
-      }
-
-      // tslint:disable-next-line:no-object-mutation
-      this.connection = connect(this.clusterId, this.clientId, { url: this.serverUrl });
-      this.connection.on('connect', () => {
-        resolve(this.connection);
-      });
-      this.connection.on('close', () => {
-        // tslint:disable-next-line:no-object-mutation
-        this.connection = undefined;
+  protected async connect(clientIdSuffix: string = ''): Promise<Stan> {
+    const clientId = `${this.clientId}${clientIdSuffix}`;
+    return new Promise<Stan>((resolve) => {
+      const connection = connect(this.clusterId, clientId, { url: this.serverUrl });
+      connection.on('connect', () => {
+        resolve(connection);
       });
     });
+  }
+}
+
+async function drainIterable(iterable: AsyncIterable<any>): Promise<void> {
+  for await (const _ of iterable) {
+    // Do nothing
   }
 }

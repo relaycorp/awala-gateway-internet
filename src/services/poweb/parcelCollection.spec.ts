@@ -130,25 +130,6 @@ test('Requests with Origin header should be refused', async () => {
   );
 });
 
-describe('Mongoose connection', () => {
-  test('Connection should be opened when request starts', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
-
-    expect(MOCK_MONGOOSE_CONNECTION_CREATION).not.toBeCalled();
-    await client.connect();
-    expect(MOCK_MONGOOSE_CONNECTION_CREATION).toBeCalled();
-  });
-
-  test('Connection should be closed when request ends', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
-
-    await client.connect();
-    client.disconnect();
-
-    expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalled();
-  });
-});
-
 describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
     const uuidBinSpy = jest.spyOn(uuid, 'bin');
@@ -298,6 +279,16 @@ describe('Handshake', () => {
       }),
     );
   });
+
+  test('Mongoose connection should be closed by the end of the handshake', async () => {
+    const client = new MockWebSocketClient(mockWSServer);
+    expect(MOCK_MONGOOSE_CONNECTION_CREATION).not.toBeCalled();
+
+    await completeHandshake(client);
+
+    expect(MOCK_MONGOOSE_CONNECTION_CREATION).toBeCalled();
+    expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalled();
+  });
 });
 
 describe('Keep alive', () => {
@@ -340,7 +331,6 @@ describe('Keep alive', () => {
     expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
 
     expect(client.wasConnectionClosed).toBeFalse();
-    client.disconnect();
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
@@ -350,7 +340,6 @@ describe('Keep alive', () => {
     await sleep(500);
     expect(MOCK_PARCEL_LIVE_STREAM).toBeCalled();
     expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
-    client.disconnect();
   });
 });
 
@@ -513,9 +502,42 @@ describe('Acknowledgements', () => {
   }
 });
 
-test.todo('Client-initiated WebSocket connection closure should be handled gracefully');
+test('Client-initiated WebSocket connection closure should be handled gracefully', async () => {
+  const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+  const client = new MockWebSocketClient(mockWSServer, 'on');
+  await client.connect();
 
-test.todo('Abrupt TCP connection closure should be handled gracefully');
+  expect(abortSpy).not.toBeCalled();
+  const closeReason = 'I have to go';
+  client.disconnect(WebSocketCode.NORMAL, closeReason);
+
+  expect(abortSpy).toBeCalled();
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Closing connection', {
+      closeCode: WebSocketCode.NORMAL,
+      closeReason,
+      reqId: UUID4_REGEX,
+    }),
+  );
+});
+
+test('Abrupt TCP connection closure should be handled gracefully', async () => {
+  const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+  const client = new MockWebSocketClient(mockWSServer, 'on');
+  await client.connect();
+
+  expect(abortSpy).not.toBeCalled();
+  const error = new Error('Sorry, I have to go');
+  client.abort(error);
+
+  expect(abortSpy).toBeCalled();
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Closing connection due to error', {
+      err: expect.objectContaining({ message: error.message }),
+      reqId: UUID4_REGEX,
+    }),
+  );
+});
 
 function mockParcelStreamMessage(
   parcelSerialized: Buffer,
@@ -631,6 +653,10 @@ class MockWebSocketClient extends EventEmitter {
 
   public disconnect(code?: number, reason?: string): void {
     this.wsConnection.emit('close', code, reason);
+  }
+
+  public abort(error: Error): void {
+    this.wsConnection.emit('error', error);
   }
 
   public async send(message: WSData): Promise<void> {

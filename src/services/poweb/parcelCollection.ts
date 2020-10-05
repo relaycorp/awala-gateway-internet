@@ -51,13 +51,20 @@ function makeConnectionHandler(
       return;
     }
 
+    const abortController = new AbortController();
+    wsConnection.once('close', (closeCode, closeReason) => {
+      requestAwareLogger.info({ closeCode, closeReason }, 'Closing connection');
+      abortController.abort();
+    });
+    wsConnection.once('error', (err) => {
+      requestAwareLogger.info({ err }, 'Closing connection due to error');
+      abortController.abort();
+    });
+
     // "on" or any value other than "off" should keep the connection alive
     const keepAlive = request.headers['x-relaynet-keep-alive'] !== 'off';
 
     const nonce = bufferToArray(uuid.bin() as Buffer);
-
-    const mongooseConnection = await createMongooseConnectionFromEnv();
-    wsConnection.on('close', () => mongooseConnection.close());
 
     wsConnection.once('message', async (message) => {
       // tslint:disable-next-line:no-let
@@ -84,7 +91,11 @@ function makeConnectionHandler(
         return;
       }
 
+      const mongooseConnection = await createMongooseConnectionFromEnv();
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+      // noinspection ES6MissingAwait
+      mongooseConnection.close();
+
       // tslint:disable-next-line:no-let
       let peerGatewayCertificate: Certificate;
       try {
@@ -133,7 +144,6 @@ function makeConnectionHandler(
         }
       });
 
-      const abortController = new AbortController();
       const activeParcelsForGateway = streamActiveParcels(
         keepAlive,
         parcelStore,

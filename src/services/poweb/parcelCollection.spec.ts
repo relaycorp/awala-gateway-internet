@@ -26,33 +26,34 @@ import {
   mockSpy,
   partialPinoLog,
   partialPinoLogger,
-  PdaChain,
   UUID4_REGEX,
 } from '../../_test_utils';
 import * as mongo from '../../backingServices/mongo';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { expectBuffersToEqual, generatePdaChain } from '../_test_utils';
+import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import * as certs from '../certs';
 import { ParcelStore, ParcelStreamMessage } from '../parcelStore';
-import parcelCollection from './parcelCollection';
+import { setUpCommonFixtures } from './_test_utils';
+import { makeWebSocketServer } from './parcelCollection';
 import { WebSocketCode } from './websockets';
 
 const REQUEST_ID_HEADER = 'X-Request';
+
+const getFixtures = setUpCommonFixtures();
 
 let mockWSServer: WSServer;
 let mockLogging: MockLogging;
 beforeEach(() => {
   mockLogging = makeMockLogging();
-  mockWSServer = parcelCollection(REQUEST_ID_HEADER, mockLogging.logger);
+  mockWSServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
 });
 
-let pdaChain: PdaChain;
 let nonceSigner: NonceSigner;
 let peerGatewayAddress: string;
 beforeAll(async () => {
-  pdaChain = await generatePdaChain();
-  nonceSigner = new NonceSigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey);
-  peerGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  const fixtures = getFixtures();
+  nonceSigner = new NonceSigner(fixtures.privateGatewayCert, fixtures.privateGatewayPrivateKey);
+  peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
 const MOCK_MONGOOSE_CONNECTION: Connection = { close: mockSpy(jest.fn()) } as any;
@@ -64,23 +65,16 @@ const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
   async (connection) => {
     expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
-    return [pdaChain.publicGatewayCert];
+    const fixtures = getFixtures();
+    return [fixtures.publicGatewayCert];
   },
 );
 
-const MOCK_PARCEL_STORE = new ParcelStore(null as any, null as any);
-jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(MOCK_PARCEL_STORE);
-const MOCK_PARCEL_LIVE_STREAM = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'liveStreamActiveParcelsForGateway'),
-  async function* (): AsyncIterable<any> {
-    // tslint:disable-next-line:no-unused-expression
-    await new Promise(() => 'A promise that never resolves');
-  },
-);
-const MOCK_PARCEL_NON_LIVE_STREAM = mockSpy(
-  jest.spyOn(ParcelStore.prototype, 'streamActiveParcelsForGateway'),
-  () => arrayToAsyncIterable([]),
-);
+let MOCK_PARCEL_STORE: ParcelStore;
+beforeEach(() => {
+  const fixtures = getFixtures();
+  MOCK_PARCEL_STORE = fixtures.parcelStore;
+});
 
 const MOCK_NATS_STREAMING_CLIENT = new NatsStreamingClient(null as any, null as any, null as any);
 jest.spyOn(NatsStreamingClient, 'initFromEnv').mockReturnValue(MOCK_NATS_STREAMING_CLIENT);
@@ -88,6 +82,26 @@ jest.spyOn(NatsStreamingClient, 'initFromEnv').mockReturnValue(MOCK_NATS_STREAMI
 const parcelSerialization = Buffer.from('This is supposed to be a RAMF serialization');
 
 mockSpy(jest.spyOn(WS, 'createWebSocketStream'), (ws: MockWebSocketConnection) => ws.makeDuplex());
+
+describe('WebSocket server configuration', () => {
+  test('Path should be /v1/parcel-collection', () => {
+    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+
+    expect(wsServer.options.path).toEqual('/v1/parcel-collection');
+  });
+
+  test('Maximum incoming payload size should be 2 kib', () => {
+    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+
+    expect(wsServer.options.maxPayload).toEqual(2 * 1024);
+  });
+
+  test('Clients should not be tracked', () => {
+    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+
+    expect(wsServer.options.clientTracking).toBeFalse();
+  });
+});
 
 describe('Request id', () => {
   test('Existing request id should be honored if present in request headers', async () => {
@@ -298,7 +312,7 @@ describe('Keep alive', () => {
 
     await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
     expect(client.getLastMessage()).toBeUndefined();
-    expect(MOCK_PARCEL_NON_LIVE_STREAM).toBeCalledWith(
+    expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).toBeCalledWith(
       peerGatewayAddress,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
@@ -309,7 +323,7 @@ describe('Keep alive', () => {
       }),
     );
 
-    expect(MOCK_PARCEL_LIVE_STREAM).not.toBeCalled();
+    expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).not.toBeCalled();
     expect(NatsStreamingClient.initFromEnv).not.toBeCalled();
   });
 
@@ -321,14 +335,14 @@ describe('Keep alive', () => {
     await completeHandshake(client);
 
     await sleep(500);
-    expect(MOCK_PARCEL_LIVE_STREAM).toBeCalledWith(
+    expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalledWith(
       peerGatewayAddress,
       MOCK_NATS_STREAMING_CLIENT,
       abortController.signal,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
     expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
-    expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
+    expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
 
     expect(client.wasConnectionClosed).toBeFalse();
   });
@@ -338,14 +352,14 @@ describe('Keep alive', () => {
     await completeHandshake(client);
 
     await sleep(500);
-    expect(MOCK_PARCEL_LIVE_STREAM).toBeCalled();
-    expect(MOCK_PARCEL_NON_LIVE_STREAM).not.toBeCalled();
+    expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalled();
+    expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
   });
 });
 
 test('Server should send parcel to client', async () => {
   const client = new MockWebSocketClient(mockWSServer);
-  MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+  getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
     arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
   );
   await completeHandshake(client);
@@ -366,7 +380,7 @@ test('Server should send parcel to client', async () => {
 describe('Acknowledgements', () => {
   test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
     const client = new MockWebSocketClient(mockWSServer);
-    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([
         mockParcelStreamMessage(parcelSerialization),
         mockParcelStreamMessage(parcelSerialization),
@@ -387,7 +401,9 @@ describe('Acknowledgements', () => {
 
   test('Parcel should be acknowledged in store when client acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
-    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+      arrayToAsyncIterable([parcelStreamMessage]),
+    );
     const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
@@ -406,7 +422,9 @@ describe('Acknowledgements', () => {
 
   test('Parcel should not be deleted if client never acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
-    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(arrayToAsyncIterable([parcelStreamMessage]));
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+      arrayToAsyncIterable([parcelStreamMessage]),
+    );
     const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 
@@ -418,7 +436,7 @@ describe('Acknowledgements', () => {
   });
 
   test('Connection should be closed with an error if client sends unknown ACK', async () => {
-    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
     const client = new MockWebSocketClient(mockWSServer);
@@ -441,7 +459,7 @@ describe('Acknowledgements', () => {
   });
 
   test('Connection should be closed with an error if client sends a binary ACK', async () => {
-    MOCK_PARCEL_NON_LIVE_STREAM.mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
     const client = new MockWebSocketClient(mockWSServer);
@@ -469,20 +487,20 @@ describe('Acknowledgements', () => {
     // in-flight.
 
     const ackAlert = new EventEmitter();
-    MOCK_PARCEL_NON_LIVE_STREAM.mockImplementation(async function* (): AsyncIterable<
-      ParcelStreamMessage
-    > {
-      // parcel1
-      yield mockParcelStreamMessage(parcelSerialization, () => ackAlert.emit('ackProcessed'));
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockImplementation(
+      async function* (): AsyncIterable<ParcelStreamMessage> {
+        // parcel1
+        yield mockParcelStreamMessage(parcelSerialization, () => ackAlert.emit('ackProcessed'));
 
-      await Promise.all([
-        waitForEvent('ackSent', ackAlert),
-        waitForEvent('ackProcessed', ackAlert),
-      ]);
+        await Promise.all([
+          waitForEvent('ackSent', ackAlert),
+          waitForEvent('ackProcessed', ackAlert),
+        ]);
 
-      // parcel2
-      yield mockParcelStreamMessage(parcelSerialization);
-    });
+        // parcel2
+        yield mockParcelStreamMessage(parcelSerialization);
+      },
+    );
     const client = new MockWebSocketClient(mockWSServer);
     await completeHandshake(client);
 

@@ -1,7 +1,6 @@
 import { UnboundKeyPair } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
-import pino from 'pino';
 
 import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { configureFastify, FastifyLogger } from '../fastifyUtils';
@@ -12,6 +11,7 @@ import registrationRoutes from './registration';
 import RouteOptions from './RouteOptions';
 
 const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
+  parcelCollection,
   parcelDelivery,
   preRegistrationRoutes,
   registrationRoutes,
@@ -24,7 +24,7 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  */
 export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstance> {
   const publicGatewayKeyPair = await retrieveKeyPair();
-  const fastify = await configureFastify(
+  return configureFastify(
     ROUTES,
     {
       publicGatewayCertificate: publicGatewayKeyPair.certificate,
@@ -32,10 +32,6 @@ export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstanc
     },
     logger,
   );
-  // TODO: Connect fastify.server
-  // TODO: Retrieve actual reqId header
-  parcelCollection('foo', pino());
-  return fastify;
 }
 
 async function retrieveKeyPair(): Promise<UnboundKeyPair> {

@@ -7,12 +7,17 @@ import {
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { IncomingHttpHeaders, IncomingMessage } from 'http';
+import { FastifyInstance } from 'fastify';
+import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';
 import pipe from 'it-pipe';
 import { Logger } from 'pino';
 import { duplex } from 'stream-to-it';
 import uuid from 'uuid-random';
-import WebSocket, { createWebSocketStream, Server as WSServer } from 'ws';
+import WebSocket, {
+  createWebSocketStream,
+  Server as WSServer,
+  ServerOptions as WSServerOptions,
+} from 'ws';
 
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
@@ -20,13 +25,38 @@ import { retrieveOwnCertificates } from '../certs';
 import { ParcelStore, ParcelStreamMessage } from '../parcelStore';
 import { WebSocketCode } from './websockets';
 
+// The largest payload the client could send is the handshake response, which should be < 1.9 kib
+const MAX_PAYLOAD = 2 * 1024;
+
 interface PendingACK {
   readonly ack: () => Promise<void>;
   readonly parcelObjectKey: string;
 }
 
-export default function (requestIdHeader: string, baseLogger: Logger): WSServer {
-  const wsServer = new WSServer({ noServer: true });
+export default async function (
+  fastify: FastifyInstance,
+  _options: any,
+  done: () => void,
+): Promise<void> {
+  const requestIdHeader = (fastify as any).initialConfig.requestIdHeader;
+  makeWebSocketServer(requestIdHeader, fastify.log as Logger, fastify.server);
+  done();
+}
+
+export function makeWebSocketServer(
+  requestIdHeader: string,
+  baseLogger: Logger,
+  httpServer?: HTTPServer,
+): WSServer {
+  const serverOptions: Partial<WSServerOptions> = httpServer
+    ? { server: httpServer }
+    : { noServer: true };
+  const wsServer = new WSServer({
+    clientTracking: false,
+    maxPayload: MAX_PAYLOAD,
+    path: '/v1/parcel-collection',
+    ...serverOptions,
+  });
 
   wsServer.on('connection', makeConnectionHandler(requestIdHeader, baseLogger));
 

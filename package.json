@@ -32,7 +32,7 @@
     "@types/pkijs": "0.0.5",
     "@types/split2": "^2.1.6",
     "@types/verror": "^1.10.4",
-    "@types/ws": "^7.2.6",
+    "@types/ws": "^7.2.7",
     "docker-compose": "^0.23.5",
     "dotenv": "^8.2.0",
     "fastify-plugin": "^2.3.4",

@@ -2,11 +2,12 @@
 
 import {
   CMSError,
+  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
   InvalidMessageError,
-  NonceSigner,
   ParcelDelivery,
+  Signer,
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -48,11 +49,11 @@ beforeEach(() => {
   mockWSServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
 });
 
-let nonceSigner: NonceSigner;
+let nonceSigner: Signer;
 let peerGatewayAddress: string;
 beforeAll(async () => {
   const fixtures = getFixtures();
-  nonceSigner = new NonceSigner(fixtures.privateGatewayCert, fixtures.privateGatewayPrivateKey);
+  nonceSigner = new Signer(fixtures.privateGatewayCert, fixtures.privateGatewayPrivateKey);
   peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
@@ -580,7 +581,9 @@ async function completeHandshake(client: MockWebSocketClient): Promise<void> {
   await client.connect();
 
   const challenge = HandshakeChallenge.deserialize((await client.receive()) as ArrayBuffer);
-  const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
+  const response = new HandshakeResponse([
+    await nonceSigner.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE),
+  ]);
 
   await client.send(Buffer.from(response.serialize()));
 }

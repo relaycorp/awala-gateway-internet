@@ -1,8 +1,8 @@
 import {
   Certificate,
+  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
-  NONCE_SIGNATURE,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
@@ -159,7 +159,7 @@ async function doHandshake(wsConnection: WebSocket, logger: Logger): Promise<str
       // tslint:disable-next-line:no-let
       let peerGatewayCertificate: Certificate;
       try {
-        peerGatewayCertificate = await NONCE_SIGNATURE.verify(
+        peerGatewayCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
           handshakeResponse.nonceSignatures[0],
           nonce,
           trustedCertificates,

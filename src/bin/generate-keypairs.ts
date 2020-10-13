@@ -48,7 +48,9 @@ async function main(): Promise<void> {
   // hack won't be necessary once https://github.com/relaycorp/relaynet-internet-gateway/issues/49
   // is done.
   // tslint:disable-next-line:no-object-mutation
-  gatewayCertificate.pkijsCertificate.serialNumber.valueBlock.valueHex = bufferToArray(keyId);
+  (gatewayCertificate as any).pkijsCertificate.serialNumber.valueBlock.valueHex = bufferToArray(
+    keyId,
+  );
 
   await sessionStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
   await saveOwnCertificate(gatewayCertificate);

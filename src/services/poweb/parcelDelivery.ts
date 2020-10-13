@@ -1,8 +1,8 @@
 import {
   Certificate,
+  DETACHED_SIGNATURE_TYPES,
   InvalidMessageError,
   Parcel,
-  PARCEL_DELIVERY,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
@@ -109,7 +109,7 @@ async function verifyCountersignature(
   }
   const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
   try {
-    return await PARCEL_DELIVERY.verify(
+    return await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(
       bufferToArray(countersignature),
       parcelSerialized,
       trustedCertificates,

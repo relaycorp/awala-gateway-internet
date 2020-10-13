@@ -1,6 +1,4 @@
-// tslint:disable:no-let
-
-import { InvalidMessageError, Parcel, PARCEL_DELIVERY } from '@relaycorp/relaynet-core';
+import { DETACHED_SIGNATURE_TYPES, InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest, { Response as LightMyRequestResponse } from 'light-my-request';
@@ -93,7 +91,7 @@ describe('Authorization errors', () => {
     const logging = makeMockLogging();
     const fastify = await makeServer(logging.logger);
     const fixtures = getFixtures();
-    const countersignature = await PARCEL_DELIVERY.sign(
+    const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
       PARCEL_SERIALIZED,
       fixtures.privateGatewayPrivateKey,
       fixtures.peerEndpointCert, // Wrong certificate
@@ -126,7 +124,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
   const fastify = await makeServer();
   const fixtures = getFixtures();
   const invalidParcelSerialization = Buffer.from('I am a "parcel". MUA HA HA HA!');
-  const countersignature = await PARCEL_DELIVERY.sign(
+  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
     bufferToArray(invalidParcelSerialization),
     fixtures.privateGatewayPrivateKey,
     fixtures.privateGatewayCert,
@@ -147,7 +145,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 403 respons
   const logging = makeMockLogging();
   const fastify = await makeServer(logging.logger);
   const fixtures = getFixtures();
-  const countersignature = await PARCEL_DELIVERY.sign(
+  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
     PARCEL_SERIALIZED,
     fixtures.privateGatewayPrivateKey,
     fixtures.privateGatewayCert,
@@ -175,7 +173,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   const logging = makeMockLogging();
   const fastify = await makeServer(logging.logger);
   const fixtures = getFixtures();
-  const countersignature = await PARCEL_DELIVERY.sign(
+  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
     PARCEL_SERIALIZED,
     fixtures.privateGatewayPrivateKey,
     fixtures.privateGatewayCert,
@@ -207,7 +205,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
   const logging = makeMockLogging();
   const fastify = await makeServer(logging.logger);
   const fixtures = getFixtures();
-  const countersignature = await PARCEL_DELIVERY.sign(
+  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
     PARCEL_SERIALIZED,
     fixtures.privateGatewayPrivateKey,
     fixtures.privateGatewayCert,
@@ -237,7 +235,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
 test('NATS Streaming connection should use the right arguments', async () => {
   const fastify = await makeServer();
   const fixtures = getFixtures();
-  const countersignature = await PARCEL_DELIVERY.sign(
+  const countersignature = await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.sign(
     PARCEL_SERIALIZED,
     fixtures.privateGatewayPrivateKey,
     fixtures.privateGatewayCert,

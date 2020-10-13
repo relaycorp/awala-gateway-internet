@@ -25,7 +25,7 @@
     "node": ">=12"
   },
   "devDependencies": {
-    "@relaycorp/shared-config": "^1.4.4",
+    "@relaycorp/shared-config": "^1.4.5",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.14",
     "@types/mongoose": "^5.7.36",

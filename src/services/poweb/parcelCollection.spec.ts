@@ -7,7 +7,7 @@ import {
   ParcelDelivery,
   Signer,
 } from '@relaycorp/relaynet-core';
-import { MockWebSocketClient, MockWebSocketConnection } from '@relaycorp/ws-mock';
+import { MockClient, MockConnection } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
@@ -78,7 +78,7 @@ jest.spyOn(NatsStreamingClient, 'initFromEnv').mockReturnValue(MOCK_NATS_STREAMI
 
 const parcelSerialization = Buffer.from('This is supposed to be a RAMF serialization');
 
-mockSpy(jest.spyOn(WS, 'createWebSocketStream'), (ws: MockWebSocketConnection) => ws.makeDuplex());
+mockSpy(jest.spyOn(WS, 'createWebSocketStream'), (ws: MockConnection) => ws.makeDuplex());
 
 describe('WebSocket server configuration', () => {
   test('Path should be /v1/parcel-collection', () => {
@@ -106,7 +106,7 @@ describe('Request id', () => {
     const client = new MockPoWebClient(mockWSServer, 'off', 'origin', reqId);
 
     await client.connect();
-    await client.waitForClose();
+    await client.waitForPeerClosure();
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Starting parcel collection request', { reqId }),
@@ -117,7 +117,7 @@ describe('Request id', () => {
     const client = new MockPoWebClient(mockWSServer, 'off', 'origin');
 
     await client.connect();
-    await client.waitForClose();
+    await client.waitForPeerClosure();
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Starting parcel collection request', {
@@ -132,7 +132,7 @@ test('Requests with Origin header should be refused', async () => {
 
   await client.connect();
 
-  await expect(client.waitForClose()).resolves.toEqual({
+  await expect(client.waitForPeerClosure()).resolves.toEqual({
     code: WebSocketCode.VIOLATED_POLICY,
     reason: 'Web browser requests are disabled for security reasons',
   });
@@ -164,7 +164,7 @@ describe('Handshake', () => {
 
     await client.send(Buffer.from('invalid handshake response'));
 
-    await expect(client.waitForClose()).resolves.toEqual({
+    await expect(client.waitForPeerClosure()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Invalid handshake response',
     });
@@ -182,7 +182,7 @@ describe('Handshake', () => {
 
     await client.send('invalid handshake response');
 
-    await expect(client.waitForClose()).resolves.toEqual({
+    await expect(client.waitForPeerClosure()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Invalid handshake response',
     });
@@ -199,7 +199,7 @@ describe('Handshake', () => {
     const invalidResponse = new HandshakeResponse([]);
     await client.send(Buffer.from(invalidResponse.serialize()));
 
-    const closeFrame = await client.waitForClose();
+    const closeFrame = await client.waitForPeerClosure();
     expect(closeFrame).toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Handshake response did not include exactly one nonce signature (got 0)',
@@ -223,7 +223,7 @@ describe('Handshake', () => {
 
     await client.send(Buffer.from(invalidResponse.serialize()));
 
-    const closeFrame = await client.waitForClose();
+    const closeFrame = await client.waitForPeerClosure();
     expect(closeFrame).toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Handshake response did not include exactly one nonce signature (got 2)',
@@ -245,7 +245,7 @@ describe('Handshake', () => {
 
     await client.send(Buffer.from(invalidResponse.serialize()));
 
-    const closeFrame = await client.waitForClose();
+    const closeFrame = await client.waitForPeerClosure();
     expect(closeFrame).toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Nonce signature is invalid',
@@ -264,7 +264,7 @@ describe('Handshake', () => {
 
     await completeHandshake(client);
 
-    const closeFrame = await client.waitForClose();
+    const closeFrame = await client.waitForPeerClosure();
     expect(closeFrame).toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Nonce signature is invalid',
@@ -282,7 +282,7 @@ describe('Handshake', () => {
 
     await completeHandshake(client);
 
-    await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+    await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Handshake completed successfully', {
         peerGatewayAddress,
@@ -307,8 +307,8 @@ describe('Keep alive', () => {
     const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
-    await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
-    expect(client.getLastMessage()).toBeUndefined();
+    await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+    expect(client.popLastPeerMessage()).toBeUndefined();
     expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).toBeCalledWith(
       peerGatewayAddress,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
@@ -443,7 +443,7 @@ describe('Acknowledgements', () => {
     await client.receive();
     await client.send('unknown delivery id');
 
-    await expect(client.waitForClose()).resolves.toEqual({
+    await expect(client.waitForPeerClosure()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Unknown delivery id sent as acknowledgement',
     });
@@ -466,7 +466,7 @@ describe('Acknowledgements', () => {
     await client.receive();
     await client.send(Buffer.from('invalid ACK'));
 
-    await expect(client.waitForClose()).resolves.toEqual({
+    await expect(client.waitForPeerClosure()).resolves.toEqual({
       code: WebSocketCode.CANNOT_ACCEPT,
       reason: 'Unknown delivery id sent as acknowledgement',
     });
@@ -508,7 +508,7 @@ describe('Acknowledgements', () => {
     expect(client.wasConnectionClosed).toBeFalse();
     const parcel2Delivery = ParcelDelivery.deserialize(bufferToArray(parcel2DeliverySerialized));
     await client.send(parcel2Delivery.deliveryId);
-    await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
+    await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Closing connection after all parcels have been acknowledged', {
@@ -596,7 +596,7 @@ async function waitForEvent<T>(eventName: string, eventEmitter: EventEmitter): P
   return new Promise((resolve) => eventEmitter.once(eventName, resolve));
 }
 
-class MockPoWebClient extends MockWebSocketClient {
+class MockPoWebClient extends MockClient {
   constructor(wsServer: WSServer, keepAlive: string = 'off', origin?: string, requestId?: string) {
     super(wsServer, {
       'x-relaynet-keep-alive': keepAlive,

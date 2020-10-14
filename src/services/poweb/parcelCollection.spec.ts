@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import {
   CMSError,
   DETACHED_SIGNATURE_TYPES,
@@ -9,13 +7,11 @@ import {
   ParcelDelivery,
   Signer,
 } from '@relaycorp/relaynet-core';
+import { MockWebSocketClient, MockWebSocketConnection } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
-import { IncomingMessage } from 'http';
 import { Connection } from 'mongoose';
-import { Socket } from 'net';
-import { Duplex } from 'stream';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
@@ -107,7 +103,7 @@ describe('WebSocket server configuration', () => {
 describe('Request id', () => {
   test('Existing request id should be honored if present in request headers', async () => {
     const reqId = '123-id';
-    const client = new MockWebSocketClient(mockWSServer, 'off', 'origin', reqId);
+    const client = new MockPoWebClient(mockWSServer, 'off', 'origin', reqId);
 
     await client.connect();
     await client.waitForClose();
@@ -118,7 +114,7 @@ describe('Request id', () => {
   });
 
   test('Request id should be generated if not present in request headers', async () => {
-    const client = new MockWebSocketClient(mockWSServer, 'off', 'origin');
+    const client = new MockPoWebClient(mockWSServer, 'off', 'origin');
 
     await client.connect();
     await client.waitForClose();
@@ -132,7 +128,7 @@ describe('Request id', () => {
 });
 
 test('Requests with Origin header should be refused', async () => {
-  const client = new MockWebSocketClient(mockWSServer, 'off', 'https://invalid.local');
+  const client = new MockPoWebClient(mockWSServer, 'off', 'https://invalid.local');
 
   await client.connect();
 
@@ -148,7 +144,7 @@ test('Requests with Origin header should be refused', async () => {
 describe('Handshake', () => {
   test('Challenge should be sent as soon as client connects', async () => {
     const uuidBinSpy = jest.spyOn(uuid, 'bin');
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
 
     const challengeSerialized = await client.receive();
@@ -163,7 +159,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should fail if response is malformed', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
 
     await client.send(Buffer.from('invalid handshake response'));
@@ -181,7 +177,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should fail if response is a text frame', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
 
     await client.send('invalid handshake response');
@@ -196,7 +192,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should fail if response contains zero signatures', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
     await client.receive(); // Discard challenge
 
@@ -217,7 +213,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should fail if response contains multiple signatures', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
     await client.receive(); // Discard challenge
     const invalidResponse = new HandshakeResponse([
@@ -242,7 +238,7 @@ describe('Handshake', () => {
 
   test('Handshake should fail if response signature is invalid', async () => {
     // Send two signatures: One valid and the other invalid
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await client.connect();
     await client.receive(); // Discard challenge
     const invalidResponse = new HandshakeResponse([arrayBufferFrom('invalid')]);
@@ -264,7 +260,7 @@ describe('Handshake', () => {
 
   test('Handshake should fail if signer of response nonce is not trusted', async () => {
     MOCK_RETRIEVE_OWN_CERTIFICATES.mockResolvedValue([]);
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
 
     await completeHandshake(client);
 
@@ -282,7 +278,7 @@ describe('Handshake', () => {
   });
 
   test('Handshake should complete successfully if all signatures are valid', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
 
     await completeHandshake(client);
 
@@ -296,7 +292,7 @@ describe('Handshake', () => {
   });
 
   test('Mongoose connection should be closed by the end of the handshake', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     expect(MOCK_MONGOOSE_CONNECTION_CREATION).not.toBeCalled();
 
     await completeHandshake(client);
@@ -308,7 +304,7 @@ describe('Handshake', () => {
 
 describe('Keep alive', () => {
   test('Connection should be closed upon completion if Keep-Alive is off', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     await expect(client.waitForClose()).resolves.toEqual({ code: WebSocketCode.NORMAL });
@@ -330,7 +326,7 @@ describe('Keep alive', () => {
 
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
     const reqId = 'the-request-id';
-    const client = new MockWebSocketClient(mockWSServer, 'on', undefined, reqId);
+    const client = new MockPoWebClient(mockWSServer, 'on', undefined, reqId);
     const abortController = new AbortController();
 
     await completeHandshake(client);
@@ -349,7 +345,7 @@ describe('Keep alive', () => {
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
-    const client = new MockWebSocketClient(mockWSServer, 'THIS IS NOT A VALID VALUE');
+    const client = new MockPoWebClient(mockWSServer, 'THIS IS NOT A VALID VALUE');
     await completeHandshake(client);
 
     await sleep(500);
@@ -359,7 +355,7 @@ describe('Keep alive', () => {
 });
 
 test('Server should send parcel to client', async () => {
-  const client = new MockWebSocketClient(mockWSServer);
+  const client = new MockPoWebClient(mockWSServer);
   getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
     arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
   );
@@ -380,7 +376,7 @@ test('Server should send parcel to client', async () => {
 
 describe('Acknowledgements', () => {
   test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([
         mockParcelStreamMessage(parcelSerialization),
@@ -405,7 +401,7 @@ describe('Acknowledgements', () => {
     getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([parcelStreamMessage]),
     );
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     await receiveAndACKDelivery(client);
@@ -426,7 +422,7 @@ describe('Acknowledgements', () => {
     getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([parcelStreamMessage]),
     );
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but don't ACK it
@@ -440,7 +436,7 @@ describe('Acknowledgements', () => {
     getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but acknowledge it with a different id
@@ -463,7 +459,7 @@ describe('Acknowledgements', () => {
     getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     // Get the parcel but acknowledge it with a different id
@@ -502,7 +498,7 @@ describe('Acknowledgements', () => {
         yield mockParcelStreamMessage(parcelSerialization);
       },
     );
-    const client = new MockWebSocketClient(mockWSServer);
+    const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
     await receiveAndACKDelivery(client); // parcel1
@@ -522,7 +518,7 @@ describe('Acknowledgements', () => {
     );
   });
 
-  async function receiveAndACKDelivery(client: MockWebSocketClient): Promise<void> {
+  async function receiveAndACKDelivery(client: MockPoWebClient): Promise<void> {
     const parcelDeliverySerialized = (await client.receive()) as Buffer;
     const parcelDelivery = ParcelDelivery.deserialize(bufferToArray(parcelDeliverySerialized));
     await client.send(parcelDelivery.deliveryId);
@@ -531,7 +527,7 @@ describe('Acknowledgements', () => {
 
 test('Client-initiated WebSocket connection closure should be handled gracefully', async () => {
   const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
-  const client = new MockWebSocketClient(mockWSServer, 'on');
+  const client = new MockPoWebClient(mockWSServer, 'on');
   await client.connect();
 
   expect(abortSpy).not.toBeCalled();
@@ -550,7 +546,7 @@ test('Client-initiated WebSocket connection closure should be handled gracefully
 
 test('Abrupt TCP connection closure should be handled gracefully', async () => {
   const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
-  const client = new MockWebSocketClient(mockWSServer, 'on');
+  const client = new MockPoWebClient(mockWSServer, 'on');
   await client.connect();
 
   expect(abortSpy).not.toBeCalled();
@@ -577,7 +573,7 @@ function mockParcelStreamMessage(
   };
 }
 
-async function completeHandshake(client: MockWebSocketClient): Promise<void> {
+async function completeHandshake(client: MockPoWebClient): Promise<void> {
   await client.connect();
 
   const challenge = HandshakeChallenge.deserialize((await client.receive()) as ArrayBuffer);
@@ -600,140 +596,12 @@ async function waitForEvent<T>(eventName: string, eventEmitter: EventEmitter): P
   return new Promise((resolve) => eventEmitter.once(eventName, resolve));
 }
 
-//region WebSocket utilities
-
-interface WebSocketCloseMessage {
-  readonly code?: number;
-  readonly reason?: string;
-}
-
-// tslint:disable-next-line:max-classes-per-file
-class MockWebSocketConnection extends EventEmitter {
-  // tslint:disable-next-line:readonly-keyword
-  public serverCloseFrame: WebSocketCloseMessage | null = null;
-  // tslint:disable-next-line:readonly-array
-  public readonly messagesSentByServer: Array<Buffer | string> = [];
-  public readonly serverEvents = new EventEmitter();
-
-  public send(data: any): void {
-    this.messagesSentByServer.push(data);
-    this.serverEvents.emit('messageSent', data);
-  }
-
-  public close(code?: number, reason?: string): void {
-    // tslint:disable-next-line:no-object-mutation
-    this.serverCloseFrame = { code, reason };
-    this.serverEvents.emit('close', this.serverCloseFrame);
-  }
-
-  public makeDuplex(): Duplex {
-    // tslint:disable-next-line:no-this-assignment
-    const connection = this;
-    const duplex = new Duplex({
-      objectMode: true,
-      read(_size: number): void {
-        connection.on('message', (message) => {
-          duplex.push(message);
-        });
-      },
-      write(chunk: any, _encoding: string, callback: (error?: Error | null) => void): void {
-        connection.send(chunk);
-        callback();
-      },
+class MockPoWebClient extends MockWebSocketClient {
+  constructor(wsServer: WSServer, keepAlive: string = 'off', origin?: string, requestId?: string) {
+    super(wsServer, {
+      'x-relaynet-keep-alive': keepAlive,
+      ...(requestId && { [REQUEST_ID_HEADER]: requestId }),
+      ...(origin && { origin }),
     });
-
-    this.on('close', () => duplex.push(null));
-
-    this.on('error', (error) => duplex.destroy(error));
-
-    return duplex;
   }
 }
-
-// tslint:disable-next-line:max-classes-per-file
-class MockWebSocketClient extends EventEmitter {
-  private readonly wsConnection: MockWebSocketConnection;
-  private readonly socket: Socket;
-
-  constructor(
-    private wsServer: WSServer,
-    private keepAlive: string = 'off',
-    private origin?: string,
-    private requestId?: string,
-  ) {
-    super();
-
-    this.socket = new Socket();
-    this.socket.on('error', (hadError) => {
-      // tslint:disable-next-line:no-console
-      console.log({ hadError });
-    });
-
-    this.wsConnection = new MockWebSocketConnection();
-  }
-
-  get wasConnectionClosed(): boolean {
-    return this.wsConnection.serverCloseFrame !== null;
-  }
-
-  public async connect(): Promise<void> {
-    const incomingMessage = new IncomingMessage(this.socket);
-    // tslint:disable-next-line:no-object-mutation
-    incomingMessage.headers = {
-      ...incomingMessage.headers,
-      origin: this.origin,
-      'x-relaynet-keep-alive': this.keepAlive,
-      [REQUEST_ID_HEADER]: this.requestId,
-    };
-    return new Promise((resolve) => {
-      this.wsServer.once('connection', resolve);
-      this.wsServer.emit('connection', this.wsConnection, incomingMessage);
-    });
-  }
-
-  public disconnect(code?: number, reason?: string): void {
-    this.wsConnection.emit('close', code, reason);
-  }
-
-  public abort(error: Error): void {
-    this.wsConnection.emit('error', error);
-  }
-
-  public async send(message: Buffer | string): Promise<void> {
-    expect(this.wasConnectionClosed).toBeFalse();
-    return new Promise((resolve) => {
-      this.wsConnection.once('message', resolve);
-      this.wsConnection.emit('message', message);
-    });
-  }
-
-  public async receive(): Promise<Buffer | string> {
-    expect(this.wasConnectionClosed).toBeFalse();
-
-    const lastMessage = this.getLastMessage();
-    if (lastMessage) {
-      return lastMessage;
-    }
-
-    const message = await waitForEvent<Buffer | string>(
-      'messageSent',
-      this.wsConnection.serverEvents,
-    );
-    const index = this.wsConnection.messagesSentByServer.indexOf(message);
-    this.wsConnection.messagesSentByServer.splice(index, 1);
-    return message;
-  }
-
-  public getLastMessage(): Buffer | string | undefined {
-    return this.wsConnection.messagesSentByServer.pop() as Buffer | string;
-  }
-
-  public async waitForClose(): Promise<WebSocketCloseMessage> {
-    if (this.wsConnection.serverCloseFrame) {
-      return this.wsConnection.serverCloseFrame;
-    }
-    return waitForEvent('close', this.wsConnection.serverEvents);
-  }
-}
-
-//endregion

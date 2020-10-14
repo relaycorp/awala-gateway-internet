@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@relaycorp/shared-config": "^1.4.5",
+    "@relaycorp/ws-mock": "^1.0.0",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.14",
     "@types/mongoose": "^5.7.36",

@@ -532,7 +532,7 @@ test('Client-initiated WebSocket connection closure should be handled gracefully
 
   expect(abortSpy).not.toBeCalled();
   const closeReason = 'I have to go';
-  client.disconnect(WebSocketCode.NORMAL, closeReason);
+  client.close(WebSocketCode.NORMAL, closeReason);
 
   expect(abortSpy).toBeCalled();
   expect(mockLogging.logs).toContainEqual(

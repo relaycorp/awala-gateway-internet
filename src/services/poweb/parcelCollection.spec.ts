@@ -7,7 +7,7 @@ import {
   ParcelDelivery,
   Signer,
 } from '@relaycorp/relaynet-core';
-import { MockClient, MockConnection } from '@relaycorp/ws-mock';
+import { createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
@@ -78,7 +78,7 @@ jest.spyOn(NatsStreamingClient, 'initFromEnv').mockReturnValue(MOCK_NATS_STREAMI
 
 const parcelSerialization = Buffer.from('This is supposed to be a RAMF serialization');
 
-mockSpy(jest.spyOn(WS, 'createWebSocketStream'), (ws: MockConnection) => ws.makeDuplex());
+mockSpy(jest.spyOn(WS, 'createWebSocketStream'), createMockWebSocketStream);
 
 describe('WebSocket server configuration', () => {
   test('Path should be /v1/parcel-collection', () => {

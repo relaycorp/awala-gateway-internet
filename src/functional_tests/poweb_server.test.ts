@@ -27,10 +27,10 @@ describe('PoWeb server', () => {
 
       await expect(
         derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
-      ).resolves.toEqual(derSerializePublicKey(privateGatewayKeyPair.publicKey));
+      ).resolves.toEqual(await derSerializePublicKey(privateGatewayKeyPair.publicKey));
 
       const actualPublicGatewayCertificate = await getPublicGatewayCertificate();
-      expect(actualPublicGatewayCertificate.isEqual(registration.gatewayCertificate));
+      expect(actualPublicGatewayCertificate.isEqual(registration.gatewayCertificate)).toBeTrue();
 
       await expect(
         registration.privateNodeCertificate.getCertificationPath(

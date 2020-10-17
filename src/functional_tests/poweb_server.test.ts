@@ -3,7 +3,7 @@ import {
   generateRSAKeyPair,
   PrivateNodeRegistrationRequest,
 } from '@relaycorp/relaynet-core';
-import { PoWebClient } from '@relaycorp/relaynet-poweb';
+import { PoWebClient, ServerError } from '@relaycorp/relaynet-poweb';
 
 import { configureServices, GW_POWEB_LOCAL_PORT } from './services';
 import { getPublicGatewayCertificate } from './utils';
@@ -40,6 +40,18 @@ describe('PoWeb server', () => {
       ).resolves.toHaveLength(2);
     });
 
-    test.todo('Registration request for different key should be refused');
+    test('Registration request for different key should be refused', async () => {
+      const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+      const keyPair1 = await generateRSAKeyPair();
+      const keyPair2 = await generateRSAKeyPair();
+
+      const authorizationSerialized = await client.preRegisterNode(keyPair1.publicKey);
+      const registrationRequest = new PrivateNodeRegistrationRequest(
+        keyPair2.publicKey,
+        authorizationSerialized,
+      );
+      const pnrrSerialized = await registrationRequest.serialize(keyPair2.privateKey);
+      await expect(client.registerNode(pnrrSerialized)).rejects.toBeInstanceOf(ServerError);
+    });
   });
 });

@@ -1,8 +1,10 @@
 import {
+  Certificate,
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   issueGatewayCertificate,
+  UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
@@ -78,13 +80,22 @@ export async function getFirstQueueMessage(subject: string): Promise<Buffer | un
   });
 }
 
-export async function generatePdaChain(): Promise<PdaChain> {
+async function getPublicGatewayKeyPair(): Promise<UnboundKeyPair> {
   const privateKeyStore = initVaultKeyStore();
   const publicGatewayKeyId = Buffer.from(
     getEnvVar('GATEWAY_KEY_ID').required().asString(),
     'base64',
   );
-  const publicGatewayKeyPair = await privateKeyStore.fetchNodeKey(publicGatewayKeyId);
+  return privateKeyStore.fetchNodeKey(publicGatewayKeyId);
+}
+
+export async function getPublicGatewayCertificate(): Promise<Certificate> {
+  const keyPair = await getPublicGatewayKeyPair();
+  return keyPair.certificate;
+}
+
+export async function generatePdaChain(): Promise<PdaChain> {
+  const publicGatewayKeyPair = await getPublicGatewayKeyPair();
 
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const privateGatewayCertificate = await issueGatewayCertificate({

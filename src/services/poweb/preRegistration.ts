@@ -7,6 +7,7 @@ import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/pre-registrations';
+const SHA256_HEX_DIGEST_LENGTH = 64;
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -23,7 +24,7 @@ export default async function registerRoutes(
       }
 
       const privateGatewayPublicKeyDigest = request.body;
-      if (32 < privateGatewayPublicKeyDigest.length) {
+      if (SHA256_HEX_DIGEST_LENGTH !== privateGatewayPublicKeyDigest.length) {
         return reply.code(400).send({ message: 'Payload is not a SHA-256 digest' });
       }
       const authorizationSerialized = await generateAuthorization(
@@ -41,7 +42,7 @@ async function generateAuthorization(
   privateGatewayPublicKeyDigest: string,
   ownPrivateKey: CryptoKey,
 ): Promise<Buffer> {
-  const gatewayData = bufferToArray(Buffer.from(privateGatewayPublicKeyDigest));
+  const gatewayData = bufferToArray(Buffer.from(privateGatewayPublicKeyDigest, 'hex'));
   const tenSecondsInTheFuture = new Date();
   tenSecondsInTheFuture.setSeconds(tenSecondsInTheFuture.getSeconds() + 10);
   const authorization = new PrivateNodeRegistrationAuthorization(

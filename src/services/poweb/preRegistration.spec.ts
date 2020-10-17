@@ -27,30 +27,36 @@ test('HTTP 415 should be returned if the request Content-Type is not text/plain'
   expect(response).toHaveProperty('statusCode', 415);
 });
 
-test('HTTP 400 should be returned if the request body exceeds 32 octets', async () => {
-  const fastify = await makeServer();
-  const requestBody = Buffer.from('a'.repeat(33));
+test.each([63, 65])(
+  'HTTP 400 should be returned if the request body has %s octets',
+  async (octetCount) => {
+    const fastify = await makeServer();
+    const requestBody = Buffer.from('a'.repeat(octetCount));
 
-  const response = await fastify.inject({
-    headers: { 'content-type': 'text/plain' },
-    method: 'POST',
-    payload: requestBody,
-    url: ENDPOINT_URL,
-  });
+    const response = await fastify.inject({
+      headers: { 'content-type': 'text/plain' },
+      method: 'POST',
+      payload: requestBody,
+      url: ENDPOINT_URL,
+    });
 
-  expect(response).toHaveProperty('statusCode', 400);
-  expect(response.headers['content-type']).toStartWith('application/json');
-  expect(JSON.parse(response.payload)).toHaveProperty('message', 'Payload is not a SHA-256 digest');
-});
+    expect(response).toHaveProperty('statusCode', 400);
+    expect(response.headers['content-type']).toStartWith('application/json');
+    expect(JSON.parse(response.payload)).toHaveProperty(
+      'message',
+      'Payload is not a SHA-256 digest',
+    );
+  },
+);
 
 test('A valid authorization should be issued if the request if valid', async () => {
   const fastify = await makeServer();
-  const requestBody = Buffer.from('a'.repeat(32));
+  const privateGatewayPublicKeyDigest = Buffer.from('a'.repeat(64), 'hex');
 
   const response = await fastify.inject({
     headers: { 'content-type': 'text/plain' },
     method: 'POST',
-    payload: requestBody,
+    payload: privateGatewayPublicKeyDigest.toString('hex'),
     url: ENDPOINT_URL,
   });
 
@@ -66,5 +72,5 @@ test('A valid authorization should be issued if the request if valid', async () 
   const now = new Date();
   expect(authorization.expiryDate.getTime()).toBeGreaterThan(now.getTime() + 8_000);
   expect(authorization.expiryDate.getTime()).toBeLessThanOrEqual(now.getTime() + 10_000);
-  expect(requestBody.equals(Buffer.from(authorization.gatewayData))).toBeTruthy();
+  expect(privateGatewayPublicKeyDigest.equals(Buffer.from(authorization.gatewayData))).toBeTruthy();
 });

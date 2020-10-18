@@ -1,4 +1,5 @@
 import {
+  CertificateError,
   CMSError,
   DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
@@ -271,7 +272,7 @@ describe('Handshake', () => {
     });
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid signature', {
-        err: expect.objectContaining({ type: CMSError.name }),
+        err: expect.objectContaining({ type: CertificateError.name }),
         reqId: UUID4_REGEX,
       }),
     );

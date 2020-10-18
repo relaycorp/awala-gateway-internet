@@ -1,4 +1,4 @@
-import { Parcel } from '@relaycorp/relaynet-core';
+import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
@@ -193,7 +193,10 @@ export class ParcelStore {
     natsStreamingClient: NatsStreamingClient,
   ): Promise<string> {
     const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
-    const certificationPath = (await parcel.validate(trustedCertificates))!!;
+    const certificationPath = (await parcel.validate(
+      RecipientAddressType.PRIVATE,
+      trustedCertificates,
+    ))!!;
 
     const recipientGatewayCert = certificationPath[certificationPath.length - 2];
     const privateGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();

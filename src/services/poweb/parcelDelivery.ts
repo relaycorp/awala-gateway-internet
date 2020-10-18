@@ -114,8 +114,8 @@ async function verifyCountersignature(
       parcelSerialized,
       trustedCertificates,
     );
-  } catch (error) {
-    logger.debug({ error }, 'Invalid countersignature');
+  } catch (err) {
+    logger.debug({ err }, 'Invalid countersignature');
     return null;
   }
 }

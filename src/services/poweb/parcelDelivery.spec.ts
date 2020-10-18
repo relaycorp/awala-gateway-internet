@@ -105,7 +105,7 @@ describe('Authorization errors', () => {
 
     expectResponseToRequireAuthentication(response);
     expect(logging.logs).toContainEqual(
-      partialPinoLog('debug', 'Invalid countersignature', { error: expect.anything() }),
+      partialPinoLog('debug', 'Invalid countersignature', { err: expect.anything() }),
     );
     expect(fixtures.parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
   });

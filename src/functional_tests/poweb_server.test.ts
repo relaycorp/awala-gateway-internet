@@ -1,6 +1,7 @@
 import {
   derSerializePublicKey,
   generateRSAKeyPair,
+  issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
   PrivateNodeRegistration,
@@ -8,6 +9,7 @@ import {
   Signer,
 } from '@relaycorp/relaynet-core';
 import {
+  ParcelDeliveryError,
   PoWebClient,
   RefusedParcelError,
   ServerError,
@@ -73,13 +75,6 @@ describe('PoWeb server', () => {
         client,
       );
 
-      const sendingEndpointKeyPair = await generateRSAKeyPair();
-      const sendingEndpointCertificate = await issueEndpointCertificate({
-        issuerCertificate: privateGateway1Registration.privateNodeCertificate,
-        issuerPrivateKey: privateGateway1KeyPair.privateKey,
-        subjectPublicKey: sendingEndpointKeyPair.publicKey,
-        validityEndDate: privateGateway1Registration.privateNodeCertificate.expiryDate,
-      });
       const receivingEndpointKeyPair = await generateRSAKeyPair();
       const receivingEndpointCertificate = await issueEndpointCertificate({
         issuerCertificate: privateGateway2Registration.privateNodeCertificate,
@@ -87,11 +82,24 @@ describe('PoWeb server', () => {
         subjectPublicKey: receivingEndpointKeyPair.publicKey,
         validityEndDate: privateGateway2Registration.privateNodeCertificate.expiryDate,
       });
+      const sendingEndpointKeyPair = await generateRSAKeyPair();
+      const sendingEndpointCertificate = await issueDeliveryAuthorization({
+        issuerCertificate: receivingEndpointCertificate,
+        issuerPrivateKey: receivingEndpointKeyPair.privateKey,
+        subjectPublicKey: sendingEndpointKeyPair.publicKey,
+        validityEndDate: receivingEndpointCertificate.expiryDate,
+      });
 
       const parcel = new Parcel(
         await receivingEndpointCertificate.calculateSubjectPrivateAddress(),
         sendingEndpointCertificate,
         Buffer.from([]),
+        {
+          senderCaCertificateChain: [
+            receivingEndpointCertificate,
+            privateGateway2Registration.privateNodeCertificate,
+          ],
+        },
       );
       const parcelSerialized = await parcel.serialize(sendingEndpointKeyPair.privateKey);
 
@@ -118,9 +126,8 @@ describe('PoWeb server', () => {
         parcelCollection,
         async function* (collections): AsyncIterable<Parcel> {
           for await (const collection of collections) {
-            const incomingParcel = await collection.deserializeAndValidateParcel();
+            yield await collection.deserializeAndValidateParcel();
             await collection.ack();
-            yield incomingParcel;
           }
         },
         asyncIterableToArray,
@@ -137,6 +144,24 @@ describe('PoWeb server', () => {
         client,
       );
 
+      const invalidKeyPair = await generateRSAKeyPair();
+
+      await expect(
+        client.deliverParcel(
+          new ArrayBuffer(0),
+          new Signer(privateGatewayRegistration.privateNodeCertificate, invalidKeyPair.privateKey),
+        ),
+      ).rejects.toBeInstanceOf(ParcelDeliveryError);
+    });
+
+    test('Invalid parcels should be refused', async () => {
+      const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+      const privateGatewayKeyPair = await generateRSAKeyPair();
+      const privateGatewayRegistration = await registerPrivateGateway(
+        privateGatewayKeyPair,
+        client,
+      );
+
       const sendingEndpointKeyPair = await generateRSAKeyPair();
       const sendingEndpointCertificate = await issueEndpointCertificate({
         issuerCertificate: privateGatewayRegistration.privateNodeCertificate,
@@ -145,11 +170,7 @@ describe('PoWeb server', () => {
         validityEndDate: privateGatewayRegistration.privateNodeCertificate.expiryDate,
       });
 
-      const parcel = new Parcel(
-        'https://example.com/',
-        sendingEndpointCertificate,
-        Buffer.from([]),
-      );
+      const parcel = new Parcel('0deadbeef', sendingEndpointCertificate, Buffer.from([]));
       const parcelSerialized = await parcel.serialize(sendingEndpointKeyPair.privateKey);
 
       await expect(

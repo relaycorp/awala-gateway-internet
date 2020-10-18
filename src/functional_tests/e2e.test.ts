@@ -37,7 +37,9 @@ beforeEach(async () => {
   await vaultEnableSecret('pong-keys');
 });
 
-test('Sending pings and receiving pongs via CogRPC and PoHTTP', async () => {
+test.todo('Sending pings via PoWeb and receiving pongs via PoHTTP');
+
+test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pongEndpointSessionCertificate = await generatePongEndpointKeyPairs();
 
   const pingId = Buffer.from(uuid());

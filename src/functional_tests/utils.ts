@@ -3,15 +3,18 @@ import {
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
-  issueGatewayCertificate,
+  PrivateNodeRegistration,
+  PrivateNodeRegistrationRequest,
   UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
+import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
 import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
 
 import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
+import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 
@@ -98,12 +101,10 @@ export async function generatePdaChain(): Promise<PdaChain> {
   const publicGatewayKeyPair = await getPublicGatewayKeyPair();
 
   const privateGatewayKeyPair = await generateRSAKeyPair();
-  const privateGatewayCertificate = await issueGatewayCertificate({
-    issuerCertificate: publicGatewayKeyPair.certificate,
-    issuerPrivateKey: publicGatewayKeyPair.privateKey,
-    subjectPublicKey: privateGatewayKeyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
+  const { privateNodeCertificate: privateGatewayCertificate } = await registerPrivateGateway(
+    privateGatewayKeyPair,
+    PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
+  );
 
   const peerEndpointKeyPair = await generateRSAKeyPair();
   const peerEndpointCertificate = await issueEndpointCertificate({
@@ -129,8 +130,20 @@ export async function generatePdaChain(): Promise<PdaChain> {
     privateGatewayCert: privateGatewayCertificate,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     publicGatewayCert: publicGatewayKeyPair.certificate,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey, // TODO: Remove -- shouldn't be used
   };
+}
+
+export async function registerPrivateGateway(
+  privateGatewayKeyPair: CryptoKeyPair,
+  client: PoWebClient,
+): Promise<PrivateNodeRegistration> {
+  const authorizationSerialized = await client.preRegisterNode(privateGatewayKeyPair.publicKey);
+  const registrationRequest = new PrivateNodeRegistrationRequest(
+    privateGatewayKeyPair.publicKey,
+    authorizationSerialized,
+  );
+  return client.registerNode(await registrationRequest.serialize(privateGatewayKeyPair.privateKey));
 }
 
 export function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {

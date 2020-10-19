@@ -4,7 +4,6 @@ import {
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
-  PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
   Signer,
 } from '@relaycorp/relaynet-core';
@@ -19,7 +18,7 @@ import pipe from 'it-pipe';
 
 import { asyncIterableToArray } from '../_test_utils';
 import { configureServices, GW_POWEB_LOCAL_PORT } from './services';
-import { getPublicGatewayCertificate, sleep } from './utils';
+import { getPublicGatewayCertificate, registerPrivateGateway, sleep } from './utils';
 
 configureServices(['poweb']);
 
@@ -185,15 +184,3 @@ describe('PoWeb server', () => {
     });
   });
 });
-
-async function registerPrivateGateway(
-  privateGatewayKeyPair: CryptoKeyPair,
-  client: PoWebClient,
-): Promise<PrivateNodeRegistration> {
-  const authorizationSerialized = await client.preRegisterNode(privateGatewayKeyPair.publicKey);
-  const registrationRequest = new PrivateNodeRegistrationRequest(
-    privateGatewayKeyPair.publicKey,
-    authorizationSerialized,
-  );
-  return client.registerNode(await registrationRequest.serialize(privateGatewayKeyPair.privateKey));
-}

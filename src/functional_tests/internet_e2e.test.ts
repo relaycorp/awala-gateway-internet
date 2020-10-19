@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
   Cargo,
@@ -12,21 +10,33 @@ import {
   ServiceMessage,
   SessionEnvelopedData,
   SessionlessEnvelopedData,
+  Signer,
 } from '@relaycorp/relaynet-core';
+import { PoWebClient, StreamingMode } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
+import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
 import { asyncIterableToArray, PdaChain } from '../_test_utils';
 import {
   configureServices,
   GW_GOGRPC_URL,
+  GW_POWEB_LOCAL_PORT,
   PONG_ENDPOINT_ADDRESS,
   runServiceCommand,
   vaultEnableSecret,
 } from './services';
 import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep, TOMORROW } from './utils';
 
-configureServices(['cogrpc', 'crc-queue-worker', 'pohttp']);
+configureServices([
+  'poweb',
+  'cogrpc',
+  'pdc-outgoing-queue-worker',
+  'crc-queue-worker',
+  'pohttp',
+  'pong',
+  'pong-queue',
+]);
 
 let GW_PDA_CHAIN: PdaChain;
 beforeEach(async () => {
@@ -37,7 +47,43 @@ beforeEach(async () => {
   await vaultEnableSecret('pong-keys');
 });
 
-test.todo('Sending pings via PoWeb and receiving pongs via PoHTTP');
+test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
+  const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+  const privateGatewaySigner = new Signer(
+    GW_PDA_CHAIN.privateGatewayCert,
+    GW_PDA_CHAIN.privateGatewayPrivateKey,
+  );
+
+  const pongEndpointSessionCertificate = await generatePongEndpointKeyPairs();
+  const pingId = Buffer.from(uuid());
+  const pingParcelData = await makePingParcel(
+    pingId,
+    pongEndpointSessionCertificate.identityCert,
+    pongEndpointSessionCertificate.sessionCert,
+  );
+
+  // Deliver the ping message
+  await powebClient.deliverParcel(pingParcelData.parcelSerialized, privateGatewaySigner);
+
+  await sleep(IS_GITHUB ? 10 : 5);
+
+  // Collect the pong message once it's been received
+  const incomingParcels = await pipe(
+    powebClient.collectParcels([privateGatewaySigner], StreamingMode.CLOSE_UPON_COMPLETION),
+    async function* (collections): AsyncIterable<ArrayBuffer> {
+      for await (const collection of collections) {
+        yield collection.parcelSerialized;
+        await collection.ack();
+      }
+    },
+    asyncIterableToArray,
+  );
+  expect(incomingParcels).toHaveLength(1);
+
+  await expect(deserializePong(incomingParcels[0], pingParcelData.sessionKey)).resolves.toEqual(
+    pingId,
+  );
+});
 
 test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pongEndpointSessionCertificate = await generatePongEndpointKeyPairs();

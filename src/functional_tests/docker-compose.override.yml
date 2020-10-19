@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   pong:
-    image: relaycorp/relaynet-pong:v1.3.4
+    image: relaycorp/relaynet-pong:v1.4.0
     init: true
     links:
       - redis
@@ -10,7 +10,7 @@ services:
       POHTTP_TLS_REQUIRED: 'false'
 
   pong-queue:
-    image: relaycorp/relaynet-pong:v1.3.4
+    image: relaycorp/relaynet-pong:v1.4.0
     init: true
     command: node build/main/bin/background-queue.js
     links:

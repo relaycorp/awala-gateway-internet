@@ -8,7 +8,7 @@ import {
   ParcelDelivery,
   Signer,
 } from '@relaycorp/relaynet-core';
-import { createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
+import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
@@ -304,7 +304,7 @@ describe('Handshake', () => {
 });
 
 describe('Keep alive', () => {
-  test('Connection should be closed upon completion if Keep-Alive is off', async () => {
+  test('Connection should be closed if Keep-Alive is off and there are no parcels', async () => {
     const client = new MockPoWebClient(mockWSServer);
     await completeHandshake(client);
 
@@ -323,6 +323,20 @@ describe('Keep alive', () => {
 
     expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).not.toBeCalled();
     expect(NatsStreamingClient.initFromEnv).not.toBeCalled();
+  });
+
+  test('Connection should be closed upon completion if Keep-Alive is off', async () => {
+    const client = new MockPoWebClient(mockWSServer);
+    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+      arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
+    );
+    await completeHandshake(client);
+
+    await receiveAndACKDelivery(client);
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.NORMAL,
+    });
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
@@ -518,12 +532,6 @@ describe('Acknowledgements', () => {
       }),
     );
   });
-
-  async function receiveAndACKDelivery(client: MockPoWebClient): Promise<void> {
-    const parcelDeliverySerialized = (await client.receive()) as Buffer;
-    const parcelDelivery = ParcelDelivery.deserialize(bufferToArray(parcelDeliverySerialized));
-    await client.send(parcelDelivery.deliveryId);
-  }
 });
 
 test('Client-initiated WebSocket connection closure should be handled gracefully', async () => {
@@ -583,6 +591,12 @@ async function completeHandshake(client: MockPoWebClient): Promise<void> {
   ]);
 
   await client.send(Buffer.from(response.serialize()));
+}
+
+async function receiveAndACKDelivery(client: MockPoWebClient): Promise<void> {
+  const parcelDeliverySerialized = (await client.receive()) as Buffer;
+  const parcelDelivery = ParcelDelivery.deserialize(bufferToArray(parcelDeliverySerialized));
+  await client.send(parcelDelivery.deliveryId);
 }
 
 async function sleep(milliseconds: number): Promise<void> {

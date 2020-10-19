@@ -123,8 +123,6 @@ export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => As
       yield item;
       count++;
       if (max === count) {
-        // tslint:disable-next-line:no-console
-        console.log(new Date().getTime(), 'Breaking loop');
         break;
       }
     }

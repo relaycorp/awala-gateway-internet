@@ -31,7 +31,7 @@ export function configureServices(servicesToLog?: readonly string[]): void {
   beforeEach(async () => {
     jest.setTimeout(30_000);
 
-    await tearDownServices();
+    await tearDownServices(); // In case service are still running from a previous run
 
     await startServices(BACKING_SERVICES);
     await sleep(IS_GITHUB ? 5 : 1); // GitHub is painfully slow
@@ -51,9 +51,10 @@ export function configureServices(servicesToLog?: readonly string[]): void {
         log: true,
       });
     }
-  });
 
-  afterAll(tearDownServices);
+    // Shut down all service to force all open connections to close
+    await tearDownServices();
+  });
 }
 
 export async function runServiceCommand(

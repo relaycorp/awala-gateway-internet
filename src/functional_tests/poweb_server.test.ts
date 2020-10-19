@@ -16,9 +16,15 @@ import {
 } from '@relaycorp/relaynet-poweb';
 import pipe from 'it-pipe';
 
-import { asyncIterableToArray } from '../_test_utils';
+import { asyncIterableToArray, iterableTake, PdaChain } from '../_test_utils';
+import { expectBuffersToEqual } from '../services/_test_utils';
 import { configureServices, GW_POWEB_LOCAL_PORT } from './services';
-import { getPublicGatewayCertificate, registerPrivateGateway, sleep } from './utils';
+import {
+  generatePdaChain,
+  getPublicGatewayCertificate,
+  registerPrivateGateway,
+  sleep,
+} from './utils';
 
 configureServices(['poweb']);
 
@@ -61,78 +67,66 @@ describe('PoWeb server', () => {
   });
 
   describe('Parcel delivery and collection', () => {
-    test('Delivering and collecting a given parcel', async () => {
+    test('Delivering and collecting a given parcel (closing upon completion)', async () => {
       const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-      const privateGateway1KeyPair = await generateRSAKeyPair();
-      const privateGateway1Registration = await registerPrivateGateway(
-        privateGateway1KeyPair,
-        client,
-      );
-      const privateGateway2KeyPair = await generateRSAKeyPair();
-      const privateGateway2Registration = await registerPrivateGateway(
-        privateGateway2KeyPair,
-        client,
-      );
+      const senderChain = await generatePdaChain();
+      const recipientChain = await generatePdaChain();
 
-      const receivingEndpointKeyPair = await generateRSAKeyPair();
-      const receivingEndpointCertificate = await issueEndpointCertificate({
-        issuerCertificate: privateGateway2Registration.privateNodeCertificate,
-        issuerPrivateKey: privateGateway2KeyPair.privateKey,
-        subjectPublicKey: receivingEndpointKeyPair.publicKey,
-        validityEndDate: privateGateway2Registration.privateNodeCertificate.expiryDate,
-      });
-      const sendingEndpointKeyPair = await generateRSAKeyPair();
-      const sendingEndpointCertificate = await issueDeliveryAuthorization({
-        issuerCertificate: receivingEndpointCertificate,
-        issuerPrivateKey: receivingEndpointKeyPair.privateKey,
-        subjectPublicKey: sendingEndpointKeyPair.publicKey,
-        validityEndDate: receivingEndpointCertificate.expiryDate,
-      });
-
-      const parcel = new Parcel(
-        await receivingEndpointCertificate.calculateSubjectPrivateAddress(),
-        sendingEndpointCertificate,
-        Buffer.from([]),
-        {
-          senderCaCertificateChain: [
-            receivingEndpointCertificate,
-            privateGateway2Registration.privateNodeCertificate,
-          ],
-        },
-      );
-      const parcelSerialized = await parcel.serialize(sendingEndpointKeyPair.privateKey);
+      const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
 
       await client.deliverParcel(
         parcelSerialized,
-        new Signer(
-          privateGateway1Registration.privateNodeCertificate,
-          privateGateway1KeyPair.privateKey,
-        ),
+        new Signer(senderChain.privateGatewayCert, senderChain.privateGatewayPrivateKey),
       );
 
       await sleep(2);
 
       const parcelCollection = client.collectParcels(
-        [
-          new Signer(
-            privateGateway2Registration.privateNodeCertificate,
-            privateGateway2KeyPair.privateKey,
-          ),
-        ],
+        [new Signer(recipientChain.privateGatewayCert, recipientChain.privateGatewayPrivateKey)],
         StreamingMode.CLOSE_UPON_COMPLETION,
       );
       const incomingParcels = await pipe(
         parcelCollection,
-        async function* (collections): AsyncIterable<Parcel> {
+        async function* (collections): AsyncIterable<ArrayBuffer> {
           for await (const collection of collections) {
-            yield await collection.deserializeAndValidateParcel();
+            yield await collection.parcelSerialized;
             await collection.ack();
           }
         },
         asyncIterableToArray,
       );
       expect(incomingParcels).toHaveLength(1);
-      expect(incomingParcels[0].id).toEqual(parcel.id);
+      expectBuffersToEqual(parcelSerialized, incomingParcels[0]);
+    });
+
+    test('Delivering and collecting a given parcel (keep alive)', async () => {
+      const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+      const senderChain = await generatePdaChain();
+      const recipientChain = await generatePdaChain();
+
+      const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
+
+      await client.deliverParcel(
+        parcelSerialized,
+        new Signer(senderChain.privateGatewayCert, senderChain.privateGatewayPrivateKey),
+      );
+
+      const incomingParcels = await pipe(
+        client.collectParcels(
+          [new Signer(recipientChain.privateGatewayCert, recipientChain.privateGatewayPrivateKey)],
+          StreamingMode.KEEP_ALIVE,
+        ),
+        async function* (collections): AsyncIterable<ArrayBuffer> {
+          for await (const collection of collections) {
+            yield await collection.parcelSerialized;
+            await collection.ack();
+          }
+        },
+        iterableTake(1),
+        asyncIterableToArray,
+      );
+      expect(incomingParcels).toHaveLength(1);
+      expectBuffersToEqual(parcelSerialized, incomingParcels[0]);
     });
 
     test('Invalid parcel deliveries should be refused', async () => {
@@ -184,3 +178,26 @@ describe('PoWeb server', () => {
     });
   });
 });
+
+async function generateDummyParcel(
+  senderChain: PdaChain,
+  recipientChain: PdaChain,
+): Promise<ArrayBuffer> {
+  const recipientEndpointCertificate = recipientChain.peerEndpointCert;
+  const sendingEndpointCertificate = await issueDeliveryAuthorization({
+    issuerCertificate: recipientEndpointCertificate,
+    issuerPrivateKey: recipientChain.peerEndpointPrivateKey,
+    subjectPublicKey: await senderChain.peerEndpointCert.getPublicKey(),
+    validityEndDate: recipientEndpointCertificate.expiryDate,
+  });
+
+  const parcel = new Parcel(
+    await recipientEndpointCertificate.calculateSubjectPrivateAddress(),
+    sendingEndpointCertificate,
+    Buffer.from([]),
+    {
+      senderCaCertificateChain: [recipientEndpointCertificate, recipientChain.privateGatewayCert],
+    },
+  );
+  return parcel.serialize(senderChain.peerEndpointPrivateKey);
+}

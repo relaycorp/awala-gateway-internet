@@ -26,7 +26,7 @@ import {
   runServiceCommand,
   vaultEnableSecret,
 } from './services';
-import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep, TOMORROW } from './utils';
+import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep } from './utils';
 
 configureServices([
   'poweb',
@@ -154,7 +154,7 @@ async function makePingParcel(
     issuerCertificate: GW_PDA_CHAIN.peerEndpointCert,
     issuerPrivateKey: GW_PDA_CHAIN.peerEndpointPrivateKey,
     subjectPublicKey: await identityCert.getPublicKey(),
-    validityEndDate: TOMORROW,
+    validityEndDate: GW_PDA_CHAIN.peerEndpointCert.expiryDate,
   });
   const pingSerialized = serializePing(pingId, pongEndpointPda);
 

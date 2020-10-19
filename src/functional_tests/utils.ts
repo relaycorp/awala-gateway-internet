@@ -18,9 +18,6 @@ import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 
-export const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
-
 export const OBJECT_STORAGE_CLIENT = initS3Client();
 export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
 
@@ -111,7 +108,7 @@ export async function generatePdaChain(): Promise<PdaChain> {
     issuerCertificate: privateGatewayCertificate,
     issuerPrivateKey: privateGatewayKeyPair.privateKey,
     subjectPublicKey: peerEndpointKeyPair.publicKey,
-    validityEndDate: TOMORROW,
+    validityEndDate: privateGatewayCertificate.expiryDate,
   });
 
   const pdaGranteeKeyPair = await generateRSAKeyPair();
@@ -119,7 +116,7 @@ export async function generatePdaChain(): Promise<PdaChain> {
     issuerCertificate: peerEndpointCertificate,
     issuerPrivateKey: peerEndpointKeyPair.privateKey,
     subjectPublicKey: pdaGranteeKeyPair.publicKey,
-    validityEndDate: TOMORROW,
+    validityEndDate: peerEndpointCertificate.expiryDate,
   });
 
   return {

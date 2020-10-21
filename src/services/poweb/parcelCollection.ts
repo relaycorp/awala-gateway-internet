@@ -187,8 +187,8 @@ function streamActiveParcels(
   requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
 ): AsyncIterable<ParcelStreamMessage> {
-  // "on" or any value other than "off" should keep the connection alive
-  const keepAlive = requestHeaders['x-relaynet-keep-alive'] !== 'off';
+  // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
+  const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
 
   if (!keepAlive) {
     return parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);

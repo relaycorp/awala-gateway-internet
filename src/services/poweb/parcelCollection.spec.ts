@@ -8,6 +8,7 @@ import {
   ParcelDelivery,
   Signer,
 } from '@relaycorp/relaynet-core';
+import { StreamingMode } from '@relaycorp/relaynet-poweb';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -104,7 +105,12 @@ describe('WebSocket server configuration', () => {
 describe('Request id', () => {
   test('Existing request id should be honored if present in request headers', async () => {
     const reqId = '123-id';
-    const client = new MockPoWebClient(mockWSServer, 'off', 'origin', reqId);
+    const client = new MockPoWebClient(
+      mockWSServer,
+      StreamingMode.CLOSE_UPON_COMPLETION,
+      'origin',
+      reqId,
+    );
 
     await client.connect();
     await client.waitForPeerClosure();
@@ -115,7 +121,7 @@ describe('Request id', () => {
   });
 
   test('Request id should be generated if not present in request headers', async () => {
-    const client = new MockPoWebClient(mockWSServer, 'off', 'origin');
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.CLOSE_UPON_COMPLETION, 'origin');
 
     await client.connect();
     await client.waitForPeerClosure();
@@ -129,7 +135,11 @@ describe('Request id', () => {
 });
 
 test('Requests with Origin header should be refused', async () => {
-  const client = new MockPoWebClient(mockWSServer, 'off', 'https://invalid.local');
+  const client = new MockPoWebClient(
+    mockWSServer,
+    StreamingMode.CLOSE_UPON_COMPLETION,
+    'https://invalid.local',
+  );
 
   await client.connect();
 
@@ -341,7 +351,7 @@ describe('Keep alive', () => {
 
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
     const reqId = 'the-request-id';
-    const client = new MockPoWebClient(mockWSServer, 'on', undefined, reqId);
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE, undefined, reqId);
     const abortController = new AbortController();
 
     await completeHandshake(client);
@@ -360,7 +370,7 @@ describe('Keep alive', () => {
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
-    const client = new MockPoWebClient(mockWSServer, 'THIS IS NOT A VALID VALUE');
+    const client = new MockPoWebClient(mockWSServer, 'THIS IS NOT A VALID VALUE' as any);
     await completeHandshake(client);
 
     await sleep(500);
@@ -536,7 +546,7 @@ describe('Acknowledgements', () => {
 
 test('Client-initiated WebSocket connection closure should be handled gracefully', async () => {
   const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
-  const client = new MockPoWebClient(mockWSServer, 'on');
+  const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
   await client.connect();
 
   expect(abortSpy).not.toBeCalled();
@@ -555,7 +565,7 @@ test('Client-initiated WebSocket connection closure should be handled gracefully
 
 test('Abrupt TCP connection closure should be handled gracefully', async () => {
   const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
-  const client = new MockPoWebClient(mockWSServer, 'on');
+  const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
   await client.connect();
 
   expect(abortSpy).not.toBeCalled();
@@ -612,9 +622,14 @@ async function waitForEvent<T>(eventName: string, eventEmitter: EventEmitter): P
 }
 
 class MockPoWebClient extends MockClient {
-  constructor(wsServer: WSServer, keepAlive: string = 'off', origin?: string, requestId?: string) {
+  constructor(
+    wsServer: WSServer,
+    streamingMode: StreamingMode = StreamingMode.CLOSE_UPON_COMPLETION,
+    origin?: string,
+    requestId?: string,
+  ) {
     super(wsServer, {
-      'x-relaynet-keep-alive': keepAlive,
+      'x-relaynet-streaming-mode': streamingMode.toString(),
       ...(requestId && { [REQUEST_ID_HEADER]: requestId }),
       ...(origin && { origin }),
     });

@@ -79,7 +79,7 @@
     "@types/pino": "^6.3.2",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
-    "aws-sdk": "^2.774.0",
+    "aws-sdk": "^2.779.0",
     "axios": "^0.20.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",

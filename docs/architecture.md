@@ -1,6 +1,10 @@
+---
+nav_order: 20
+permalink: /architecture
+---
 # Architecture
 
-The overall system comprises a series of services, background queues and third-party backing services, as shown in the diagram below:
+The overall system comprises a series of services, background queues and third-party [backing services](https://12factor.net/backing-services), as shown in the diagram below:
 
 [![](./diagrams/system.png)](./diagrams/system.png)
 
@@ -16,12 +20,6 @@ A [PoWeb](https://specs.relaynet.network/RS-016) server, to exchange parcels wit
 
 This server is powered by [Fastify](https://www.fastify.io/) and [`ws`](https://www.npmjs.com/package/ws).
 
-### PoHTTP server
-
-A [CogRPC](https://specs.relaynet.network/RS-008) server, to receive parcels from other gateways or public endpoints.
-
-This server is powered by [Fastify](https://www.fastify.io/).
-
 ### CogRPC server
 
 A [PoHTTP](https://specs.relaynet.network/RS-007) server, to exchange parcels with private gateways via an end-to-end encrypted sneakernet.
@@ -29,6 +27,12 @@ A [PoHTTP](https://specs.relaynet.network/RS-007) server, to exchange parcels wi
 An operator may choose not to deploy the CogRPC server if their users don't need the ability to use the sneakernet.
 
 This server is powered by [`grpc`](https://www.npmjs.com/package/grpc).
+
+### PoHTTP server
+
+A [CogRPC](https://specs.relaynet.network/RS-008) server, to receive parcels from other gateways or public endpoints.
+
+This server is powered by [Fastify](https://www.fastify.io/).
 
 ## Background queues
 

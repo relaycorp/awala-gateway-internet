@@ -1,0 +1,65 @@
+@startuml "system"
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Container.puml
+
+skinparam wrapWidth 200
+skinparam maxMessageSize 200
+
+LAYOUT_TOP_DOWN
+
+Person(user, User)
+Person(courier, Courier)
+
+System_Boundary(c1, "Relaynet-Internet Gateway") {
+  Container(poweb, "PoWeb service", "Fastify, ws", "Allows direct communication with private gateway over the Internet")
+
+  Container(cogrpc, "CogRPC service", "gRPC server", "Allows courier to collect and deliver cargo on behalf of private gateway")
+
+  Container(pohttp, "PoHTTP service", "Fastify", "Allows other gateways and public endpoints to send parcels to private peers")
+
+  Container(pdc_internet_queue, "Queue worker for Internet-bound parcel delivery", "Background queue", "Delivers parcels bound for the Internet")
+
+  Container(crc_queue_worker, "CRC queue worker", "Background queue", "Extracts contents of incoming cargo")
+
+  Container(message_queue, "Message queue", "NATS Streaming")
+
+  ContainerDb(object_store, "Object store", "S3-compatible server", "Stores parcels and incoming cargoes")
+
+  ContainerDb(db, "Database", "MongoDB")
+
+  Container(secrets_manager, "Secrets manager", "HashiCorp Vault", "Stores identity and session key pairs")
+}
+
+System_Ext(public_endpoint, "Public endpoint", "E.g., api.twitter.com/relaynet")
+System_Ext(other_public_gateway, "Another public gateway")
+
+Rel_R(user, courier, "Exchanges parcels encapsulated in cargoes when the Internet is unavailable")
+
+Rel(user, poweb, "Delivers and collects parcels via private gateway when the Internet is available", "HTTP, WebSocket")
+Rel(courier, cogrpc, "Delivers and collects cargo", "gRPC")
+Rel(public_endpoint, pohttp, "Delivers parcels")
+Rel(other_public_gateway, pohttp, "Delivers parcels")
+
+Rel(poweb, object_store, "Stores and retrieves parcels")
+Rel(poweb, message_queue, "Notifies parcel reception")
+Rel(poweb, db, "Reads own certificates")
+Rel(poweb, secrets_manager, "Reads private key to issue certificates")
+
+Rel(pohttp, db, "Reads own certificates")
+Rel(pohttp, object_store, "Stores parcels")
+Rel(pohttp, message_queue, "Notifies parcel reception")
+
+Rel(cogrpc, db, "Reads own certificates")
+Rel(cogrpc, object_store, "Stores cargoes and retrieves parcels")
+Rel(cogrpc, secrets_manager, "Reads private key to sign cargoes")
+Rel(cogrpc, message_queue, "Notifies cargo reception")
+
+Rel(pdc_internet_queue, message_queue, "Retrieves outgoing parcel notifications")
+Rel(pdc_internet_queue, object_store, "Reads parcels")
+Rel(pdc_internet_queue, public_endpoint, "Delivers parcels")
+Rel(pdc_internet_queue, other_public_gateway, "Delivers parcels")
+
+Rel(crc_queue_worker, message_queue, "Retrieves incoming cargo notifications and notifies parcel reception")
+Rel_L(crc_queue_worker, object_store, "Reads cargoes and stores encapsulated parcels")
+Rel_U(crc_queue_worker, secrets_manager, "Reads private keys to decrypt cargoes")
+
+@enduml

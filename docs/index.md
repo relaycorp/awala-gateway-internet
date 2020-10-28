@@ -1,35 +1,15 @@
 ---
-layout: page
-title: Relaynet-Internet Gateway
+title: Home
 ---
 # Relaynet-Internet Gateway
 
-TODO
+The Relaynet-Internet Gateway is a cloud-native, server-side application that acts as a Relaynet _public gateway_ that connects private gateways to the Internet as well as each other.
 
-## Architecture and Backing Services
+This documentation is aimed at people contributing to the development of this app, and organisations operating an instance of this app.
 
-TODO
+By default, private gateways (e.g., the Android gateway) will connect to an instance of this app operated by [Relaycorp](https://relaycorp.tech/), which means that neither users nor service providers _have_ to deploy their own instance -- in fact, both stakeholders are encouraged not to do that anyway:
 
-## Releases
+- Unless the public gateway is shared with many users, it'd be relatively easy for an observer to identify the user. This is analogous to email addresses: If you have an email address at a domain that only you or very few people use, then an outsider could infer who you are -- Which wouldn't happen if you use a widely-used domain like `gmail.com`.
+- Relaynet service providers need not be concerned about the public gateways of their users, just like Web site operators need not be concerned about the Internet Service Providers (ISPs) of their users.
 
-This image is automatically pushed to the Docker repository [`relaycorp/relaynet-internet-gateway`](https://hub.docker.com/r/relaycorp/relaynet-internet-gateway). Using the `latest` tag is not recommended: Instead, the tag for the corresponding version should be used (e.g., `v1.2.1`). This project uses [semantic versioning v2](https://semver.org/).
-
-The changelog is available on GitHub.
-
-## Processes
-
-TODO
-
-## Development
-
-Make sure to install the development dependencies when contributing to this project: Docker, docker-compose and Node.js v12+.
-
-This project can be installed in development mode like any other Node.js project: By running `npm install` from the root of the repository.
-
-To run the unit test suite, run `npm test` on the host computer (i.e., without running Docker).
-
-To start the long-running processes, run: `docker-compose up --build --remove-orphan`.
-
-The PoHTTP endpoint will be available at http://127.0.0.1:8080/.
-
-To run the functional tests locally, run `npm run test:functional`.
+If you decide to operate a public gateway, whether this implementation or one provided by another party, you are strongly encouraged to familiarise yourself with the [Relaynet bindings](https://specs.relaynet.network/RS-000#message-transport-bindings) supported by the gateway. Otherwise, it would be very hard for you to configure it properly or triage issues.

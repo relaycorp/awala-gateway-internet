@@ -44,7 +44,8 @@ export default async function registerRoutes(
         registrationRequest = await PrivateNodeRegistrationRequest.deserialize(
           bufferToArray(request.body),
         );
-      } catch (error) {
+      } catch (err) {
+        request.log.info({ err }, 'Invalid PNRR received');
         return reply
           .code(400)
           .send({ message: 'Payload is not a valid Private Node Registration Request' });
@@ -57,7 +58,8 @@ export default async function registerRoutes(
           registrationRequest.pnraSerialized,
           await options.publicGatewayCertificate.getPublicKey(),
         );
-      } catch (error) {
+      } catch (err) {
+        request.log.info({ err }, 'PNRR contains invalid authorization');
         return reply
           .code(400)
           .send({ message: 'Registration request contains an invalid authorization' });

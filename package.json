@@ -30,11 +30,11 @@
     "@relaycorp/ws-mock": "^1.4.8",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.15",
-    "@types/mongoose": "^5.7.36",
+    "@types/mongoose": "^5.7.37",
     "@types/pkijs": "0.0.6",
     "@types/split2": "^2.1.6",
     "@types/verror": "^1.10.4",
-    "@types/ws": "^7.2.8",
+    "@types/ws": "^7.2.9",
     "docker-compose": "^0.23.5",
     "dotenv": "^8.2.0",
     "fastify-plugin": "^3.0.0",
@@ -79,7 +79,7 @@
     "@types/pino": "^6.3.3",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
-    "aws-sdk": "^2.779.0",
+    "aws-sdk": "^2.783.0",
     "axios": "^0.21.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",
@@ -98,7 +98,7 @@
     "ws": "^7.3.1"
   },
   "optionalDependencies": {
-    "bufferutil": "^4.0.1",
-    "utf-8-validate": "^5.0.2"
+    "bufferutil": "^4.0.2",
+    "utf-8-validate": "^5.0.3"
   }
 }

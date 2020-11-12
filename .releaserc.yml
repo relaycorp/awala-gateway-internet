@@ -5,6 +5,10 @@ plugins:
   - - "@semantic-release/npm"
     - npmPublish: false
   - - "@semantic-release/exec"
+    - prepareCmd: helm package chart/ --app-version=${nextRelease.version} --version=${nextRelease.version} --destination=build/
+  - - "@semantic-release/exec"
     - prepareCmd: docker tag relaynet-gw:local ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
       publishCmd: docker push ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
-  - "@semantic-release/github"
+  - - "@semantic-release/github"
+    - assets:
+        - path: build/relaynet-internet-gateway-*.tgz

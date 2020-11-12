@@ -1,12 +1,8 @@
----
-nav_order: 10
-permalink: /install
----
-# Install and upgrade
+# Helm Chart for the Relaynet-Internet Gateway
 
-The Relaynet-Internet Gateway is distributed as a Helm chart. Note that deploying the Docker images directly is discouraged: We're likely to change paths, as well as split and rename the Docker image.
+This Helm chart allows you to deploy the [Relaynet-Internet Gateway](https://docs.relaycorp.tech/relaynet-internet-gateway/) to any Kubernetes-compatible cloud provider.
 
-There's no Helm repository at this point but you can download the chart directly from [the latest GitHub release](https://github.com/relaycorp/relaynet-internet-gateway/releases/latest).
+There's no Helm repository at this point but you can download the chart directly from a [GitHub release](https://docs.relaycorp.tech/relaynet-internet-gateway-chart/releases). Or if you want to use the latest from the `master` branch, use `https://github.com/relaycorp/relaynet-internet-gateway-chart/archive/master.tar.gz`.
 
 ## Example
 
@@ -38,10 +34,10 @@ Then you can install the chart:
 helm install \
   --values values.yaml \
   gateway-test \
-  https://github.com/relaycorp/relaynet-internet-gateway/releases/latest/download/relaynet-internet-gateway-1.10.0.tgz
+  https://github.com/relaycorp/relaynet-internet-gateway-chart/archive/master.tar.gz
 ```
 
-Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway) for a working example on Google Cloud Platform.
+Check out [`example/`](./example) for a working example on Google Cloud Platform.
 
 ## Configuration options
 
@@ -69,3 +65,36 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `vault.serverUrl` | string | | URL to the HashiCorp Vault server |
 | `vault.token` | string | | Token to the HashiCorp Vault server |
 | `vault.kvPrefix` | string | `gw-keys` | The path prefix for the Vault secret engine |
+
+## Development
+
+Here's how to set up your local environment for development:
+
+1. Install Vault and enable the KV secret store:
+   ```
+   # Add HashiCorp's repo if you haven't done so yet
+   helm repo add hashicorp https://helm.releases.hashicorp.com
+   
+   helm install vault-test hashicorp/vault \
+       --set "server.dev.enabled=true" \
+       --set "server.image.extraEnvironmentVars.VAULT_DEV_ROOT_TOKEN_ID=letmein"
+   
+   kubectl exec -it vault-test-0 -- vault secrets enable -path=gw-keys kv-v2
+   ```
+1. Install NATS Streaming: https://github.com/nats-io/nats-streaming-operator
+1. Install Mongo:
+   ```
+   helm repo add bitnami https://charts.bitnami.com/bitnami
+   helm install mongo-test bitnami/mongodb
+   ```
+1. Install Minio:
+   ```
+   helm install \
+       --set accessKey=THE-KEY-ID,secretKey=letmeinpls \
+       minio-test \
+       stable/minio
+   ```
+1. Install gw:
+   ```
+   helm install --values values.dev.yml gw-test .
+   ```

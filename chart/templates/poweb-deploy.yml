@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-poweb
+  labels:
+    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "poweb") .) | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "poweb") .) | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "poweb") .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-poweb
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      shareProcessNamespace: true
+      containers:
+        - name: poweb
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - build/main/bin/poweb-server.js
+          env:
+            {{- if .Values.proxyRequestIdHeader }}
+            - name: REQUEST_ID_HEADER
+              value: {{ .Values.proxyRequestIdHeader | quote }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+            - secretRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+          ports:
+            - name: poweb
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: poweb
+          readinessProbe:
+            httpGet:
+              path: /
+              port: poweb
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

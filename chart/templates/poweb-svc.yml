@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-poweb
+  labels:
+    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "poweb") .) | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 8082
+      targetPort: poweb
+      protocol: TCP
+      name: poweb
+  selector:
+    {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "poweb") .) | nindent 4 }}

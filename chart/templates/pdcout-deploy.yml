@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-pdcout
+  labels:
+    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pdcout") .) | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-pdcout
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      shareProcessNamespace: true
+      containers:
+        - name: pdcout
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - build/main/bin/pdc-outgoing-queue-worker.js
+          env:
+            - name: POHTTP_ADDRESS
+              value: {{ include "relaynet-internet-gateway.pohttpUri" . }}
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - secretRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,22 @@
+gatewayKeyId: MTM1NzkK
+pohttpHost: gw-test-relaynet-internet-gateway-pohttp.default.svc.cluster.local
+powebHost: gw-test-relaynet-internet-gateway-poweb.default.svc.cluster.local
+cogrpcHost: gw-test-relaynet-internet-gateway-cogrpc.default.svc.cluster.local
+
+mongo:
+  uri: mongodb://mongo-test-mongodb.default.svc.cluster.local/test_db
+
+nats:
+  serverUrl: nats://example-nats.default.svc.cluster.local:4222
+  clusterId: example-stan
+
+objectStore:
+  endpoint: minio-test.default.svc.cluster.local:9000
+  bucket: relaynet-public-gateway
+  accessKeyId: THE-KEY-ID
+  secretKey: letmeinpls
+  tlsEnabled: false
+
+vault:
+  serverUrl: http://vault-test.default.svc.cluster.local:8200
+  token: letmein

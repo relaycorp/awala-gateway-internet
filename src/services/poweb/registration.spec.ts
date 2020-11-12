@@ -2,6 +2,7 @@
 
 import {
   derSerializePublicKey,
+  InvalidMessageError,
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
@@ -9,7 +10,13 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 
-import { arrayBufferFrom, sha256 } from '../../_test_utils';
+import {
+  arrayBufferFrom,
+  makeMockLogging,
+  MockLogSet,
+  partialPinoLog,
+  sha256,
+} from '../../_test_utils';
 import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
@@ -20,7 +27,12 @@ const ENDPOINT_URL = '/v1/nodes';
 const getFixtures = setUpCommonFixtures();
 
 let fastify: FastifyInstance;
-beforeEach(async () => (fastify = await makeServer()));
+let LOGS: MockLogSet;
+beforeEach(async () => {
+  const logging = makeMockLogging();
+  fastify = await makeServer(logging.logger);
+  LOGS = logging.logs;
+});
 
 testDisallowedMethods(['POST'], ENDPOINT_URL, makeServer);
 
@@ -48,6 +60,11 @@ test('HTTP 400 should be returned if the PNRR is not valid', async () => {
     'message',
     'Payload is not a valid Private Node Registration Request',
   );
+  expect(LOGS).toContainEqual(
+    partialPinoLog('info', 'Invalid PNRR received', {
+      err: expect.objectContaining({ type: InvalidMessageError.name }),
+    }),
+  );
 });
 
 test('HTTP 400 should be returned if the authorization in the PNRR is invalid', async () => {
@@ -69,6 +86,11 @@ test('HTTP 400 should be returned if the authorization in the PNRR is invalid', 
   expect(JSON.parse(response.payload)).toHaveProperty(
     'message',
     'Registration request contains an invalid authorization',
+  );
+  expect(LOGS).toContainEqual(
+    partialPinoLog('info', 'PNRR contains invalid authorization', {
+      err: expect.objectContaining({ type: InvalidMessageError.name }),
+    }),
   );
 });
 

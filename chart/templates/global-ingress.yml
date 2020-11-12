@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName :=  include "relaynet-internet-gateway.fullname" . -}}
+apiVersion: {{ .Values.ingress.apiVersion }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.enableTls }}
+  tls:
+    - hosts:
+      - {{ .Values.pohttpHost | quote }}
+      - {{ .Values.powebHost | quote }}
+      - {{ .Values.cogrpcHost | quote }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.pohttpHost | quote }}
+      http:
+        paths:
+          - backend:
+              serviceName: {{ $fullName }}-pohttp
+              servicePort: http
+    - host: {{ .Values.powebHost | quote }}
+      http:
+        paths:
+          - backend:
+              serviceName: {{ $fullName }}-poweb
+              servicePort: poweb
+    - host: {{ .Values.cogrpcHost | quote }}
+      http:
+        paths:
+          - backend:
+              serviceName: {{ $fullName }}-cogrpc
+              servicePort: cogrpc
+  {{- end }}

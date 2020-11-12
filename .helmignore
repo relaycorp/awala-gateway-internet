@@ -1,0 +1,12 @@
+.DS_Store
+
+.git
+.github
+.gitignore
+
+.idea
+.vscode
+
+.dependabot
+docs
+src

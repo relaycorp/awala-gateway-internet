@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+  labels:
+    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-cogrpc
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      shareProcessNamespace: true
+      containers:
+        - name: cogrpc
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - build/main/bin/cogrpc-server.js
+          env:
+            - name: COGRPC_ADDRESS
+              value: {{ include "relaynet-internet-gateway.cogrpcUri" . }}
+            - name: SERVER_IP_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          envFrom:
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+            - secretRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+          ports:
+            - name: grpc
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: cogrpc-health-check
+          image: salrashid123/grpc_health_proxy:1.0.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - "/bin/grpc_health_proxy"
+            - "-http-listen-addr"
+            - "0.0.0.0:8082"
+            - "-grpcaddr"
+            - "127.0.0.1:8080"
+            - "-service-name"
+            - "relaynet.cogrpc.CargoRelay"
+            - "-grpctls"
+            - "-grpc-tls-no-verify"
+            - "-v"
+            - "10"
+          ports:
+            - name: health-check
+              containerPort: 8082
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              port: "health-check"
+          readinessProbe:
+            httpGet:
+              port: "health-check"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

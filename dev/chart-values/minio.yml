@@ -1,0 +1,10 @@
+accessKey: test-key
+secretKey: test-secret
+persistence:
+  size: 100Mi
+buckets:
+  - name: public-gateway
+    policy: none
+resources:
+  requests:
+    memory: 500Mi

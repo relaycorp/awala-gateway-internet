@@ -27,7 +27,9 @@ jobs:
       - uses: azure/setup-helm@v1
         with:
           version: v3.2.4
-      - name: Validate Helm chart
+      - name: Lint Helm chart
+        run: helm lint chart/ --values=chart/values.dev.yml --strict
+      - name: Template Helm chart
         run: helm template --values=chart/values.dev.yml chart/
 
       # Functional tests

@@ -47,7 +47,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "relaynet-internet-gateway.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "relaynet-internet-gateway.name" . }}{{ empty .Component | ternary "" (printf "-%s" .Component) }}
+app.kubernetes.io/name: {{ include "relaynet-internet-gateway.name" . }}
+{{- if .Component }}
+app.kubernetes.io/component: {{ .Component }}
+{{- end }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 

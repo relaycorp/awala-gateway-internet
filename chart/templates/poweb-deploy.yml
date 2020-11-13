@@ -42,7 +42,7 @@ spec:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-generated
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
           ports:

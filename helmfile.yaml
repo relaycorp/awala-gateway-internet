@@ -1,0 +1,51 @@
+repositories:
+  - name: hashicorp
+    url: https://helm.releases.hashicorp.com
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: minio
+    url: https://helm.min.io
+  - name: nats
+    url: https://nats-io.github.io/k8s/helm/charts
+commonLabels:
+  app: relaynet-internet-gateway
+releases:
+  - name: vault
+    chart: hashicorp/vault
+    version: 0.8.0
+    set:
+      - name: server.dev.enabled
+        value: true
+  - name: mongodb
+    chart: bitnami/mongodb
+    version: 10.0.1
+    set:
+      - name: auth.enabled
+        value: false
+  - name: minio
+    chart: minio/minio
+    version: 8.0.3
+    values:
+      - dev/chart-values/minio.yml
+  - name: nats
+    chart: nats/nats
+    version: 0.7.2
+    set:
+      - name: nats.logging.debug
+        value: true
+  - name: stan
+    chart: nats/stan
+    version: 0.7.2
+    set:
+      - name: stan.nats.url
+        value: nats://nats:4222
+      - name: stan.logging.debug
+        value: true
+  - name: gateway
+    chart: chart/
+    values:
+      - chart/values.dev.yml
+    set:
+      - name: image.repository
+        value: public-gateway
+    wait: true

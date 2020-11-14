@@ -26,7 +26,7 @@ jobs:
 
       - uses: azure/setup-helm@v1
         with:
-          version: v3.2.4
+          version: v3.4.0
       - name: Lint Helm chart
         run: helm lint chart/ --values=chart/values.dev.yml --strict
       - name: Template Helm chart

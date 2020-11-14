@@ -5,19 +5,34 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "test") .) | nindent 4 }}
   annotations:
-    "helm.sh/hook": test-success
+    "helm.sh/hook": test
 spec:
   containers:
-    - name: poweb
-      image: busybox
-      command: ['wget', '--spider']
-      args: ['http://{{ include "relaynet-internet-gateway.fullname" . }}-poweb:8080']
     - name: pohttp
-      image: busybox
-      command: ['wget', '--spider']
-      args: ['http://{{ include "relaynet-internet-gateway.fullname" . }}-pohttp:8080']
+      image: busybox:1.32.0
+      imagePullPolicy: IfNotPresent
+      command: ['wget']
+      args:
+        - '--spider'
+        - '-T'
+        - '2'
+        - http://{{ include "relaynet-internet-gateway.fullname" . }}-pohttp:8080
     - name: cogrpc
-      image: busybox
-      command: ['wget', '--spider']
-      args: ['http://{{ include "relaynet-internet-gateway.fullname" . }}-cogrpc:8080']
+      image: busybox:1.32.0
+      imagePullPolicy: IfNotPresent
+      command: ['wget']
+      args:
+        - '--spider'
+        - '-T'
+        - '2'
+        - http://{{ include "relaynet-internet-gateway.fullname" . }}-cogrpc:8081
+    - name: poweb
+      image: busybox:1.32.0
+      imagePullPolicy: IfNotPresent
+      command: ['wget']
+      args:
+        - '--spider'
+        - '-T'
+        - '2'
+        - http://{{ include "relaynet-internet-gateway.fullname" . }}-poweb:8082
   restartPolicy: Never

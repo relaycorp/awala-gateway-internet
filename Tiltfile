@@ -44,7 +44,7 @@ k8s_resource(
 k8s_resource(
   'gateway-relaynet-internet-gateway-cogrpc',
   new_name='gw-cogrpc',
-  port_forwards=['127.0.0.1:8082:8080'],
+  port_forwards=['127.0.0.1:8082:8080', '127.0.0.1:8083:8081'],
   resource_deps=gw_dependencies,
 )
 k8s_resource(
@@ -56,4 +56,9 @@ k8s_resource(
   'gateway-relaynet-internet-gateway-pdcout',
   new_name='gw-pdc-out',
   resource_deps=gw_dependencies,
+)
+k8s_resource(
+  'gateway-relaynet-internet-gateway-test-services',
+  new_name='gw-test',
+  resource_deps=['gw-pohttp', 'gw-poweb', 'gw-cogrpc'],
 )

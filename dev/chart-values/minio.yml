@@ -8,3 +8,6 @@ buckets:
 resources:
   requests:
     memory: 500Mi
+makeBucketJob:
+  annotations:
+    "helm.sh/hook-delete-policy": hook-succeeded

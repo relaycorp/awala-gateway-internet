@@ -1,0 +1,18 @@
+dependencies:
+- name: minio
+  repository: https://helm.min.io
+  version: 8.0.3
+- name: vault
+  repository: https://helm.releases.hashicorp.com
+  version: 0.8.0
+- name: mongodb
+  repository: https://charts.bitnami.com/bitnami
+  version: 10.0.1
+- name: nats
+  repository: https://nats-io.github.io/k8s/helm/charts
+  version: 0.7.2
+- name: stan
+  repository: https://nats-io.github.io/k8s/helm/charts
+  version: 0.7.2
+digest: sha256:1d9713fd3a037ef7a64d1a2f9d0256b122d6ac96c526ba64c741bdeeaf88730c
+generated: "2020-11-14T18:30:13.308043567Z"

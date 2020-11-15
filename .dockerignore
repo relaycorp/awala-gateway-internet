@@ -1,7 +1,6 @@
-node_modules/
-build/
-docs/
-.*
-Dockerfile*
-src/functional_tests/
-docker-compose.yml
+*
+!src
+src/functional_tests
+!tsconfig.json
+!package.json
+!package-lock.json

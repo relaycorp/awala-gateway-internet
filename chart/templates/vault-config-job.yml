@@ -1,38 +1,44 @@
+{{- if .Values.tags.dev -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-vault-config
   labels:
-    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+  {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   template:
     metadata:
-      name: "{{ .Release.Name }}-keygen"
+      name: "{{ .Release.Name }}-vault-config"
       labels:
         app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
     spec:
-      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-keygen
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-vault-config
       securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true
       restartPolicy: OnFailure
       containers:
-        - name: keygen
-          image: {{ include "relaynet-internet-gateway.image" . }}
+        - name: vault-config
+          image: vault:1.5.4
           imagePullPolicy: IfNotPresent
           command:
-            - node
-            - build/main/bin/generate-keypairs.js
+            - vault
+            - secrets
+            - enable
+            - "-path=$(VAULT_KV_PREFIX)"
+            - kv-v2
+          env:
+            - name: VAULT_ADDR
+              value: {{ .Values.vault.serverUrl }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
-            - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-generated
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
+{{- end }}

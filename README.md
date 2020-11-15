@@ -7,8 +7,8 @@ This is the reference implementation of a Relaynet-Internet Gateway, a type of _
 To use this app locally and be able to update the source code, you need the following system dependencies:
 
 - Node.js v12+.
-- [Tilt](https://docs.tilt.dev/install.html).
-- [helmfile](https://github.com/roboll/helmfile).
+- [Skaffold](https://skaffold.dev/) v1.16+.
+- [Helm](https://helm.sh/) v3.4+.
 
 The dependencies can be installed with the usual `npm install`.
 
@@ -28,17 +28,23 @@ Again, you can run the tests selectively from your IDE (using `jest.config.funct
 npm run test:functional
 ```
 
-## Run the services with Tilt
+## Run the services locally
 
-Simple use [use Tilt](https://docs.tilt.dev/welcome_to_tilt.html) in this directory.
+Simply run `skaffold dev --port-forward`. The services will then be available at the following addresses:
+
+- PoWeb: `127.0.0.1:8080`
+- PoHTTP: `127.0.0.1:8081`
+- CogRPC: `127.0.0.1:8082`
 
 ## Access to backing services
 
-The Tilt dashboard contains shortcuts to the UI of the backing services, where applicable. Use the follow credentials when prompted:
+The backing services that offer web interfaces may be accessed with the following.
 
 - Vault:
+  - URL: `http://127.0.0.1:8200`
   - Token: `root`
 - Minio:
+  - URL: `http://127.0.0.1:9000`
   - Access key: `test-key`
   - Secret key: `test-secret`
 

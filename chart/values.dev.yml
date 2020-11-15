@@ -1,11 +1,17 @@
-pohttpHost: gateway-relaynet-internet-gateway-pohttp
-powebHost: gateway-relaynet-internet-gateway-poweb
-cogrpcHost: gateway-relaynet-internet-gateway-cogrpc
+fullnameOverride: public-gateway
+
+tags:
+  dev: true
+
+pohttpHost: public-gateway-pohttp
+powebHost: public-gateway-poweb
+cogrpcHost: public-gateway-cogrpc
 
 mongo:
   uri: mongodb://mongodb/test_db
 
 nats:
+  nameOverride: nats
   serverUrl: nats://nats:4222
   clusterId: stan
 
@@ -16,6 +22,34 @@ objectStore:
   secretKey: letmeinpls
   tlsEnabled: false
 
+# Chart dependencies:
+
 vault:
-  serverUrl: http://vault:8200
+  nameOverride: vault
+  serverUrl: http://public-gateway-vault:8200
   token: root
+  server:
+    dev:
+      enabled: true
+
+minio:
+  fullnameOverride: minio
+  accessKey: test-key
+  secretKey: test-secret
+  buckets:
+    - name: public-gateway
+      policy: none
+  makeBucketJob:
+    annotations:
+      "helm.sh/hook-delete-policy": hook-succeeded
+
+mongodb:
+  fullnameOverride: mongodb
+  auth:
+    enabled: false
+
+stan:
+  nameOverride: stan
+  stan:
+    nats:
+      url: nats://nats:4222

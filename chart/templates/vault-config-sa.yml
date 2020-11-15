@@ -1,0 +1,8 @@
+{{- if .Values.tags.dev -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-vault-config
+  labels:
+  {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+{{- end }}

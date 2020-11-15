@@ -16,6 +16,7 @@ deploy:
         valuesFiles:
           - chart/values.dev.yml
         wait: true
+        skipBuildDependencies: true
 portForward:
   - resourceType: service
     resourceName: public-gateway-vault

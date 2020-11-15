@@ -10,7 +10,12 @@ To use this app locally and be able to update the source code, you need the foll
 - [Skaffold](https://skaffold.dev/) v1.16+.
 - [Helm](https://helm.sh/) v3.4+.
 
-The dependencies can be installed with the usual `npm install`.
+You can then install the Node.js and Helm chart dependencies with:
+
+```
+npm install
+helm dependency update chart/
+```
 
 ## Run unit test suite
 

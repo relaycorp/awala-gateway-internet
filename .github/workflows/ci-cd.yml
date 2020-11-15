@@ -27,8 +27,8 @@ jobs:
       - uses: azure/setup-helm@v1
         with:
           version: v3.4.0
-      - name: Build Helm chart dependencies
-        run: helm dependency build chart/
+      - name: Update Helm chart dependencies
+        run: helm dependency update chart/
       - name: Lint Helm chart
         run: helm lint chart/ --values=chart/values.dev.yml --strict
       - name: Template Helm chart

@@ -36,5 +36,5 @@ portForward:
     localPort: 8081
   - resourceType: service
     resourceName: public-gateway-cogrpc
-    port: 8080
+    port: 8081
     localPort: 8082

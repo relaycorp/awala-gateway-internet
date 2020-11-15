@@ -25,7 +25,7 @@ spec:
         - '--spider'
         - '-T'
         - '2'
-        - http://{{ include "relaynet-internet-gateway.fullname" . }}-cogrpc:8081
+        - http://{{ include "relaynet-internet-gateway.fullname" . }}-cogrpc:8083
     - name: poweb
       image: busybox:1.32.0
       imagePullPolicy: IfNotPresent

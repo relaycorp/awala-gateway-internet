@@ -1,6 +1,5 @@
-import { Certificate } from '@relaycorp/relaynet-core';
+import { UnboundKeyPair } from '@relaycorp/relaynet-core';
 
 export default interface RouteOptions {
-  readonly publicGatewayPrivateKey: CryptoKey;
-  readonly publicGatewayCertificate: Certificate;
+  readonly keyPairRetriever: () => Promise<UnboundKeyPair>;
 }

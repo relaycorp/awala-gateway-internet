@@ -51,12 +51,14 @@ export default async function registerRoutes(
           .send({ message: 'Payload is not a valid Private Node Registration Request' });
       }
 
+      const publicGatewayKeyPair = await options.keyPairRetriever();
+
       // tslint:disable-next-line:no-let
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
         registrationAuthorization = await PrivateNodeRegistrationAuthorization.deserialize(
           registrationRequest.pnraSerialized,
-          await options.publicGatewayCertificate.getPublicKey(),
+          await publicGatewayKeyPair.certificate.getPublicKey(),
         );
       } catch (err) {
         request.log.info({ err }, 'PNRR contains invalid authorization');
@@ -77,12 +79,12 @@ export default async function registerRoutes(
 
       const privateGatewayCertificate = await issuePrivateGatewayCertificate(
         registrationRequest.privateNodePublicKey,
-        options.publicGatewayPrivateKey,
-        options.publicGatewayCertificate,
+        publicGatewayKeyPair.privateKey,
+        publicGatewayKeyPair.certificate,
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
-        options.publicGatewayCertificate,
+        publicGatewayKeyPair.certificate,
       );
       return reply
         .code(200)

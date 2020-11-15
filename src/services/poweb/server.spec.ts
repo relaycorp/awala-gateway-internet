@@ -15,30 +15,13 @@ const mockConfigureFastify = mockSpy(
 );
 
 describe('makeServer', () => {
-  test('Private key should be loaded and added to the options', async () => {
+  test('Function to retrieve the key pair should be added to the options', async () => {
     await makeServer();
 
-    expect(mockConfigureFastify).toBeCalledWith(
-      expect.anything(),
-      expect.objectContaining<Partial<RouteOptions>>({
-        publicGatewayPrivateKey: getFixtures().publicGatewayPrivateKey,
-      }),
-      undefined,
-    );
-  });
-
-  test('Gateway key id should be added to the options', async () => {
-    await makeServer();
-
-    expect(mockConfigureFastify).toBeCalledWith(
-      expect.anything(),
-      expect.objectContaining<Partial<RouteOptions>>({
-        publicGatewayCertificate: expect.toSatisfy((c) =>
-          c.isEqual(getFixtures().publicGatewayCert),
-        ),
-      }),
-      undefined,
-    );
+    const routeOptions = mockConfigureFastify.mock.calls[0][1] as RouteOptions;
+    const retriever = routeOptions.keyPairRetriever;
+    const retrieverCertificate = (await retriever()).certificate;
+    expect(retrieverCertificate.isEqual(getFixtures().publicGatewayCert)).toBeTrue();
   });
 
   test('No logger should be passed by default', async () => {

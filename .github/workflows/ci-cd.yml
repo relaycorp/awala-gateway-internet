@@ -33,7 +33,7 @@ jobs:
       - name: Push Helm chart
         run: |
           helm plugin install https://github.com/chartmuseum/helm-push --version 0.9.0
-          helm repo add relaycorp https://h.cfcr.io/relaycorp/default
+          helm repo add relaycorp https://h.cfcr.io/relaycorp/public
         env:
           HELM_REPO_ACCESS_TOKEN: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}
 

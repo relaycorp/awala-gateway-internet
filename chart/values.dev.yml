@@ -42,10 +42,14 @@ minio:
   makeBucketJob:
     annotations:
       "helm.sh/hook-delete-policy": hook-succeeded
+  persistence:
+    enabled: false
 
 mongodb:
   fullnameOverride: mongodb
   auth:
+    enabled: false
+  persistence:
     enabled: false
 
 stan:

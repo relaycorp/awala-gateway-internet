@@ -83,7 +83,7 @@
     "axios": "^0.21.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^6.3.0",
-    "fastify": "^3.7.0",
+    "fastify": "^3.8.0",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.3",
     "grpc-health-check": "^1.8.0",

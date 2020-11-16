@@ -98,7 +98,7 @@ jobs:
 
           helm plugin install https://github.com/chartmuseum/helm-push --version 0.9.0
           HELM_PACKAGE="$(find build/ -name 'relaynet-internet-gateway-*.tgz' | head -n1)"
-          helm push "${HELM_PACKAGE}" cm://h.cfcr.io/relaycorp/public
+          helm push "${HELM_PACKAGE}" https://h.cfcr.io/relaycorp/public
         env:
           CF_API_KEY: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}
           HELM_REPO_ACCESS_TOKEN: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}

@@ -1,3 +1,8 @@
+# Configuration for local development computers and CI
+#
+# Backing services are configured with no persistence so that the data can be reset by deleting
+# the respective pods.
+
 fullnameOverride: public-gateway
 
 tags:
@@ -57,3 +62,23 @@ stan:
   stan:
     nats:
       url: nats://nats:4222
+  store:
+    type: memory
+
+# Relaynet Pong dependencies
+relaynet-pong:
+  fullnameOverride: relaynet-pong
+  pohttp_tls_required: false
+  vault:
+    host: public-gateway-vault
+    token: root
+  redis:
+    host: redis-master
+
+redis:
+  fullnameOverride: redis
+  usePassword: false
+  cluster:
+    enabled: false
+  persistence:
+    enabled: false

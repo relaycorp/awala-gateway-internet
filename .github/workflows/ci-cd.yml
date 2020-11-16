@@ -83,7 +83,19 @@ jobs:
           login-server: ghcr.io
           username: irelaybot
           password: ${{ secrets.GH_CONTAINER_REGISTRY_PASSWORD }}
-      - name: Release
+      - name: Publish Docker image
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: azure/setup-helm@v1
+        with:
+          version: v3.2.4
+      - name: Publish Helm chart
+        run: |
+          helm plugin install https://github.com/chartmuseum/helm-push --version 0.9.0
+          HELM_PACKAGE="$(find build/ -name 'relaynet-internet-gateway-*.tgz' | head -n1)"
+          helm push "${HELM_PACKAGE}" cm://h.cfcr.io/relaycorp/public
+        env:
+          CF_API_KEY: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}
+          HELM_REPO_ACCESS_TOKEN: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}

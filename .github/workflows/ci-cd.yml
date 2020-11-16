@@ -70,6 +70,11 @@ jobs:
             ${{ runner.os }}-node-
       - name: Install dependencies
         run: npm ci
+      - uses: azure/setup-helm@v1
+        with:
+          version: v3.2.4
+      - name: Install Helm Push plugin
+        run: helm plugin install https://github.com/chartmuseum/helm-push --version 0.9.0
       - name: Download Docker image
         uses: actions/download-artifact@v2
         with:
@@ -83,18 +88,8 @@ jobs:
           login-server: ghcr.io
           username: irelaybot
           password: ${{ secrets.GH_CONTAINER_REGISTRY_PASSWORD }}
-      - name: Publish Docker image
+      - name: Publish Docker image and Helm chart
         run: npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: azure/setup-helm@v1
-        with:
-          version: v3.2.4
-      - name: Publish Helm chart
-        run: |
-          helm plugin install https://github.com/chartmuseum/helm-push --version 0.9.0
-          HELM_PACKAGE="$(find build/ -name 'relaynet-internet-gateway-*.tgz' | head -n1)"
-          helm push "${HELM_PACKAGE}" https://h.cfcr.io/relaycorp/public
-        env:
           HELM_REPO_ACCESS_TOKEN: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}

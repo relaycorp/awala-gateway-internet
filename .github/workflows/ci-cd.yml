@@ -44,6 +44,9 @@ jobs:
         uses: hiberbee/github-action-skaffold@1.4.0
         with:
           command: run
+        env:
+          # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'

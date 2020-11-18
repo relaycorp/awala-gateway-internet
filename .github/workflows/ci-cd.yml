@@ -48,6 +48,8 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
+      # TODO: REMOVE
+      - run: kubectl get svc
       - name: port-forward poweb
         uses: RichiCoder1/kube-forward-action@v0.1.4
         with:

@@ -22,7 +22,7 @@ This server is powered by [Fastify](https://www.fastify.io/) and [`ws`](https://
 
 ### CogRPC server
 
-A [PoHTTP](https://specs.relaynet.network/RS-007) server, to exchange parcels with private gateways via an end-to-end encrypted sneakernet.
+A [CogRPC](https://specs.relaynet.network/RS-008) server, to exchange parcels with private gateways via an end-to-end encrypted sneakernet.
 
 An operator may choose not to deploy the CogRPC server if their users don't need the ability to use the sneakernet.
 
@@ -30,7 +30,7 @@ This server is powered by [`grpc`](https://www.npmjs.com/package/grpc).
 
 ### PoHTTP server
 
-A [CogRPC](https://specs.relaynet.network/RS-008) server, to receive parcels from other gateways or public endpoints.
+A [PoHTTP](https://specs.relaynet.network/RS-007) server, to receive parcels from other gateways or public endpoints.
 
 This server is powered by [Fastify](https://www.fastify.io/).
 

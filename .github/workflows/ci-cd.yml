@@ -53,6 +53,7 @@ jobs:
           set -o nounset
           set -o errexit
           set -o pipefail
+          set +x
 
           kubectl port-forward svc/public-gateway-poweb 8080:8082 &
           kubectl port-forward svc/public-gateway-pohttp 8081:8080 &

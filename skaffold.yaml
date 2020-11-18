@@ -15,6 +15,10 @@ deploy:
           "image.repository": public-gateway
         valuesFiles:
           - chart/values.dev.yml
+        setValues:
+          gatewayKeyId: MTM1NzkK
+          "relaynet-pong.current_endpoint_key_id": aGVsbG8K
+          "relaynet-pong.current_endpoint_session_key_id": OTc1MzEK
         wait: true
         skipBuildDependencies: true
 portForward:

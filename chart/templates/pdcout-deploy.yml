@@ -5,9 +5,7 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pdcout") .) | nindent 4 }}
 spec:
-{{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-{{- end }}
+  replicas: {{ .Values.pdcQueue.replicaCount }}
   selector:
     matchLabels:
       {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 6 }}
@@ -40,6 +38,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: POHTTP_TLS_REQUIRED
+              value: {{ ternary "false" "true" .Values.tags.dev | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}

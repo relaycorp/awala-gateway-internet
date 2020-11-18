@@ -8,9 +8,12 @@ fullnameOverride: public-gateway
 tags:
   dev: true
 
-pohttpHost: public-gateway-pohttp
+pohttpHost: public-gateway-pohttp:8080
 powebHost: public-gateway-poweb
-cogrpcHost: public-gateway-cogrpc
+cogrpcHost: 127.0.0.1:8082
+
+pdcQueue:
+  replicaCount: 2
 
 mongo:
   uri: mongodb://mongodb/test_db
@@ -19,12 +22,14 @@ nats:
   nameOverride: nats
   serverUrl: nats://nats:4222
   clusterId: stan
+  natsbox:
+    enabled: false
 
 objectStore:
   endpoint: minio:9000
-  bucket: relaynet-public-gateway
-  accessKeyId: THE-KEY-ID
-  secretKey: letmeinpls
+  bucket: public-gateway
+  accessKeyId: test-key
+  secretKey: test-secret
   tlsEnabled: false
 
 # Chart dependencies:
@@ -49,6 +54,10 @@ minio:
       "helm.sh/hook-delete-policy": hook-succeeded
   persistence:
     enabled: false
+  resources:
+    requests:
+      # TODO: Try to get Minio to use less RAM
+      memory: 1Gi
 
 mongodb:
   fullnameOverride: mongodb
@@ -73,7 +82,7 @@ relaynet-pong:
     host: public-gateway-vault
     token: root
   redis:
-    host: redis-master
+    host: redis-headless
 
 redis:
   fullnameOverride: redis

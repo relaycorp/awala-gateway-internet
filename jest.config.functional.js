@@ -5,6 +5,8 @@ module.exports = {
   preset: mainJestConfig.preset,
   roots: ['src/functional_tests'],
   testEnvironment: mainJestConfig.testEnvironment,
-  setupFiles: ['./src/functional_tests/jest.setup.ts'],
-  setupFilesAfterEnv: mainJestConfig.setupFilesAfterEnv
+  setupFilesAfterEnv: [
+    ...mainJestConfig.setupFilesAfterEnv,
+    './src/functional_tests/jest.setup.ts',
+  ],
 };

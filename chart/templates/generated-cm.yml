@@ -6,4 +6,4 @@ metadata:
     "helm.sh/hook": "pre-install"
     "helm.sh/hook-weight": "-5"
 data:
-  GATEWAY_KEY_ID: {{ default .Values.gatewayKeyId (randAlphaNum 12 | b64enc) | quote }}
+  GATEWAY_KEY_ID: {{ default (randAlphaNum 12 | b64enc) .Values.gatewayKeyId | quote }}

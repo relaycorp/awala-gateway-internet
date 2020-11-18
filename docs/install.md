@@ -58,6 +58,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `cogrpcHost` | string | | Domain name for the CogRPC service |
 | `pohttpHost` | string | | Domain name for the PoHTTP service |
 | `powebHost` | string | | Domain name for the PoWeb service |
+| `pdcQueue.replicaCount` | number | 3 | Number of workers (pods) for the PDC queue |
 | `mongo.uri` | string | | Connection URI for MongoDB |
 | `nats.serverUrl` | string | | Connection URI for NATS Streaming |
 | `nats.clusterId` | string | | NATS Streaming cluster id |

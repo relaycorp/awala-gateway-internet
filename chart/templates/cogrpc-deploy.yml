@@ -37,9 +37,13 @@ spec:
             - name: COGRPC_ADDRESS
               value: {{ include "relaynet-internet-gateway.cogrpcUri" . }}
             - name: SERVER_IP_ADDRESS
+              {{- if .Values.tags.dev }}
+              value: 127.0.0.1
+              {{- else }}
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+              {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}

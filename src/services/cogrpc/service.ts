@@ -141,10 +141,11 @@ async function deliverCargo(
     await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
   } catch (err) {
     logger.error({ err }, 'Failed to store cargo');
-    call.emit('error', INTERNAL_SERVER_ERROR);
+    call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
     return;
   }
 
+  call.end();
   logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');
 }
 
@@ -225,7 +226,7 @@ async function collectCargo(
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
     ccaAwareLogger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
-    call.emit('error', INTERNAL_SERVER_ERROR);
+    call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
     return;
   }
 

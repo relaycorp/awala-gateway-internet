@@ -5,6 +5,7 @@
     "cogrpcHost",
     "pohttpHost",
     "powebHost",
+    "pdcQueue",
     "mongo",
     "nats",
     "vault"
@@ -69,6 +70,15 @@
     },
     "powebHost": {
       "type": "string"
+    },
+    "pdcQueue": {
+      "type": "object",
+      "required": ["replicaCount"],
+      "properties": {
+        "replicaCount": {
+          "type": "number"
+        }
+      }
     },
     "mongo": {
       "type": "object",

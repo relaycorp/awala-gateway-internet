@@ -2,7 +2,7 @@ import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp
 import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { Message, Stan } from 'node-nats-streaming';
 
-import { configureServices, GW_POHTTP_URL } from './services';
+import { GW_POHTTP_URL } from './services';
 import {
   connectToNatsStreaming,
   generatePdaChain,
@@ -10,13 +10,14 @@ import {
   OBJECT_STORAGE_CLIENT,
 } from './utils';
 
-configureServices(['pohttp']);
-
 describe('PoHTTP server', () => {
   // tslint:disable-next-line:no-let
   let stanConnection: Stan;
   beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
-  afterEach(async () => stanConnection.close());
+  afterEach(async () => {
+    stanConnection.close();
+    await new Promise((resolve) => stanConnection.once('close', resolve));
+  });
 
   test('Valid parcel should be accepted', async (cb) => {
     const pdaChain = await generatePdaChain();

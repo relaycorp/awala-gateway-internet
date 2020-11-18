@@ -72,7 +72,7 @@ http{{ ternary "s" "" (and .Values.ingress.enabled .Values.ingress.enableTls) }}
 Generate CogRPC URI
 */}}
 {{- define "relaynet-internet-gateway.cogrpcUri" -}}
-http{{ ternary "s" "" (and .Values.ingress.enabled .Values.ingress.enableTls) }}://{{ .Values.cogrpcHost }}
+https://{{ .Values.cogrpcHost }}
 {{- end }}
 
 {{/*

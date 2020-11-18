@@ -73,6 +73,9 @@ affinity: {}
 cogrpc:
   serviceAnnotations: {}
 
+pdcQueue:
+  replicaCount: 3
+
 # Backing services
 
 mongo: {}

@@ -9,15 +9,14 @@ import {
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { Message, Stan, Subscription } from 'node-nats-streaming';
 
 import { asyncIterableToArray } from '../_test_utils';
-import { configureServices, GW_GOGRPC_URL, GW_POHTTP_URL } from './services';
-import { arrayToIterable, generatePdaChain, getFirstQueueMessage, sleep } from './utils';
+import { GW_GOGRPC_URL, GW_POHTTP_URL } from './services';
+import { arrayToIterable, connectToNatsStreaming, generatePdaChain, sleep } from './utils';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
-
-configureServices(['cogrpc']);
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
@@ -25,14 +24,18 @@ describe('Cargo delivery', () => {
     const cargo = new Cargo(GW_GOGRPC_URL, pdaChain.privateGatewayCert, Buffer.from([]));
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
-    const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
     const deliveryId = 'random-delivery-id';
-    const ackDeliveryIds = await cogRPCClient.deliverCargo(
-      arrayToIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
-    );
+    const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    try {
+      const ackDeliveryIds = await cogRPCClient.deliverCargo(
+        arrayToIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
+      );
 
-    await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
-    await expect(getFirstQueueMessage('crc-cargo')).resolves.toEqual(cargoSerialized);
+      await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
+      await expect(getLastQueueMessage()).resolves.toEqual(cargoSerialized);
+    } finally {
+      cogRPCClient.close();
+    }
   });
 
   test('Unauthorized cargo should be acknowledged but not processed', async () => {
@@ -49,12 +52,16 @@ describe('Cargo delivery', () => {
     );
 
     const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
-    await asyncIterableToArray(
-      await cogRPCClient.deliverCargo(
-        arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
-      ),
-    );
-    await expect(getFirstQueueMessage('crc-cargo')).resolves.toBeUndefined();
+    try {
+      await asyncIterableToArray(
+        await cogRPCClient.deliverCargo(
+          arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+        ),
+      );
+    } finally {
+      cogRPCClient.close();
+    }
+    await expect(getLastQueueMessage()).resolves.not.toEqual(cargoSerialized);
   });
 });
 
@@ -77,11 +84,16 @@ describe('Cargo collection', () => {
       Buffer.from([]),
     );
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
-    const collectedCargoes = await asyncIterableToArray(
-      cogrpcClient.collectCargo(
-        Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey)),
-      ),
-    );
+    let collectedCargoes: readonly Buffer[];
+    try {
+      collectedCargoes = await asyncIterableToArray(
+        cogrpcClient.collectCargo(
+          Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey)),
+        ),
+      );
+    } finally {
+      cogrpcClient.close();
+    }
 
     await expect(collectedCargoes).toHaveLength(1);
 
@@ -110,9 +122,13 @@ describe('Cargo collection', () => {
     );
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
-    await expect(
-      asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-    ).resolves.toHaveLength(0);
+    try {
+      await expect(
+        asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
+      ).resolves.toHaveLength(0);
+    } finally {
+      cogrpcClient.close();
+    }
   });
 
   test('CCAs should not be reusable', async () => {
@@ -125,9 +141,45 @@ describe('Cargo collection', () => {
     const ccaSerialized = Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey));
 
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
-    await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
-    await expect(
-      asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-    ).rejects.toBeInstanceOf(CogRPCError);
+    try {
+      await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
+      await expect(
+        asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
+      ).rejects.toBeInstanceOf(CogRPCError);
+    } finally {
+      cogrpcClient.close();
+    }
   });
 });
+
+async function getLastQueueMessage(): Promise<Buffer | undefined> {
+  const stanConnection = await connectToNatsStreaming();
+  const subscription = subscribeToCRCChannel(stanConnection);
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      subscription.close();
+      stanConnection.close();
+      resolve();
+    }, 3_000);
+    subscription.on('error', (error) => {
+      clearTimeout(timeout);
+      // Close the connection directly. Not the subscription because it probably wasn't created.
+      stanConnection.close();
+      reject(error);
+    });
+    subscription.on('message', (message: Message) => {
+      clearTimeout(timeout);
+      subscription.close();
+      stanConnection.close();
+      resolve(message.getRawData());
+    });
+  });
+}
+
+function subscribeToCRCChannel(stanConnection: Stan): Subscription {
+  return stanConnection.subscribe(
+    'crc-cargo',
+    'functional-tests',
+    stanConnection.subscriptionOptions().setDeliverAllAvailable().setStartWithLastReceived(),
+  );
+}

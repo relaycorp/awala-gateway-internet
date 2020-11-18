@@ -1,22 +1,93 @@
-gatewayKeyId: MTM1NzkK
-pohttpHost: gw-test-relaynet-internet-gateway-pohttp.default.svc.cluster.local
-powebHost: gw-test-relaynet-internet-gateway-poweb.default.svc.cluster.local
-cogrpcHost: gw-test-relaynet-internet-gateway-cogrpc.default.svc.cluster.local
+# Configuration for local development computers and CI
+#
+# Backing services are configured with no persistence so that the data can be reset by deleting
+# the respective pods.
+
+fullnameOverride: public-gateway
+
+tags:
+  dev: true
+
+pohttpHost: public-gateway-pohttp:8080
+powebHost: public-gateway-poweb
+cogrpcHost: 127.0.0.1:8082
+
+pdcQueue:
+  replicaCount: 2
 
 mongo:
-  uri: mongodb://mongo-test-mongodb.default.svc.cluster.local/test_db
+  uri: mongodb://mongodb/test_db
 
 nats:
-  serverUrl: nats://example-nats.default.svc.cluster.local:4222
-  clusterId: example-stan
+  nameOverride: nats
+  serverUrl: nats://nats:4222
+  clusterId: stan
+  natsbox:
+    enabled: false
 
 objectStore:
-  endpoint: minio-test.default.svc.cluster.local:9000
-  bucket: relaynet-public-gateway
-  accessKeyId: THE-KEY-ID
-  secretKey: letmeinpls
+  endpoint: minio:9000
+  bucket: public-gateway
+  accessKeyId: test-key
+  secretKey: test-secret
   tlsEnabled: false
 
+# Chart dependencies:
+
 vault:
-  serverUrl: http://vault-test.default.svc.cluster.local:8200
-  token: letmein
+  nameOverride: vault
+  serverUrl: http://public-gateway-vault:8200
+  token: root
+  server:
+    dev:
+      enabled: true
+
+minio:
+  fullnameOverride: minio
+  accessKey: test-key
+  secretKey: test-secret
+  buckets:
+    - name: public-gateway
+      policy: none
+  makeBucketJob:
+    annotations:
+      "helm.sh/hook-delete-policy": hook-succeeded
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      # TODO: Try to get Minio to use less RAM
+      memory: 1Gi
+
+mongodb:
+  fullnameOverride: mongodb
+  auth:
+    enabled: false
+  persistence:
+    enabled: false
+
+stan:
+  nameOverride: stan
+  stan:
+    nats:
+      url: nats://nats:4222
+  store:
+    type: memory
+
+# Relaynet Pong dependencies
+relaynet-pong:
+  fullnameOverride: relaynet-pong
+  pohttp_tls_required: false
+  vault:
+    host: public-gateway-vault
+    token: root
+  redis:
+    host: redis-headless
+
+redis:
+  fullnameOverride: redis
+  usePassword: false
+  cluster:
+    enabled: false
+  persistence:
+    enabled: false

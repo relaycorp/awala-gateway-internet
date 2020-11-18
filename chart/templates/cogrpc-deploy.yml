@@ -28,7 +28,7 @@ spec:
         - name: cogrpc
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "relaynet-internet-gateway.image" . }}
           imagePullPolicy: IfNotPresent
           command:
             - node
@@ -37,14 +37,18 @@ spec:
             - name: COGRPC_ADDRESS
               value: {{ include "relaynet-internet-gateway.cogrpcUri" . }}
             - name: SERVER_IP_ADDRESS
+              {{- if .Values.tags.dev }}
+              value: 127.0.0.1
+              {{- else }}
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+              {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-generated
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
           ports:

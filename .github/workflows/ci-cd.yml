@@ -26,22 +26,54 @@ jobs:
 
       - uses: azure/setup-helm@v1
         with:
-          version: v3.2.4
-      - name: Validate Helm chart
+          version: v3.4.0
+      - name: Update Helm chart dependencies
+        run: helm dependency update chart/
+      - name: Lint Helm chart
+        run: helm lint chart/ --values=chart/values.dev.yml --strict
+      - name: Template Helm chart
         run: helm template --values=chart/values.dev.yml chart/
 
       # Functional tests
-      - run: docker-compose pull
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.1.0
+        with:
+          cluster_name: default
+      - name: Run Skaffold pipeline
+        uses: hiberbee/github-action-skaffold@1.4.0
+        with:
+          command: run
+          skaffold-version: 1.16.0
         env:
-          COMPOSE_FILE: docker-compose.yml:src/functional_tests/docker-compose.override.yml
+          # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
+      - name: Start port-forwarding
+        run: |
+          set -o nounset
+          set -o errexit
+          set -o pipefail
+          set +x
+
+          kubectl port-forward --address 127.0.0.1 svc/public-gateway-poweb 8080:8082 &
+          kubectl port-forward --address 127.0.0.1 svc/public-gateway-pohttp 8081:8080 &
+          kubectl port-forward --address 127.0.0.1 svc/public-gateway-cogrpc 8082:8081 &
+          kubectl port-forward --address 127.0.0.1 svc/public-gateway-vault 8200:8200 &
+          kubectl port-forward --address 127.0.0.1 svc/nats 4222:4222 &
+          kubectl port-forward --address 127.0.0.1 svc/minio 9000:9000 &
+
+          # Check at least one of the ports:
+          timeout 5 sh -c "while ! wget --spider http://127.0.0.1:8080 ; do sleep 1s ; done"
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
+      - name: Output diagnostic information upon failure
+        if: failure()
+        run: .github/scripts/output-diagnostics.sh
 
       # Export Docker image so it can be published
       - name: Export Docker image
         if: github.ref == 'refs/heads/master'
-        run: docker save -o /tmp/docker-image relaynet-gw:local
+        run: docker save -o /tmp/docker-image public-gateway:latest
       - name: Upload Docker image
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v2

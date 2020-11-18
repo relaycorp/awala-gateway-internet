@@ -27,9 +27,11 @@ export default async function registerRoutes(
       if (SHA256_HEX_DIGEST_LENGTH !== privateGatewayPublicKeyDigest.length) {
         return reply.code(400).send({ message: 'Payload is not a SHA-256 digest' });
       }
+
+      const publicGatewayKeyPair = await options.keyPairRetriever();
       const authorizationSerialized = await generateAuthorization(
         privateGatewayPublicKeyDigest,
-        options.publicGatewayPrivateKey,
+        publicGatewayKeyPair.privateKey,
       );
       return reply
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.AUTHORIZATION)

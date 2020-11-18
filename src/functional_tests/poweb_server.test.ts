@@ -16,17 +16,16 @@ import {
 } from '@relaycorp/relaynet-poweb';
 import pipe from 'it-pipe';
 
-import { asyncIterableToArray, iterableTake, PdaChain } from '../_test_utils';
+import { asyncIterableToArray, iterableTake } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
-import { configureServices, GW_POWEB_LOCAL_PORT } from './services';
+import { GW_POWEB_LOCAL_PORT } from './services';
 import {
+  ExternalPdaChain,
   generatePdaChain,
   getPublicGatewayCertificate,
   registerPrivateGateway,
   sleep,
 } from './utils';
-
-configureServices(['poweb']);
 
 describe('PoWeb server', () => {
   describe('Node registration', () => {
@@ -180,8 +179,8 @@ describe('PoWeb server', () => {
 });
 
 async function generateDummyParcel(
-  senderChain: PdaChain,
-  recipientChain: PdaChain,
+  senderChain: ExternalPdaChain,
+  recipientChain: ExternalPdaChain,
 ): Promise<ArrayBuffer> {
   const recipientEndpointCertificate = recipientChain.peerEndpointCert;
   const sendingEndpointCertificate = await issueDeliveryAuthorization({

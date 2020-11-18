@@ -10,11 +10,14 @@ import {
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { S3 } from 'aws-sdk';
 import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Message, Stan } from 'node-nats-streaming';
+import { connect as stanConnect, Stan } from 'node-nats-streaming';
+import uuid from 'uuid-random';
 
 import { PdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { GW_POWEB_LOCAL_PORT } from './services';
+
+export type ExternalPdaChain = Omit<PdaChain, 'publicGatewayPrivateKey'>;
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 
@@ -43,40 +46,12 @@ export function connectToNatsStreaming(): Promise<Stan> {
   return new Promise((resolve) => {
     const stanConnection = stanConnect(
       getEnvVar('NATS_CLUSTER_ID').required().asString(),
-      'functional-tests',
+      `functional-tests-${uuid()}`,
       {
         url: getEnvVar('NATS_SERVER_URL').required().asString(),
       },
     );
     stanConnection.on('connect', resolve);
-  });
-}
-
-export async function getFirstQueueMessage(subject: string): Promise<Buffer | undefined> {
-  const stanConnection = await connectToNatsStreaming();
-  const subscription = stanConnection.subscribe(
-    subject,
-    'functional-tests',
-    stanConnection.subscriptionOptions().setDeliverAllAvailable(),
-  );
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      subscription.close();
-      stanConnection.close();
-      resolve();
-    }, 3_000);
-    subscription.on('error', (error) => {
-      clearTimeout(timeout);
-      // Close the connection directly. Not the subscription because it probably wasn't created.
-      stanConnection.close();
-      reject(error);
-    });
-    subscription.on('message', (message: Message) => {
-      clearTimeout(timeout);
-      subscription.close();
-      stanConnection.close();
-      resolve(message.getRawData());
-    });
   });
 }
 
@@ -94,11 +69,12 @@ export async function getPublicGatewayCertificate(): Promise<Certificate> {
   return keyPair.certificate;
 }
 
-export async function generatePdaChain(): Promise<PdaChain> {
-  const publicGatewayKeyPair = await getPublicGatewayKeyPair();
-
+export async function generatePdaChain(): Promise<ExternalPdaChain> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
-  const { privateNodeCertificate: privateGatewayCertificate } = await registerPrivateGateway(
+  const {
+    privateNodeCertificate: privateGatewayCertificate,
+    gatewayCertificate: publicGatewayCert,
+  } = await registerPrivateGateway(
     privateGatewayKeyPair,
     PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
   );
@@ -126,8 +102,7 @@ export async function generatePdaChain(): Promise<PdaChain> {
     peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
     privateGatewayCert: privateGatewayCertificate,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    publicGatewayCert: publicGatewayKeyPair.certificate,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey, // TODO: Remove -- shouldn't be used
+    publicGatewayCert,
   };
 }
 

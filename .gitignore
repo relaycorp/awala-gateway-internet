@@ -9,3 +9,6 @@ docs/.jekyll-cache
 docs/.sass-cache
 docs/_site
 docs/vendor
+
+chart/charts
+chart/tmpcharts

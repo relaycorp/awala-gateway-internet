@@ -1,23 +1,47 @@
 apiVersion: v2
 name: relaynet-internet-gateway
-description: A Helm chart for Kubernetes
-
-# A chart can be either an 'application' or a 'library' chart.
-#
-# Application charts are a collection of templates that can be packaged into versioned archives
-# to be deployed.
-#
-# Library charts provide useful utilities or functions for the chart developer. They're included as
-# a dependency of application charts to inject those utilities and functions into the rendering
-# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+description: Relaynet-Internet Gateway
+maintainers:
+  - name: Relaycorp, Inc.
 type: application
 
-# This is the chart version. This version number should be incremented each time you make changes
-# to the chart and its templates, including the app version.
-# Versions are expected to follow Semantic Versioning (https://semver.org/)
+# The chart's and the app's versions are overridden by semantic-release
 version: 0.1.0
-
-# This is the version number of the application being deployed. This version number should be
-# incremented each time you make changes to the application. Versions are not expected to
-# follow Semantic Versioning. They should reflect the version the application is using.
 appVersion: 1.9.0
+
+home: https://docs.relaycorp.tech/relaynet-internet-gateway/
+
+sources:
+  - https://github.com/relaycorp/relaynet-internet-gateway
+
+dependencies:
+  - name: minio
+    version: 8.0.3
+    tags: [dev]
+    repository: https://helm.min.io
+  - name: vault
+    version: 0.8.0
+    tags: [dev]
+    repository: https://helm.releases.hashicorp.com
+  - name: mongodb
+    version: 10.0.1
+    tags: [dev]
+    repository: https://charts.bitnami.com/bitnami
+  - name: nats
+    version: 0.7.2
+    tags: [dev]
+    repository: https://nats-io.github.io/k8s/helm/charts
+  - name: stan
+    version: 0.7.2
+    tags: [dev]
+    repository: https://nats-io.github.io/k8s/helm/charts
+
+  # Pong app
+  - name: relaynet-pong
+    version: 1.6.0
+    tags: [dev]
+    repository: https://h.cfcr.io/relaycorp/public
+  - name: redis
+    version: 12.0.0
+    tags: [dev]
+    repository: https://charts.bitnami.com/bitnami

@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
-  annotations:
-    "helm.sh/hook": "pre-install"
-    "helm.sh/hook-delete-policy": "before-hook-creation"
-data:
-  GATEWAY_KEY_ID: {{ default .Values.gatewayKeyId (randAlphaNum 12 | b64enc) | quote }}

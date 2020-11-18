@@ -1,0 +1,44 @@
+apiVersion: skaffold/v2beta9
+kind: Config
+build:
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    - image: public-gateway
+  local: {}
+deploy:
+  helm:
+    releases:
+      - name: public-gateway
+        chartPath: chart
+        artifactOverrides:
+          "image.repository": public-gateway
+        valuesFiles:
+          - chart/values.dev.yml
+        setValues:
+          gatewayKeyId: MTM1NzkK
+          "relaynet-pong.current_endpoint_key_id": aGVsbG8K
+          "relaynet-pong.current_endpoint_session_key_id": OTc1MzEK
+        wait: true
+        skipBuildDependencies: true
+portForward:
+  - resourceType: service
+    resourceName: public-gateway-vault
+    port: 8200
+    localPort: 8200
+  - resourceType: service
+    resourceName: minio
+    port: 9000
+    localPort: 9000
+  - resourceType: service
+    resourceName: public-gateway-poweb
+    port: 8082
+    localPort: 8080
+  - resourceType: service
+    resourceName: public-gateway-pohttp
+    port: 8080
+    localPort: 8081
+  - resourceType: service
+    resourceName: public-gateway-cogrpc
+    port: 8081
+    localPort: 8082

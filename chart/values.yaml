@@ -2,6 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+tags:
+  dev: false
+
 replicaCount: 1
 
 image:
@@ -69,6 +72,9 @@ affinity: {}
 
 cogrpc:
   serviceAnnotations: {}
+
+pdcQueue:
+  replicaCount: 3
 
 # Backing services
 

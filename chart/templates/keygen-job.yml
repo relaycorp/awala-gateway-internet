@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+  labels:
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-keygen"
+      labels:
+        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    spec:
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-keygen
+      securityContext:
+      {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      shareProcessNamespace: true
+      restartPolicy: OnFailure
+      containers:
+        - name: keygen
+          image: {{ include "relaynet-internet-gateway.image" . }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - build/main/bin/generate-keypairs.js
+          envFrom:
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-generated
+            - secretRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}

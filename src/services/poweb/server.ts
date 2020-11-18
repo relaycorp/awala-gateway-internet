@@ -25,20 +25,18 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
 export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstance> {
-  const publicGatewayKeyPair = await retrieveKeyPair();
   return configureFastify(
     ROUTES,
     {
-      publicGatewayCertificate: publicGatewayKeyPair.certificate,
-      publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+      keyPairRetriever: makeKeyPairRetriever(),
     },
     logger,
   );
 }
 
-async function retrieveKeyPair(): Promise<UnboundKeyPair> {
+function makeKeyPairRetriever(): () => Promise<UnboundKeyPair> {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
   const gatewayKeyId = Buffer.from(gatewayKeyIdBase64, 'base64');
   const privateKeyStore = initVaultKeyStore();
-  return privateKeyStore.fetchNodeKey(gatewayKeyId);
+  return () => privateKeyStore.fetchNodeKey(gatewayKeyId);
 }

@@ -7,9 +7,15 @@ This is the reference implementation of a Relaynet-Internet Gateway, a type of _
 To use this app locally and be able to update the source code, you need the following system dependencies:
 
 - Node.js v12+.
-- Docker and Docker Compose, if you want to run the Docker image or its functional test suite.
+- [Skaffold](https://skaffold.dev/) v1.16+.
+- [Helm](https://helm.sh/) v3.4+.
 
-The dependencies can be installed with the usual `npm install`.
+You can then install the Node.js and Helm chart dependencies with:
+
+```
+npm install
+helm dependency update chart/
+```
 
 ## Run unit test suite
 
@@ -21,62 +27,35 @@ npm test
 
 ## Run functional test suite
 
+First, run `skaffold delete` to ensure you have a clean fixture and then `skaffold run` to deploy the chart against which you'll run the tests.
+
 Again, you can run the tests selectively from your IDE (using `jest.config.functional.js` as the Jest configuration), or run the whole suite with:
 
 ```bash
 npm run test:functional
 ```
 
-## Run the servers with Docker Compose
+When you're done, destroy the environment with `skaffold delete`.
 
-With the Docker Compose project running in the background (e.g., `docker-compose up --build --remove-orphans --abort-on-container-exit -d`), run the following commands to bootstrap the backing services.
+## Run the services locally
 
-Create the Vault backend and the initial key pair:
+Simply run `skaffold dev --port-forward`. The services will then be available at the following addresses:
 
-```
-docker-compose exec -e VAULT_ADDR='http://127.0.0.1:8200' -e VAULT_TOKEN=letmein vault vault secrets enable -path=gw-keys kv-v2
-docker-compose run --rm cogrpc src/bin/generate-keypairs.ts
-```
+- PoWeb: `127.0.0.1:8080`
+- PoHTTP: `127.0.0.1:8081`
+- CogRPC: `127.0.0.1:8082`
 
-Create the Minio bucket:
+## Access to backing services
 
-```
-MC_HOST_minio=http://THE-KEY-ID:letmeinpls@object-store:9000
-docker run --rm --network=relaynet-internet-gateway_default -e MC_HOST_minio minio/mc mb minio/relaynet-public-gateway
-```
+The backing services that offer web interfaces may be accessed with the following.
 
-## Using the Helm chart
-
-Here's how to set up your local environment for development:
-
-1. Install Vault and enable the KV secret store:
-   ```
-   # Add HashiCorp's repo if you haven't done so yet
-   helm repo add hashicorp https://helm.releases.hashicorp.com
-   
-   helm install vault-test hashicorp/vault \
-       --set "server.dev.enabled=true" \
-       --set "server.image.extraEnvironmentVars.VAULT_DEV_ROOT_TOKEN_ID=letmein"
-   
-   kubectl exec -it vault-test-0 -- vault secrets enable -path=gw-keys kv-v2
-   ```
-1. Install NATS Streaming: https://github.com/nats-io/nats-streaming-operator
-1. Install Mongo:
-   ```
-   helm repo add bitnami https://charts.bitnami.com/bitnami
-   helm install mongo-test bitnami/mongodb
-   ```
-1. Install Minio:
-   ```
-   helm install \
-       --set accessKey=THE-KEY-ID,secretKey=letmeinpls \
-       minio-test \
-       stable/minio
-   ```
-1. Install gw:
-   ```
-   helm install --values chart/values.dev.yml gw-test chart/
-   ```
+- Vault:
+  - URL: `http://127.0.0.1:8200`
+  - Token: `root`
+- Minio:
+  - URL: `http://127.0.0.1:9000`
+  - Access key: `test-key`
+  - Secret key: `test-secret`
 
 ## Contributing
 

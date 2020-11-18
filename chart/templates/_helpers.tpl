@@ -32,6 +32,13 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Generate image repository and possibly tag
+*/}}
+{{- define "relaynet-internet-gateway.image" -}}
+{{ .Values.image.repository }}{{ ternary "" (printf ":%s" (.Values.image.tag | default .Chart.AppVersion)) .Values.tags.dev }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "relaynet-internet-gateway.labels" -}}
@@ -47,7 +54,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "relaynet-internet-gateway.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "relaynet-internet-gateway.name" . }}{{ empty .Component | ternary "" (printf "-%s" .Component) }}
+app.kubernetes.io/name: {{ include "relaynet-internet-gateway.name" . }}
+{{- if .Component }}
+app.kubernetes.io/component: {{ .Component }}
+{{- end }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
@@ -62,7 +72,7 @@ http{{ ternary "s" "" (and .Values.ingress.enabled .Values.ingress.enableTls) }}
 Generate CogRPC URI
 */}}
 {{- define "relaynet-internet-gateway.cogrpcUri" -}}
-http{{ ternary "s" "" (and .Values.ingress.enabled .Values.ingress.enableTls) }}://{{ .Values.cogrpcHost }}
+https://{{ .Values.cogrpcHost }}
 {{- end }}
 
 {{/*

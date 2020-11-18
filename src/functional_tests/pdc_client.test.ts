@@ -9,7 +9,7 @@ import {
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
 
-import { configureServices, PONG_ENDPOINT_ADDRESS } from './services';
+import { PONG_ENDPOINT_ADDRESS } from './services';
 import {
   connectToNatsStreaming,
   IS_GITHUB,
@@ -17,8 +17,6 @@ import {
   OBJECT_STORAGE_CLIENT,
   sleep,
 } from './utils';
-
-configureServices();
 
 let senderPrivateKey: CryptoKey;
 let senderCertificate: Certificate;
@@ -50,7 +48,9 @@ describe('PDC client', () => {
   });
 
   test('Undelivered parcels should remain in the queue', async () => {
-    const parcel = new Parcel('https://relaynet.local', senderCertificate, Buffer.from([]));
+    const parcel = new Parcel('https://relaynet.local', senderCertificate, Buffer.from([]), {
+      ttl: 10,
+    });
 
     await queueParcel(parcel);
 

@@ -277,7 +277,7 @@ describe('deliverCargo', () => {
       );
     });
 
-    test('Successful completion should be logged', async () => {
+    test('Successful completion should be logged and end the call', async () => {
       CALL.output.push({
         cargo: CARGO_SERIALIZATION,
         id: DELIVERY_ID,
@@ -292,6 +292,7 @@ describe('deliverCargo', () => {
           grpcMethod: 'deliverCargo',
         }),
       );
+      expect(CALL.end).toBeCalledWith();
     });
 
     test('Errors while processing cargo should be logged and end the call', async (cb) => {
@@ -320,6 +321,8 @@ describe('deliverCargo', () => {
           code: grpc.status.UNAVAILABLE,
           message: 'Internal server error; please try again later',
         });
+
+        expect(CALL.end).toBeCalledWith();
 
         cb();
       });
@@ -737,7 +740,7 @@ describe('collectCargo', () => {
     );
   });
 
-  test('CCA fulfillment should be logged', async () => {
+  test('CCA fulfillment should be logged and end the call', async () => {
     CALL.metadata.add('Authorization', AUTHORIZATION_METADATA);
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -750,6 +753,7 @@ describe('collectCargo', () => {
         peerGatewayAddress: PEER_GATEWAY_ADDRESS,
       }),
     );
+    expect(CALL.end).toBeCalledWith();
   });
 
   test('Errors while generating cargo should be logged and end the call', async (cb) => {

@@ -6,8 +6,6 @@ permalink: /install
 
 The Relaynet-Internet Gateway is distributed as a Helm chart. Note that deploying the Docker images directly is discouraged: We're likely to change paths, as well as split and rename the Docker image.
 
-There's no Helm repository at this point but you can download the chart directly from [the latest GitHub release](https://github.com/relaycorp/relaynet-internet-gateway/releases/latest).
-
 ## Example
 
 At a minimum, you have to specify the domain names for the services and the connection settings for the backing services; e.g.:
@@ -35,10 +33,12 @@ vault:
 Then you can install the chart:
 
 ```
+helm repo add relaycorp https://h.cfcr.io/relaycorp/public
+
 helm install \
   --values values.yaml \
   gateway-test \
-  https://github.com/relaycorp/relaynet-internet-gateway/releases/latest/download/relaynet-internet-gateway-1.10.0.tgz
+  relaycorp/relaynet-internet-gateway
 ```
 
 Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway) for a working example on Google Cloud Platform.

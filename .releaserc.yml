@@ -8,7 +8,7 @@ plugins:
     - prepareCmd: docker tag public-gateway:latest ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
       publishCmd: docker push ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
   - - "@semantic-release/exec"
-    - prepareCmd: helm package chart/ --app-version=${nextRelease.version} --version=${nextRelease.version} --destination=build/
+    - prepareCmd: helm package chart/ --dependency-update --app-version=${nextRelease.version} --version=${nextRelease.version} --destination=build/
       publishCmd: .github/scripts/push-helm-chart.sh
   - - "@semantic-release/github"
     - assets:

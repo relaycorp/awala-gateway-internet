@@ -50,36 +50,20 @@ jobs:
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
       # TODO: REMOVE
       - run: kubectl get svc
-      - name: port-forward poweb
-        uses: RichiCoder1/kube-forward-action@v0.1.4
-        with:
-          targetRef: svc/public-gateway-poweb
-          port: 8080
-          kubeconfig: /home/runner/.kube/config
-      - name: port-forward pohttp
-        uses: RichiCoder1/kube-forward-action@v0.1.4
-        with:
-          targetRef: svc/public-gateway-pohttp
-          port: 8081
-          kubeconfig: /home/runner/.kube/config
-      - name: port-forward cogrpc
-        uses: RichiCoder1/kube-forward-action@v0.1.4
-        with:
-          targetRef: svc/public-gateway-cogrpc
-          port: 8082
-          kubeconfig: /home/runner/.kube/config
-      - name: port-forward vault
-        uses: RichiCoder1/kube-forward-action@v0.1.4
-        with:
-          targetRef: svc/public-gateway-vault
-          port: 8200
-          kubeconfig: /home/runner/.kube/config
-      - name: port-forward minio
-        uses: RichiCoder1/kube-forward-action@v0.1.4
-        with:
-          targetRef: svc/public-gateway-vault
-          port: 9000
-          kubeconfig: /home/runner/.kube/config
+      - name: Start port-forwarding
+        run: |
+          set -o nounset
+          set -o errexit
+          set -o pipefail
+
+          kubectl port-forward svc/public-gateway-poweb 8080:8082 &
+          kubectl port-forward svc/public-gateway-pohttp 8081:8080 &
+          kubectl port-forward svc/public-gateway-cogrpc 8082:8081 &
+          kubectl port-forward svc/public-gateway-vault 8200:8200 &
+          kubectl port-forward svc/minio 9000:9000 &
+
+          # Check at least one of the ports:
+          curl --spider --quiet http://127.0.0.1:8080
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'

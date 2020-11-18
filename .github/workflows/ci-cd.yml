@@ -48,6 +48,8 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
+      # TODO: REMOVE
+      - run: docker images
       - name: Start port-forwarding
         run: |
           set -o nounset
@@ -70,8 +72,6 @@ jobs:
         if: failure()
         run: .github/scripts/output-diagnostics.sh
 
-      # TODO: REMOVE
-      - run: docker images
       # Export Docker image so it can be published
       - name: Export Docker image
         if: github.ref == 'refs/heads/master'

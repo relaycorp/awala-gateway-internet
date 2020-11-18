@@ -48,8 +48,6 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
-      # TODO: REMOVE
-      - run: kubectl get svc
       - name: Start port-forwarding
         run: |
           set -o nounset
@@ -67,9 +65,9 @@ jobs:
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
-      - name: Output logs upon failure
+      - name: Output diagnostic information upon failure
         if: failure()
-        run: .github/scripts/output-logs.sh
+        run: .github/scripts/output-diagnostics.sh
 
       # Export Docker image so it can be published
       - name: Export Docker image

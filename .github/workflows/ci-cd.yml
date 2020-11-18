@@ -37,6 +37,9 @@ jobs:
       # Functional tests
       - name: Set up Minikube
         uses: medyagh/setup-minikube@v0.0.2
+        env:
+          # Work around https://github.com/medyagh/setup-minikube/issues/12
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
       - name: Run Skaffold pipeline
         uses: hiberbee/github-action-skaffold@1.4.0
         with:

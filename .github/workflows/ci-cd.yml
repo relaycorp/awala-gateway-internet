@@ -61,7 +61,7 @@ jobs:
           kubectl port-forward svc/minio 9000:9000 &
 
           # Check at least one of the ports:
-          curl --spider --quiet http://127.0.0.1:8080
+          wget --spider http://127.0.0.1:8080
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'

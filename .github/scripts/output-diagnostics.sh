@@ -9,7 +9,7 @@ print_header() {
   local title="$1"
 
   printf '#%.0s' {1..50}
-  echo "${title}"
+  echo " ${title}"
 }
 
 # Main

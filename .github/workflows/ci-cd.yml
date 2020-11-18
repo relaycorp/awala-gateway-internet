@@ -69,6 +69,8 @@ jobs:
         if: failure()
         run: .github/scripts/output-diagnostics.sh
 
+      # TODO: REMOVE
+      - run: docker images
       # Export Docker image so it can be published
       - name: Export Docker image
         if: github.ref == 'refs/heads/master'

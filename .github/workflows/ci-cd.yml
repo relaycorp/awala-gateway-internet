@@ -49,27 +49,27 @@ jobs:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
       - name: port-forward poweb
-        use: RichiCoder1/kube-forward-action@v0.1.4
+        uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-poweb
           port: 8080
       - name: port-forward pohttp
-        use: RichiCoder1/kube-forward-action@v0.1.4
+        uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-pohttp
           port: 8081
       - name: port-forward cogrpc
-        use: RichiCoder1/kube-forward-action@v0.1.4
+        uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-cogrpc
           port: 8082
       - name: port-forward vault
-        use: RichiCoder1/kube-forward-action@v0.1.4
+        uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-vault
           port: 8200
       - name: port-forward minio
-        use: RichiCoder1/kube-forward-action@v0.1.4
+        uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-vault
           port: 9000

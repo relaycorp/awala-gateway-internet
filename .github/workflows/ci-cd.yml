@@ -81,6 +81,9 @@ jobs:
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
+      - name: Output logs upon failure
+        if: failure()
+        run: .github/scripts/output-logs.sh
 
       # Export Docker image so it can be published
       - name: Export Docker image

@@ -47,6 +47,7 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
+        timeout-minutes: 6
       - name: Start port-forwarding
         run: |
           set -o nounset
@@ -66,6 +67,7 @@ jobs:
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
+        timeout-minutes: 1
       - name: Output diagnostic information upon failure
         if: failure()
         run: .github/scripts/output-diagnostics.sh

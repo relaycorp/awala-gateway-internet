@@ -55,11 +55,11 @@ jobs:
           set -o pipefail
           set +x
 
-          kubectl port-forward svc/public-gateway-poweb 8080:8082 &
-          kubectl port-forward svc/public-gateway-pohttp 8081:8080 &
-          kubectl port-forward svc/public-gateway-cogrpc 8082:8081 &
-          kubectl port-forward svc/public-gateway-vault 8200:8200 &
-          kubectl port-forward svc/minio 9000:9000 &
+          kubectl port-forward svc/public-gateway-poweb 127.0.0.1:8080:8082 &
+          kubectl port-forward svc/public-gateway-pohttp 127.0.0.1:8081:8080 &
+          kubectl port-forward svc/public-gateway-cogrpc 127.0.0.1:8082:8081 &
+          kubectl port-forward svc/public-gateway-vault 127.0.0.1:8200:8200 &
+          kubectl port-forward svc/minio 127.0.0.1:9000:9000 &
 
           # Check at least one of the ports:
           wget --spider http://127.0.0.1:8080

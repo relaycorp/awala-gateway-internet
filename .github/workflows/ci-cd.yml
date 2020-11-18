@@ -53,26 +53,31 @@ jobs:
         with:
           targetRef: svc/public-gateway-poweb
           port: 8080
+          kubeconfig: /home/runner/.kube/config
       - name: port-forward pohttp
         uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-pohttp
           port: 8081
+          kubeconfig: /home/runner/.kube/config
       - name: port-forward cogrpc
         uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-cogrpc
           port: 8082
+          kubeconfig: /home/runner/.kube/config
       - name: port-forward vault
         uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-vault
           port: 8200
+          kubeconfig: /home/runner/.kube/config
       - name: port-forward minio
         uses: RichiCoder1/kube-forward-action@v0.1.4
         with:
           targetRef: svc/public-gateway-vault
           port: 9000
+          kubeconfig: /home/runner/.kube/config
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'

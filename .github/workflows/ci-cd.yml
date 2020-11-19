@@ -50,6 +50,8 @@ jobs:
         timeout-minutes: 6
       - name: Start port-forwarding
         run: |
+          # Ugly workaround for https://github.com/GoogleContainerTools/skaffold/issues/4022
+
           set -o nounset
           set -o errexit
           set -o pipefail

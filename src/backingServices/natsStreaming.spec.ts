@@ -501,7 +501,7 @@ describe('NatsStreamingClient', () => {
     }
   });
 
-  describe('NATS Streaming connection', () => {
+  describe('init', () => {
     const ENV_VARS = {
       NATS_CLUSTER_ID: STUB_CLUSTER_ID,
       NATS_SERVER_URL: STUB_SERVER_URL,
@@ -531,10 +531,16 @@ describe('NatsStreamingClient', () => {
       expect(client.clusterId).toEqual(STUB_CLUSTER_ID);
     });
 
-    test('Worker name should be used as NATS client id', () => {
+    test('Client id name should be honoured', () => {
       const client = NatsStreamingClient.initFromEnv(CLIENT_ID);
 
       expect(client.clientId).toEqual(CLIENT_ID);
+    });
+
+    test('Non-alphanumeric characters in client id name should be replaced', () => {
+      const client = NatsStreamingClient.initFromEnv('foo/bar');
+
+      expect(client.clientId).toEqual('foo_bar');
     });
   });
 });

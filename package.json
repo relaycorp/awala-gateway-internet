@@ -41,7 +41,7 @@
     "pkijs": "^2.1.84",
     "prettier": "^2.2.0",
     "split2": "^3.2.2",
-    "trash-cli": "^3.1.0",
+    "trash-cli": "^4.0.0",
     "ts-jest": "^25.5.1",
     "ts-node": "^9.0.0",
     "ts-node-dev": "^1.0.0",

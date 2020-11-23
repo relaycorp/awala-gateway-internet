@@ -16,7 +16,7 @@ export class NatsStreamingClient {
     const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
     const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
     // GCP LB request ids contain slashes, which cause the Stan client rejects in the client id.
-    const clientIdSanitised = clientId.replace(/\W/, '_');
+    const clientIdSanitised = clientId.replace(/\W/g, '_');
     return new NatsStreamingClient(natsServerUrl, natsClusterId, clientIdSanitised);
   }
 

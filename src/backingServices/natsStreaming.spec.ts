@@ -508,7 +508,7 @@ describe('NatsStreamingClient', () => {
     };
     const mockEnvVars = configureMockEnvVars(ENV_VARS);
 
-    const CLIENT_ID = 'the-client-id';
+    const CLIENT_ID = 'the_client_id';
 
     test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID'])(
       'Environment variable %s should be present',
@@ -538,9 +538,9 @@ describe('NatsStreamingClient', () => {
     });
 
     test('Non-alphanumeric characters in client id name should be replaced', () => {
-      const client = NatsStreamingClient.initFromEnv('foo/bar');
+      const client = NatsStreamingClient.initFromEnv('foo/bar/baz');
 
-      expect(client.clientId).toEqual('foo_bar');
+      expect(client.clientId).toEqual('foo_bar_baz');
     });
   });
 });

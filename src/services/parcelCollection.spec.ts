@@ -97,11 +97,12 @@ describe('generatePCAs', () => {
     };
   });
 
-  const MOCK_MONGOOSE_FIND = mockSpy(jest.fn(), async function* (): AsyncIterable<
-    ParcelCollection
-  > {
-    yield* arrayToAsyncIterable([]);
-  });
+  const MOCK_MONGOOSE_FIND = mockSpy(
+    jest.fn(),
+    async function* (): AsyncIterable<ParcelCollection> {
+      yield* arrayToAsyncIterable([]);
+    },
+  );
   beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ find: MOCK_MONGOOSE_FIND } as any));
 
   test('Existing connection should be used', async () => {

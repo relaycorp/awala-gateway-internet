@@ -440,14 +440,15 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipe(consumer, async function* (
-        messages: AsyncIterable<Message>,
-      ): AsyncIterable<Message> {
-        for await (const message of messages) {
-          yield message;
-          controller.abort(); // Do NOT use `break` instead: We want to test the signal
-        }
-      });
+      const outputMessages = pipe(
+        consumer,
+        async function* (messages: AsyncIterable<Message>): AsyncIterable<Message> {
+          for await (const message of messages) {
+            yield message;
+            controller.abort(); // Do NOT use `break` instead: We want to test the signal
+          }
+        },
+      );
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockSubscription.close).toBeCalled();

@@ -72,7 +72,7 @@
     "@relaycorp/relaynet-core": "^1.39.1",
     "@relaycorp/relaynet-pohttp": "^1.5.4",
     "@typegoose/typegoose": "^7.4.2",
-    "@types/pino": "^6.3.3",
+    "@types/pino": "^6.3.4",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "aws-sdk": "^2.797.0",

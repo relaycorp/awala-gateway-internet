@@ -68,11 +68,11 @@ describe('runServer', () => {
     );
   });
 
-  test('Server should accept metadata of up to 3.5 kb', async () => {
+  test('Server should accept metadata of up to 4 kb', async () => {
     await runServer();
 
     expect(grpc.Server).toBeCalledWith(
-      expect.objectContaining({ 'grpc.max_metadata_size': 3_500 }),
+      expect.objectContaining({ 'grpc.max_metadata_size': 4_000 }),
     );
   });
 

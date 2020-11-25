@@ -80,8 +80,7 @@ function getFinalLogger(logger: FastifyLogger): FastifyLogger {
     return logger;
   }
   const logLevelEnvVar = getEnvVar('LOG_LEVEL').asString()?.toLowerCase();
-  const finalLogger = logLevelEnvVar ? { level: logLevelEnvVar } : logger;
-  return finalLogger as any;
+  return logLevelEnvVar ? { level: logLevelEnvVar } : logger;
 }
 
 export async function runFastify(fastifyInstance: FastifyInstance): Promise<void> {

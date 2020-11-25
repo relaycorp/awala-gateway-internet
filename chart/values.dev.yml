@@ -8,6 +8,8 @@ fullnameOverride: public-gateway
 tags:
   dev: true
 
+logLevel: debug
+
 pohttpHost: public-gateway-pohttp:8080
 powebHost: public-gateway-poweb
 cogrpcHost: 127.0.0.1:8082

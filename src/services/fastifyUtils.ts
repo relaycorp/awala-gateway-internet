@@ -57,7 +57,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
 ): Promise<FastifyInstance> {
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_SIZE,
-    logger,
+    logger: getFinalLogger(logger),
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
       .default(DEFAULT_REQUEST_ID_HEADER)
       .asString()
@@ -73,6 +73,15 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   await server.ready();
 
   return server;
+}
+
+function getFinalLogger(logger: FastifyLogger): FastifyLogger {
+  if (logger !== true) {
+    return logger;
+  }
+  const logLevelEnvVar = getEnvVar('LOG_LEVEL').asString()?.toLowerCase();
+  const finalLogger = logLevelEnvVar ? { level: logLevelEnvVar } : logger;
+  return finalLogger as any;
 }
 
 export async function runFastify(fastifyInstance: FastifyInstance): Promise<void> {

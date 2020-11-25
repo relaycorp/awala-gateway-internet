@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "required": [
+    "logLevel",
     "cogrpcHost",
     "pohttpHost",
     "powebHost",
@@ -11,6 +12,10 @@
     "vault"
   ],
   "properties": {
+    "logLevel": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"]
+    },
     "ingress": {
       "type": "object",
       "required": [

@@ -192,9 +192,17 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
     fixtures.mongooseConnection,
     mockNatsStreamingConnection,
+    expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
   );
   expect(logging.logs).toContainEqual(
-    partialPinoLog('info', 'Accepted parcel', {
+    partialPinoLog('debug', 'Parcel is well-formed', {
+      parcelId: PARCEL.id,
+      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+    }),
+  );
+  expect(logging.logs).toContainEqual(
+    partialPinoLog('info', 'Parcel was successfully stored', {
+      parcelId: PARCEL.id,
       parcelObjectKey: expect.stringContaining(PARCEL.id),
       peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
     }),

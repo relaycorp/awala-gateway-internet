@@ -69,6 +69,7 @@ export default async function registerRoutes(
           request.body,
           (fastify as any).mongo.db,
           natsClient,
+          request.log,
         );
       } catch (error) {
         if (error instanceof InvalidMessageError) {

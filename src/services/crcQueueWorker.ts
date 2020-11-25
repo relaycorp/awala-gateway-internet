@@ -22,7 +22,7 @@ import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 
-const logger = pino();
+const LOGGER = pino();
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
@@ -48,7 +48,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
           // Vault is down or returned an unexpected response
           throw err;
         }
-        logger.info(
+        LOGGER.info(
           { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
           'Cargo payload is invalid',
         );
@@ -62,7 +62,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         try {
           item = await CargoMessageSet.deserializeItem(itemSerialized);
         } catch (error) {
-          logger.info(
+          LOGGER.info(
             { cargoId: cargo.id, error, peerGatewayAddress, worker: workerName },
             'Cargo contains an invalid message',
           );
@@ -142,17 +142,18 @@ async function processParcel(
       peerGatewayAddress,
       mongooseConnection,
       natsStreamingClient,
+      LOGGER,
     );
   } catch (err) {
     if (err instanceof InvalidMessageError) {
-      logger.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
+      LOGGER.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
       return;
     }
 
     throw err;
   }
 
-  logger.debug(
+  LOGGER.debug(
     {
       cargoId,
       parcelId: parcel.id,

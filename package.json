@@ -69,7 +69,7 @@
   "dependencies": {
     "@relaycorp/cogrpc": "^1.1.7",
     "@relaycorp/keystore-vault": "^1.2.0",
-    "@relaycorp/relaynet-core": "^1.39.1",
+    "@relaycorp/relaynet-core": "^1.39.2",
     "@relaycorp/relaynet-pohttp": "^1.5.4",
     "@typegoose/typegoose": "^7.4.2",
     "@types/pino": "^6.3.4",

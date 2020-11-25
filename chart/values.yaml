@@ -5,6 +5,8 @@
 tags:
   dev: false
 
+logLevel: info
+
 replicaCount: 1
 
 image:

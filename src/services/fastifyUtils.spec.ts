@@ -22,7 +22,8 @@ afterAll(() => {
 });
 
 const stubMongoUri = 'mongodb://mongodb/test_db';
-const mockEnvVars = configureMockEnvVars({ MONGO_URI: stubMongoUri });
+const BASE_ENV_VARS = { MONGO_URI: stubMongoUri };
+const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 const dummyRoutes: FastifyPluginCallback = () => null;
 
@@ -32,6 +33,32 @@ describe('configureFastify', () => {
 
     const fastifyCallArgs = getMockContext(fastify).calls[0];
     expect(fastifyCallArgs[0]).toHaveProperty('logger', true);
+  });
+
+  test('Log level in LOG_LEVEL env var should be honoured if present', () => {
+    const loglevel = 'debug';
+    mockEnvVars({ ...BASE_ENV_VARS, LOG_LEVEL: loglevel });
+
+    configureFastify([dummyRoutes]);
+
+    const fastifyCallArgs = getMockContext(fastify).calls[0];
+    expect(fastifyCallArgs[0]).toHaveProperty('logger', { level: loglevel });
+  });
+
+  test('Log level in LOG_LEVEL env var should be lower-cased if present', () => {
+    mockEnvVars({ ...BASE_ENV_VARS, LOG_LEVEL: 'DEBUG' });
+
+    configureFastify([dummyRoutes]);
+
+    const fastifyCallArgs = getMockContext(fastify).calls[0];
+    expect(fastifyCallArgs[0]).toHaveProperty('logger', { level: 'debug' });
+  });
+
+  test('LOG_LEVEL env var should be ignored if a custom logger is used', () => {
+    configureFastify([dummyRoutes], undefined, false);
+
+    const fastifyCallArgs = getMockContext(fastify).calls[0];
+    expect(fastifyCallArgs[0]).toHaveProperty('logger', false);
   });
 
   test('Custom logger should be supported', () => {

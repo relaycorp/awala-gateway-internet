@@ -63,6 +63,10 @@ export default async function registerRoutes(
       }
 
       const peerGatewayAddress = await countersignerCertificate.calculateSubjectPrivateAddress();
+      const parcelAwareLogger = request.log.child({ parcelId: parcel.id, peerGatewayAddress });
+
+      parcelAwareLogger.debug('Parcel is well-formed');
+
       const natsStreamingClient = NatsStreamingClient.initFromEnv(
         `poweb-parcel-delivery-${request.id}`,
       );
@@ -75,18 +79,19 @@ export default async function registerRoutes(
           peerGatewayAddress,
           mongooseConnection,
           natsStreamingClient,
+          parcelAwareLogger,
         );
       } catch (err) {
         if (err instanceof InvalidMessageError) {
-          request.log.info({ err, peerGatewayAddress }, 'Invalid parcel');
+          parcelAwareLogger.info({ err }, 'Invalid parcel');
           return reply.code(403).send({ message: 'Parcel is invalid' });
         }
 
-        request.log.error({ err, peerGatewayAddress }, 'Failed to save parcel');
+        parcelAwareLogger.error({ err }, 'Failed to save parcel');
         return reply.code(500).send({ message: 'Could not save parcel. Please try again later.' });
       }
 
-      request.log.info({ parcelObjectKey, peerGatewayAddress }, 'Accepted parcel');
+      parcelAwareLogger.info({ parcelObjectKey }, 'Parcel was successfully stored');
       return reply.code(202).send();
     },
   });

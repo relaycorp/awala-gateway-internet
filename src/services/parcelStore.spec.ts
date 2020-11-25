@@ -354,6 +354,7 @@ describe('storeParcelFromPeerGateway', () => {
         await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
@@ -362,6 +363,7 @@ describe('storeParcelFromPeerGateway', () => {
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
   });
 
@@ -388,6 +390,7 @@ describe('storeParcelFromPeerGateway', () => {
         await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
@@ -397,6 +400,7 @@ describe('storeParcelFromPeerGateway', () => {
       await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
   });
 });
@@ -419,9 +423,22 @@ describe('storeGatewayBoundParcel', () => {
         parcelSerialized,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockLogging.logger,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
+  });
+
+  test('Debug log confirming validity of parcel should be recorded', async () => {
+    await store.storeGatewayBoundParcel(
+      parcel,
+      parcelSerialized,
+      MOCK_MONGOOSE_CONNECTION,
+      MOCK_NATS_CLIENT,
+      mockLogging.logger,
+    );
+
+    expect(mockLogging.logs).toContainEqual(partialPinoLog('debug', 'Parcel is valid'));
   });
 
   test('Parcel object key should be output', async () => {
@@ -430,6 +447,7 @@ describe('storeGatewayBoundParcel', () => {
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     const expectedObjectKey = [
@@ -449,6 +467,7 @@ describe('storeGatewayBoundParcel', () => {
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -464,6 +483,7 @@ describe('storeGatewayBoundParcel', () => {
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -476,17 +496,21 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    await store.storeGatewayBoundParcel(
+    const parcelObjectKey = await store.storeGatewayBoundParcel(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
       expect.objectContaining({ body: parcelSerialized }),
       expect.anything(),
       expect.anything(),
+    );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel object was stored successfully', { parcelObjectKey }),
     );
   });
 
@@ -496,6 +520,7 @@ describe('storeGatewayBoundParcel', () => {
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -506,17 +531,23 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel object key should be published to right NATS Streaming channel', async () => {
-    const key = await store.storeGatewayBoundParcel(
+    const parcelObjectKey = await store.storeGatewayBoundParcel(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledTimes(1);
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
-      key,
+      parcelObjectKey,
       `pdc-parcel.${await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
+    );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel storage was successfully published on NATS', {
+        parcelObjectKey,
+      }),
     );
   });
 });
@@ -617,9 +648,23 @@ describe('storeEndpointBoundParcel', () => {
         peerGatewayAddress,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockLogging.logger,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
+  });
+
+  test('Debug log confirming validity of parcel should be recorded', async () => {
+    await store.storeEndpointBoundParcel(
+      parcel,
+      parcelSerialized,
+      peerGatewayAddress,
+      MOCK_MONGOOSE_CONNECTION,
+      MOCK_NATS_CLIENT,
+      mockLogging.logger,
+    );
+
+    expect(mockLogging.logs).toContainEqual(partialPinoLog('debug', 'Parcel is valid'));
   });
 
   test('Parcel should be ignored if it was already processed', async () => {
@@ -632,6 +677,7 @@ describe('storeEndpointBoundParcel', () => {
         peerGatewayAddress,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockLogging.logger,
       ),
     ).resolves.toBeNull();
 
@@ -640,6 +686,9 @@ describe('storeEndpointBoundParcel', () => {
       parcel,
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
+    );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel was previously processed'),
     );
   });
 
@@ -650,12 +699,16 @@ describe('storeEndpointBoundParcel', () => {
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(mockRecordParcelCollection).toBeCalledWith(
       parcel,
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
+    );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel storage was successfully recorded'),
     );
   });
 
@@ -666,6 +719,7 @@ describe('storeEndpointBoundParcel', () => {
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
@@ -680,6 +734,7 @@ describe('storeEndpointBoundParcel', () => {
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -696,6 +751,7 @@ describe('storeEndpointBoundParcel', () => {
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -706,12 +762,13 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    await store.storeEndpointBoundParcel(
+    const parcelObjectKey = await store.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
@@ -719,25 +776,34 @@ describe('storeEndpointBoundParcel', () => {
       expect.anything(),
       expect.anything(),
     );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel object was successfully stored', { parcelObjectKey }),
+    );
   });
 
   test('Parcel data should be published to right NATS Streaming channel', async () => {
-    const key = await store.storeEndpointBoundParcel(
+    const parcelObjectKey = await store.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
+      mockLogging.logger,
     );
 
     const expectedMessageData: QueuedInternetBoundParcelMessage = {
       parcelExpiryDate: parcel.expiryDate,
-      parcelObjectKey: key!!,
+      parcelObjectKey: parcelObjectKey!!,
       parcelRecipientAddress: parcel.recipientAddress,
     };
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       JSON.stringify(expectedMessageData),
       'internet-parcels',
+    );
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel storage was successfully published on NATS', {
+        parcelObjectKey,
+      }),
     );
   });
 });

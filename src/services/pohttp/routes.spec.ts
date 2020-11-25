@@ -1,5 +1,3 @@
-/* tslint:disable:no-let */
-
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
@@ -182,6 +180,7 @@ describe('receiveParcel', () => {
       validRequestOptions.payload,
       mockFastifyMongooseObject.db,
       mockNatsClient,
+      expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
     );
   });
 

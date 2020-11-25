@@ -1,5 +1,3 @@
-/* tslint:disable:no-let */
-
 import {
   Cargo,
   CargoMessageSet,
@@ -267,6 +265,7 @@ describe('Parcel processing', () => {
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       mockNatsClient,
+      mockLogger,
     );
     expect(mockLogger.debug).toBeCalledWith(
       {

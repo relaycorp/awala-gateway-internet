@@ -11,6 +11,7 @@ import { Logger } from 'pino';
 
 import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from './constants';
+import { Connection } from 'mongoose';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
@@ -68,9 +69,39 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   });
 
   const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
+  server.log.debug('Before configuring fastify-mongoose');
   await server.register(require('fastify-mongoose'), {
     ...mongoConnectionArgs.options,
     uri: mongoConnectionArgs.uri,
+  });
+  server.log.debug('Before listening for Mongoose events');
+  const mongooseConnection = (server as any).mongo.db as Connection;
+  mongooseConnection.on('connecting', () => {
+    server.log.debug('Mongoose connecting');
+  });
+  mongooseConnection.on('connected', () => {
+    server.log.debug('Mongoose connected');
+  });
+  mongooseConnection.on('disconnecting', () => {
+    server.log.debug('Mongoose disconnecting');
+  });
+  mongooseConnection.on('disconnected', () => {
+    server.log.debug('Mongoose disconnected');
+  });
+  mongooseConnection.on('reconnected', () => {
+    server.log.debug('Mongoose reconnected');
+  });
+  mongooseConnection.on('error', (err) => {
+    server.log.error({ err }, 'Mongoose error');
+  });
+  mongooseConnection.on('fullsetup', () => {
+    server.log.debug('Mongoose fullsetup');
+  });
+  mongooseConnection.on('all', () => {
+    server.log.debug('Mongoose all');
+  });
+  mongooseConnection.on('reconnectFailed', () => {
+    server.log.debug('Mongoose reconnectFailed');
   });
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));

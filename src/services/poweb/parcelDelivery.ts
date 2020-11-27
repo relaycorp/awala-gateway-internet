@@ -35,6 +35,7 @@ export default async function registerRoutes(
     method: ['POST'],
     url: ENDPOINT_URL,
     async handler(request, reply): Promise<FastifyReply<any>> {
+      request.log.debug('Starting delivery endpoint');
       if (request.headers['content-type'] !== CONTENT_TYPES.PARCEL) {
         return reply.code(415).send();
       }
@@ -47,6 +48,7 @@ export default async function registerRoutes(
         mongooseConnection,
         request.log,
       );
+      request.log.debug('After verifyCountersignature');
       if (!countersignerCertificate) {
         return reply
           .code(401)
@@ -112,7 +114,9 @@ async function verifyCountersignature(
     // The base64-encoded countersignature was empty or malformed
     return null;
   }
+  logger.debug({ readyState: mongooseConnection.readyState }, 'Before retrieving own certificates');
   const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+  logger.debug('After retrieving own certificates');
   try {
     return await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(
       bufferToArray(countersignature),

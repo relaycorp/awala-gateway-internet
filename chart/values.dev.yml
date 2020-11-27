@@ -18,7 +18,10 @@ pdcQueue:
   replicaCount: 2
 
 mongo:
-  uri: mongodb://mongodb/test_db
+  uri: mongodb://mongodb
+  db: gw
+  user: root
+  password: letmein
 
 nats:
   nameOverride: nats
@@ -64,7 +67,7 @@ minio:
 mongodb:
   fullnameOverride: mongodb
   auth:
-    enabled: false
+    rootPassword: letmein
   persistence:
     enabled: false
 

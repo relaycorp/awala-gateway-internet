@@ -35,7 +35,13 @@ beforeAll(async () => {
 
 let natsStreamingConnection: Stan;
 beforeEach(async () => (natsStreamingConnection = await connectToNatsStreaming()));
-afterEach(async () => natsStreamingConnection.close());
+afterEach(async () => {
+  // Shut up Jest about leaving open handlers
+  await new Promise((resolve) => {
+    natsStreamingConnection.once('close', resolve);
+    natsStreamingConnection.close();
+  });
+});
 
 describe('PDC client', () => {
   test('Successfully delivered parcels should be taken off the queue', async () => {

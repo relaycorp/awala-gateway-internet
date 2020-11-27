@@ -2,7 +2,7 @@ import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, PdaChain } from '../../_test_utils';
+import { mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import {
   configureMockEnvVars,
@@ -63,7 +63,7 @@ jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 
 describe('receiveParcel', () => {
   configureMockEnvVars({
-    MONGO_URI: 'uri',
+    ...MONGO_ENV_VARS,
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
   });

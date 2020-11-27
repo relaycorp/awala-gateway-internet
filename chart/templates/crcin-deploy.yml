@@ -41,6 +41,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
           resources:

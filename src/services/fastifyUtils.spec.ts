@@ -3,7 +3,7 @@ import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
-import { mockSpy } from '../_test_utils';
+import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 import { configureFastify, runFastify } from './fastifyUtils';
@@ -21,9 +21,7 @@ afterAll(() => {
   jest.restoreAllMocks();
 });
 
-const stubMongoUri = 'mongodb://mongodb/test_db';
-const BASE_ENV_VARS = { MONGO_URI: stubMongoUri };
-const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
+const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
 
 const dummyRoutes: FastifyPluginCallback = () => null;
 
@@ -37,7 +35,7 @@ describe('configureFastify', () => {
 
   test('Log level in LOG_LEVEL env var should be honoured if present', () => {
     const loglevel = 'debug';
-    mockEnvVars({ ...BASE_ENV_VARS, LOG_LEVEL: loglevel });
+    mockEnvVars({ ...MONGO_ENV_VARS, LOG_LEVEL: loglevel });
 
     configureFastify([dummyRoutes]);
 
@@ -46,7 +44,7 @@ describe('configureFastify', () => {
   });
 
   test('Log level in LOG_LEVEL env var should be lower-cased if present', () => {
-    mockEnvVars({ ...BASE_ENV_VARS, LOG_LEVEL: 'DEBUG' });
+    mockEnvVars({ ...MONGO_ENV_VARS, LOG_LEVEL: 'DEBUG' });
 
     configureFastify([dummyRoutes]);
 
@@ -81,7 +79,7 @@ describe('configureFastify', () => {
 
   test('Custom request id header can be set via REQUEST_ID_HEADER variable', () => {
     const requestIdHeader = 'X-Id';
-    mockEnvVars({ MONGO_URI: stubMongoUri, REQUEST_ID_HEADER: requestIdHeader });
+    mockEnvVars({ ...MONGO_ENV_VARS, REQUEST_ID_HEADER: requestIdHeader });
 
     configureFastify([dummyRoutes]);
 
@@ -128,7 +126,7 @@ describe('configureFastify', () => {
     expect(mockFastify.register).toBeCalledWith(dummyRoutes, options);
   });
 
-  test('The env var MONGO_URI should be set', async () => {
+  test('MongoDB connection arguments should be set', async () => {
     mockEnvVars({ MONGO_URI: undefined });
 
     await expect(configureFastify([dummyRoutes])).rejects.toBeInstanceOf(EnvVarError);
@@ -137,9 +135,14 @@ describe('configureFastify', () => {
   test('The fastify-mongoose plugin should be configured', async () => {
     await configureFastify([dummyRoutes]);
 
-    expect(mockFastify.register).toBeCalledWith(require('fastify-mongoose'), {
-      uri: stubMongoUri,
-    });
+    expect(mockFastify.register).toBeCalledWith(
+      require('fastify-mongoose'),
+      expect.objectContaining({
+        dbName: MONGO_ENV_VARS.MONGO_DB,
+        uri: MONGO_ENV_VARS.MONGO_URI,
+        user: MONGO_ENV_VARS.MONGO_USER,
+      }),
+    );
   });
 
   test('It should wait for the Fastify server to be ready', async () => {

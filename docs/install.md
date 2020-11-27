@@ -16,7 +16,10 @@ cogrpcHost: gogrpc.eu.relaycorp.tech
 pohttpHost: pohttp.eu.relaycorp.tech
 powebHost: poweb.eu.relaycorp.tech
 mongo:
-  uri: mongodb+srv://user:password@foo.gcp.mongodb.net/db
+  uri: mongodb+srv://foo.gcp.mongodb.net
+  db: db
+  user: the_user
+  password: passw0rd
 nats:
   serverUrl: nats://nats.example.com:4222
   clusterId: example-stan
@@ -60,6 +63,9 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `powebHost` | string | | Domain name for the PoWeb service |
 | `pdcQueue.replicaCount` | number | 3 | Number of workers (pods) for the PDC queue |
 | `mongo.uri` | string | | Connection URI for MongoDB |
+| `mongo.db` | string | | MongoDB database name |
+| `mongo.user` | string | | MongoDB user name |
+| `mongo.password` | string | | MongoDB user password |
 | `nats.serverUrl` | string | | Connection URI for NATS Streaming |
 | `nats.clusterId` | string | | NATS Streaming cluster id |
 | `objectStore.endpoint` | string | | Host name and port number for the object store server |

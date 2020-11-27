@@ -87,13 +87,20 @@
     },
     "mongo": {
       "type": "object",
-      "required": [
-        "uri"
-      ],
+      "required": ["uri", "db", "user", "password"],
       "properties": {
         "uri": {
           "type": "string",
           "format": "uri"
+        },
+        "db": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
         }
       }
     },

@@ -6,6 +6,13 @@ import split2 from 'split2';
 
 export const UUID4_REGEX = expect.stringMatching(/^[0-9a-f-]+$/);
 
+export const MONGO_ENV_VARS = {
+  MONGO_DB: 'the_db',
+  MONGO_PASSWORD: 'letmein',
+  MONGO_URI: 'mongodb://example.com',
+  MONGO_USER: 'alicia',
+};
+
 export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterable<T> {
   for (const item of array) {
     yield item;

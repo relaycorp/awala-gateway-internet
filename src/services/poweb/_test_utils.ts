@@ -1,14 +1,10 @@
-// tslint:disable:no-let
-
 import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import { arrayToAsyncIterable, mockSpy, PdaChain } from '../../_test_utils';
+import { arrayToAsyncIterable, mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
 import * as privateKeyStore from '../../backingServices/privateKeyStore';
 import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
 import { ParcelStore } from '../parcelStore';
-
-const BASE_ENV_VARS = { MONGO_URI: 'mongodb://example.com' };
 
 export interface FixtureSet extends PdaChain {
   readonly mongooseConnection: Connection;
@@ -55,11 +51,11 @@ export function setUpCommonFixtures(): () => FixtureSet {
   });
   mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
-  const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
+  const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
   beforeEach(() => {
     const gatewayCertificate = certificatePath.publicGatewayCert;
     mockEnvVars({
-      ...BASE_ENV_VARS,
+      ...MONGO_ENV_VARS,
       GATEWAY_KEY_ID: gatewayCertificate.getSerialNumber().toString('base64'),
     });
   });

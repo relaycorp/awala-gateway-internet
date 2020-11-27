@@ -8,6 +8,8 @@ import {
   HTTPMethods,
 } from 'fastify';
 import { Logger } from 'pino';
+
+import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
@@ -67,8 +69,11 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));
 
-  const mongoUri = getEnvVar('MONGO_URI').required().asString();
-  await server.register(require('fastify-mongoose'), { uri: mongoUri });
+  const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
+  await server.register(require('fastify-mongoose'), {
+    ...mongoConnectionArgs.options,
+    uri: mongoConnectionArgs.uri,
+  });
 
   await server.ready();
 

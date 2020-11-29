@@ -13,10 +13,8 @@ spec:
       {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pohttp") .) | nindent 6 }}
   template:
     metadata:
-    {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+        {{- include "relaynet-internet-gateway.podAnnotations" . | nindent 8 }}
       labels:
         {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pohttp") .) | nindent 8 }}
     spec:

@@ -51,6 +51,16 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Pod annotations
+*/}}
+{{- define "relaynet-internet-gateway.podAnnotations" -}}
+{{- if .Values.podAnnotations }}
+{{- toYaml .Values.podAnnotations -}}
+{{ end }}
+automatic-rollout-token: {{ randAlphaNum 5 | quote }}
+{{- end }}
+
+{{/*
 Selector labels
 */}}
 {{- define "relaynet-internet-gateway.selectorLabels" -}}

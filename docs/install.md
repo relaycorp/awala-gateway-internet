@@ -51,6 +51,8 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `nameOverride` | string | | A custom name for the release, to override the one passed to Helm |
+| `image.repository` | string | `ghcr.io/relaycorp/relaynet-internet-gateway` | Docker image for the gateway |
+| `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
 | `resources` | object | `{}` | A custom name `resources` to be attached to the containers |

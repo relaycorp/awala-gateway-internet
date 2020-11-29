@@ -55,15 +55,20 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
-| `resources` | object | `{}` | A custom name `resources` to be attached to the containers |
 | `service.type` | string | `ClusterIP` | The service type for the PoHTTP endpoint |
 | `service.port` | number | `80` | The service port for the PoHTTP endpoint |
 | `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoHTTP endpoint |
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
 | `cogrpcHost` | string | | Domain name for the CogRPC service |
+| `cogrpc.serviceAnnotations` | object | `{}` | Service annotations for the CogRPC service |
+| `cogrpc.resources` | object | `{}` | Container resources for the gRPC server in the CogRPC service |
 | `pohttpHost` | string | | Domain name for the PoHTTP service |
+| `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoHTTP service |
 | `powebHost` | string | | Domain name for the PoWeb service |
+| `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoWeb service |
 | `pdcQueue.replicaCount` | number | 3 | Number of workers (pods) for the PDC queue |
+| `pdcQueue.resources` | object | `{}` | Container resources for the PDC queue |
+| `crcQueue.resources` | object | `{}` | Container resources for the CRC queue |
 | `mongo.uri` | string | | Connection URI for MongoDB |
 | `mongo.db` | string | | MongoDB database name |
 | `mongo.user` | string | | MongoDB user name |

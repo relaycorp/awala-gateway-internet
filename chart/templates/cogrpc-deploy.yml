@@ -56,7 +56,7 @@ spec:
               containerPort: 8080
               protocol: TCP
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.cogrpc.resources | nindent 12 }}
         - name: cogrpc-health-check
           image: salrashid123/grpc_health_proxy:1.0.0
           imagePullPolicy: IfNotPresent
@@ -82,6 +82,13 @@ spec:
           readinessProbe:
             httpGet:
               port: "health-check"
+          resources:
+            requests:
+              cpu: 2m
+              memory: 7Mi
+            limits:
+              cpu: 5m
+              memory: 10Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

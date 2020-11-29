@@ -63,7 +63,7 @@ pohttp:
 
 pdcQueue:
   replicaCount: 3
-  resources: { }
+  resources: {}
 
 cogrpc:
   serviceAnnotations: {}

@@ -82,6 +82,13 @@ spec:
           readinessProbe:
             httpGet:
               port: "health-check"
+          resources:
+            requests:
+              cpu: 2m
+              memory: 7Mi
+            limits:
+              cpu: 5m
+              memory: 10Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

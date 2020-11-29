@@ -5,5 +5,7 @@ metadata:
   annotations:
     "helm.sh/hook": "pre-install"
     "helm.sh/hook-weight": "-5"
+  labels:
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
 data:
   GATEWAY_KEY_ID: {{ default (randAlphaNum 12 | b64enc) .Values.gatewayKeyId | quote }}

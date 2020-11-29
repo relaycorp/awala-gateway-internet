@@ -13,9 +13,7 @@ spec:
     metadata:
       name: "{{ .Release.Name }}-keygen"
       labels:
-        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
-        app.kubernetes.io/instance: {{ .Release.Name | quote }}
-        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        {{- include "relaynet-internet-gateway.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-keygen
       securityContext:

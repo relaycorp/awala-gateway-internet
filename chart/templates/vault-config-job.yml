@@ -4,7 +4,7 @@ kind: Job
 metadata:
   name: {{ include "relaynet-internet-gateway.fullname" . }}-vault-config
   labels:
-  {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "0"
@@ -14,9 +14,7 @@ spec:
     metadata:
       name: "{{ .Release.Name }}-vault-config"
       labels:
-        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
-        app.kubernetes.io/instance: {{ .Release.Name | quote }}
-        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        {{- include "relaynet-internet-gateway.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-vault-config
       securityContext:

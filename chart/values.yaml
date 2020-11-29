@@ -7,8 +7,6 @@ tags:
 
 logLevel: info
 
-replicaCount: 1
-
 image:
   repository: ghcr.io/relaycorp/relaynet-internet-gateway
   # Overrides the image tag whose default is the chart appVersion.
@@ -56,20 +54,24 @@ affinity: {}
 # Gateway
 
 poweb:
+  replicas: 1
   resources: {}
 
 pohttp:
+  replicas: 1
   resources: {}
 
 pdcQueue:
-  replicaCount: 3
+  replicas: 1
   resources: {}
 
 cogrpc:
   serviceAnnotations: {}
+  replicas: 1
   resources: {}
 
 crcQueue:
+  replicas: 1
   resources: {}
 
 # Backing services

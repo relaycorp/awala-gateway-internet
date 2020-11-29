@@ -15,7 +15,7 @@ powebHost: public-gateway-poweb
 cogrpcHost: 127.0.0.1:8082
 
 pdcQueue:
-  replicaCount: 2
+  replicas: 2
 
 mongo:
   uri: mongodb://mongodb

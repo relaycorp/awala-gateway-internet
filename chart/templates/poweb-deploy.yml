@@ -6,7 +6,7 @@ metadata:
     {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "poweb") .) | nindent 4 }}
 spec:
 {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.poweb.replicas }}
 {{- end }}
   selector:
     matchLabels:

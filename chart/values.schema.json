@@ -78,9 +78,9 @@
     },
     "pdcQueue": {
       "type": "object",
-      "required": ["replicaCount"],
+      "required": ["replicas"],
       "properties": {
-        "replicaCount": {
+        "replicas": {
           "type": "number"
         }
       }

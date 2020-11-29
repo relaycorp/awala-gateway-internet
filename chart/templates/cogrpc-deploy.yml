@@ -6,7 +6,7 @@ metadata:
     {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
 spec:
 {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.cogrpc.replicas }}
 {{- end }}
   selector:
     matchLabels:

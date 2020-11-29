@@ -4,7 +4,7 @@ kind: Job
 metadata:
   name: {{ include "relaynet-internet-gateway.fullname" . }}-vault-config
   labels:
-  {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "0"

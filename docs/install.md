@@ -61,13 +61,17 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
 | `cogrpcHost` | string | | Domain name for the CogRPC service |
 | `cogrpc.serviceAnnotations` | object | `{}` | Service annotations for the CogRPC service |
+| `cogrpc.replicas` | number | `1` | Number of servers in CogRPC service |
 | `cogrpc.resources` | object | `{}` | Container resources for the gRPC server in the CogRPC service |
 | `pohttpHost` | string | | Domain name for the PoHTTP service |
-| `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoHTTP service |
+| `pohttp.replicas` | number | `1` | Number of servers in the PoHTTP service |
+| `pohttp.resources` | object | `{}` | Container resources for the HTTP server in the PoHTTP service |
 | `powebHost` | string | | Domain name for the PoWeb service |
+| `poweb.replicas` | number | `1` | Number of servers in the PoWeb service |
 | `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoWeb service |
-| `pdcQueue.replicaCount` | number | 3 | Number of workers (pods) for the PDC queue |
+| `pdcQueue.replicas` | number | `1` | Number of workers (pods) for the PDC queue |
 | `pdcQueue.resources` | object | `{}` | Container resources for the PDC queue |
+| `crcQueue.replicas` | number | `1` | Number of workers (pods) for the CRC queue |
 | `crcQueue.resources` | object | `{}` | Container resources for the CRC queue |
 | `mongo.uri` | string | | Connection URI for MongoDB |
 | `mongo.db` | string | | MongoDB database name |

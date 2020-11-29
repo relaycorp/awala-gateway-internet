@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pdcout") .) | nindent 4 }}
 spec:
-  replicas: {{ .Values.pdcQueue.replicaCount }}
+  replicas: {{ .Values.pdcQueue.replicas }}
   selector:
     matchLabels:
       {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 6 }}

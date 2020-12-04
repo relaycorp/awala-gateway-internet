@@ -49,30 +49,33 @@ nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
-
 # Gateway
 
 poweb:
   replicas: 1
   resources: {}
+  affinity: {}
 
 pohttp:
   replicas: 1
   resources: {}
+  affinity: {}
 
 pdcQueue:
   replicas: 1
   resources: {}
+  affinity: {}
 
 cogrpc:
   serviceAnnotations: {}
   replicas: 1
   resources: {}
+  affinity: {}
 
 crcQueue:
   replicas: 1
   resources: {}
+  affinity: {}
 
 # Backing services
 

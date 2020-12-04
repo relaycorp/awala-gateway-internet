@@ -54,6 +54,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `image.repository` | string | `ghcr.io/relaycorp/relaynet-internet-gateway` | Docker image for the gateway |
 | `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
+| `podAnnotations` | object | `{}` | Annotations to be attached to the pods |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
 | `service.type` | string | `ClusterIP` | The service type for the PoWeb, PoHTTP and CogRPC servers |
 | `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoWeb, PoHTTP and CogRPC servers |

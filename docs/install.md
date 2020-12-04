@@ -46,7 +46,7 @@ helm install \
 
 Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway) for a working example on Google Cloud Platform.
 
-## Configuration options
+## Global options
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -55,24 +55,40 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
-| `service.type` | string | `ClusterIP` | The service type for the PoHTTP endpoint |
-| `service.port` | number | `80` | The service port for the PoHTTP endpoint |
-| `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoHTTP endpoint |
+| `service.type` | string | `ClusterIP` | The service type for the PoWeb, PoHTTP and CogRPC servers |
+| `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoWeb, PoHTTP and CogRPC servers |
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
+
+### Component-specific options
+
+Each gateway component has the following options:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
 | `cogrpcHost` | string | | Domain name for the CogRPC service |
 | `cogrpc.serviceAnnotations` | object | `{}` | Service annotations for the CogRPC service |
 | `cogrpc.replicas` | number | `1` | Number of servers in CogRPC service |
 | `cogrpc.resources` | object | `{}` | Container resources for the gRPC server in the CogRPC service |
+| `cogrpc.affinity` | object | | Affinity settings for CogRPC |
 | `pohttpHost` | string | | Domain name for the PoHTTP service |
 | `pohttp.replicas` | number | `1` | Number of servers in the PoHTTP service |
 | `pohttp.resources` | object | `{}` | Container resources for the HTTP server in the PoHTTP service |
+| `pohttp.affinity` | object | | Affinity settings for PoHTTP |
 | `powebHost` | string | | Domain name for the PoWeb service |
 | `poweb.replicas` | number | `1` | Number of servers in the PoWeb service |
 | `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoWeb service |
+| `poweb.affinity` | object | | Affinity settings for PoWeb |
 | `pdcQueue.replicas` | number | `1` | Number of workers (pods) for the PDC queue |
 | `pdcQueue.resources` | object | `{}` | Container resources for the PDC queue |
+| `pdcQueue.affinity` | object | | Affinity settings for the PDC queue |
 | `crcQueue.replicas` | number | `1` | Number of workers (pods) for the CRC queue |
 | `crcQueue.resources` | object | `{}` | Container resources for the CRC queue |
+| `crcQueue.affinity` | object | | Affinity settings for the CRC queue |
+
+### Backing services
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
 | `mongo.uri` | string | | Connection URI for MongoDB |
 | `mongo.db` | string | | MongoDB database name |
 | `mongo.user` | string | | MongoDB user name |

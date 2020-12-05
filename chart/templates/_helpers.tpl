@@ -81,3 +81,11 @@ Create the name of the service account to use
 {{- define "relaynet-internet-gateway.serviceAccountName" -}}
 {{- include "relaynet-internet-gateway.fullname" . }}
 {{- end }}
+
+{{/*
+Generate digest of a rendered resource template
+*/}}
+{{- define "relaynet-internet-gateway.resourceDigest" -}}
+{{- /* Truncate the digest to avoid making it easy to derive secret values */ -}}
+{{- include (print $.Template.BasePath "/" .fileName) . | sha256sum | trunc 5 }}
+{{- end }}

@@ -11,7 +11,6 @@ data:
   OBJECT_STORE_ENDPOINT: {{ .Values.objectStore.endpoint }}
   OBJECT_STORE_BUCKET: {{ .Values.objectStore.bucket }}
   OBJECT_STORE_ACCESS_KEY_ID: {{ .Values.objectStore.accessKeyId }}
-  OBJECT_STORE_SECRET_KEY: {{ .Values.objectStore.secretKey }}
   OBJECT_STORE_TLS_ENABLED: '{{ .Values.objectStore.tlsEnabled }}'
 
   VAULT_URL: {{ .Values.vault.serverUrl }}

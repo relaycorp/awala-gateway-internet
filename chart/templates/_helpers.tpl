@@ -87,5 +87,5 @@ Generate digest of a rendered resource template
 */}}
 {{- define "relaynet-internet-gateway.resourceDigest" -}}
 {{- /* Truncate the digest to avoid making it easy to derive secret values */ -}}
-{{- include (print $.Template.BasePath "/" .fileName) . | sha256sum | trunc 5 }}
+{{- include (print $.Template.BasePath "/" .fileName) . | sha256sum | trunc 5 | quote }}
 {{- end }}

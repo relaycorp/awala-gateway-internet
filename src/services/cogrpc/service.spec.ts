@@ -625,7 +625,7 @@ describe('collectCargo', () => {
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
       PEER_GATEWAY_ADDRESS,
-      partialPinoLogger({ peerGatewayAddress: PEER_GATEWAY_ADDRESS }),
+      partialPinoLogger({ peerGatewayAddress: PEER_GATEWAY_ADDRESS }) as any,
     );
   });
 

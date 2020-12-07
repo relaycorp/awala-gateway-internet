@@ -15,6 +15,7 @@ import {
   SessionlessEnvelopedData,
   SessionPublicKeyData,
 } from '@relaycorp/relaynet-core';
+import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy, PdaChain } from '../_test_utils';
@@ -58,7 +59,7 @@ mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
 
 //region Mongoose-related fixtures
 
-const MOCK_MONGOOSE_CONNECTION = { what: 'mongooseConnection' };
+const MOCK_MONGOOSE_CONNECTION: Connection = { what: 'mongooseConnection' } as any;
 mockSpy(jest.spyOn(mongo, 'createMongooseConnectionFromEnv'), () => MOCK_MONGOOSE_CONNECTION);
 
 //region Keystore-related fixtures

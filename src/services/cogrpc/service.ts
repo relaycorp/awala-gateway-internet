@@ -3,6 +3,7 @@ import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   Cargo,
   CargoCollectionAuthorization,
+  CargoCollectionRequest,
   CargoMessageStream,
   Gateway,
 } from '@relaycorp/relaynet-core';
@@ -186,6 +187,19 @@ async function collectCargo(
     return;
   }
 
+  let ccr: CargoCollectionRequest;
+  try {
+    const payload = await cca.unwrapPayload(vaultKeyStore);
+    ccr = payload.payload;
+  } catch (err) {
+    ccaAwareLogger.info({ err }, 'Failed to extract Cargo Collection Request');
+    call.emit('error', {
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'Invalid CCA',
+    });
+    return;
+  }
+
   if (await wasCCAFulfilled(cca, mongooseConnection)) {
     ccaAwareLogger.info('Refusing CCA that was already fulfilled');
     call.emit('error', {
@@ -195,13 +209,18 @@ async function collectCargo(
     return;
   }
 
-  // tslint:disable-next-line:no-let
   let cargoesCollected = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
     const gateway = new Gateway(vaultKeyStore, publicKeyStore);
-    yield* await gateway.generateCargoes(messages, cca.senderCertificate, currentKeyId);
+    const { privateKey } = await vaultKeyStore.fetchNodeKey(currentKeyId);
+    yield* await gateway.generateCargoes(
+      messages,
+      cca.senderCertificate,
+      privateKey,
+      ccr.cargoDeliveryAuthorization,
+    );
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {

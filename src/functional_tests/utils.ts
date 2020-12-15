@@ -13,11 +13,9 @@ import { get as getEnvVar } from 'env-var';
 import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
-import { PdaChain } from '../_test_utils';
+import { ExternalPdaChain } from '../_test_utils';
 import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { GW_POWEB_LOCAL_PORT } from './services';
-
-export type ExternalPdaChain = Omit<PdaChain, 'publicGatewayPrivateKey'>;
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 

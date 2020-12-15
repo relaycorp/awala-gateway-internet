@@ -1,8 +1,20 @@
-import { Certificate } from '@relaycorp/relaynet-core';
+import {
+  CargoCollectionAuthorization,
+  CargoCollectionRequest,
+  Certificate,
+  issueDeliveryAuthorization,
+  issueGatewayCertificate,
+  SessionlessEnvelopedData,
+} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
 import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
+
+import { reSerializeCertificate } from './services/_test_utils';
+
+export const TOMORROW = new Date();
+TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const UUID4_REGEX = expect.stringMatching(/^[0-9a-f-]+$/);
 
@@ -30,6 +42,15 @@ export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promi
 
 export function arrayBufferFrom(value: string): ArrayBuffer {
   return bufferToArray(Buffer.from(value));
+}
+
+export async function getPromiseRejection<E extends Error>(promise: Promise<any>): Promise<E> {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected project to reject');
 }
 
 // tslint:disable-next-line:readonly-array
@@ -95,17 +116,6 @@ export function partialPinoLog(level: pino.Level, message: string, extraAttribut
   });
 }
 
-export interface PdaChain {
-  readonly publicGatewayCert: Certificate;
-  readonly publicGatewayPrivateKey: CryptoKey;
-  readonly privateGatewayCert: Certificate;
-  readonly privateGatewayPrivateKey: CryptoKey;
-  readonly peerEndpointCert: Certificate;
-  readonly peerEndpointPrivateKey: CryptoKey;
-  readonly pdaCert: Certificate;
-  readonly pdaGranteePrivateKey: CryptoKey;
-}
-
 function makeSHA256Hash(plaintext: BinaryLike): Hash {
   return createHash('sha256').update(plaintext);
 }
@@ -134,4 +144,59 @@ export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => As
       }
     }
   };
+}
+
+export interface CDAChain {
+  readonly publicGatewayCert: Certificate;
+  readonly privateGatewayCert: Certificate;
+}
+
+export interface ExternalPdaChain extends CDAChain {
+  readonly privateGatewayPrivateKey: CryptoKey;
+  readonly peerEndpointCert: Certificate;
+  readonly peerEndpointPrivateKey: CryptoKey;
+  readonly pdaCert: Certificate;
+  readonly pdaGranteePrivateKey: CryptoKey;
+}
+
+export interface PdaChain extends ExternalPdaChain {
+  readonly publicGatewayPrivateKey: CryptoKey;
+}
+
+export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAChain> {
+  const privateGatewayCert = reSerializeCertificate(
+    await issueGatewayCertificate({
+      issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
+      subjectPublicKey: await pdaChain.privateGatewayCert.getPublicKey(),
+      validityEndDate: pdaChain.privateGatewayCert.expiryDate,
+    }),
+  );
+  const publicGatewayCert = reSerializeCertificate(
+    await issueDeliveryAuthorization({
+      issuerCertificate: privateGatewayCert,
+      issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
+      subjectPublicKey: await pdaChain.publicGatewayCert.getPublicKey(),
+      validityEndDate: TOMORROW,
+    }),
+  );
+  return { privateGatewayCert, publicGatewayCert };
+}
+
+export async function generateCCA(
+  recipientAddress: string,
+  chain: CDAChain,
+  publicGatewaySelfIssuedCertificate: Certificate,
+  privateGatewayPrivateKey: CryptoKey,
+): Promise<Buffer> {
+  const ccr = new CargoCollectionRequest(chain.publicGatewayCert);
+  const ccaPayload = await SessionlessEnvelopedData.encrypt(
+    ccr.serialize(),
+    publicGatewaySelfIssuedCertificate,
+  );
+  const cca = new CargoCollectionAuthorization(
+    recipientAddress,
+    chain.privateGatewayCert,
+    Buffer.from(await ccaPayload.serialize()),
+  );
+  return Buffer.from(await cca.serialize(privateGatewayPrivateKey));
 }

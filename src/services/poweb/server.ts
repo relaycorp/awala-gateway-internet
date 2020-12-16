@@ -2,7 +2,7 @@ import { UnboundKeyPair } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
-import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
+import { initVaultKeyStore } from '../../backingServices/keyStores';
 import { configureFastify, FastifyLogger } from '../fastifyUtils';
 import healthcheck from './healthcheck';
 import parcelCollection from './parcelCollection';

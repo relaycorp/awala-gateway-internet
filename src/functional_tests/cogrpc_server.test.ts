@@ -1,4 +1,3 @@
-// tslint:disable:no-let
 import { CogRPCClient, CogRPCError } from '@relaycorp/cogrpc';
 import {
   Cargo,
@@ -6,12 +5,21 @@ import {
   generateRSAKeyPair,
   issueGatewayCertificate,
   Parcel,
+  RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
+import grpc from 'grpc';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 
-import { asyncIterableToArray } from '../_test_utils';
+import {
+  asyncIterableToArray,
+  ExternalPdaChain,
+  generateCCA,
+  generateCDAChain,
+  getPromiseRejection,
+} from '../_test_utils';
+import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_GOGRPC_URL, GW_POHTTP_URL } from './services';
 import { arrayToIterable, connectToNatsStreaming, generatePdaChain, sleep } from './utils';
 
@@ -68,29 +76,21 @@ describe('Cargo delivery', () => {
 describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
     const pdaChain = await generatePdaChain();
-    const parcel = new Parcel(
-      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
-      pdaChain.pdaCert,
-      Buffer.from([]),
-      { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
-    );
-    const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
+    const parcelSerialized = await generateDummyParcel(pdaChain);
     await deliverParcel(GW_POHTTP_URL, parcelSerialized);
+
     await sleep(1);
 
-    const cca = new CargoCollectionAuthorization(
+    const ccaSerialized = await generateCCA(
       GW_GOGRPC_URL,
-      pdaChain.privateGatewayCert,
-      Buffer.from([]),
+      await generateCDAChain(pdaChain),
+      pdaChain.publicGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
     );
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
     let collectedCargoes: readonly Buffer[];
     try {
-      collectedCargoes = await asyncIterableToArray(
-        cogrpcClient.collectCargo(
-          Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey)),
-        ),
-      );
+      collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
     } finally {
       cogrpcClient.close();
     }
@@ -104,10 +104,36 @@ describe('Cargo collection', () => {
     const { payload: cargoMessageSet } = await cargo.unwrapPayload(
       pdaChain.privateGatewayPrivateKey,
     );
-    await expect(Array.from(cargoMessageSet.messages)).toEqual([parcelSerialized]);
+    expect(cargoMessageSet.messages).toHaveLength(1);
+    expectBuffersToEqual(cargoMessageSet.messages[0], parcelSerialized);
   });
 
-  test('Unauthorized CCA should return zero cargoes', async () => {
+  test('Cargo should be signed with Cargo Delivery Authorization', async () => {
+    const pdaChain = await generatePdaChain();
+    await deliverParcel(GW_POHTTP_URL, await generateDummyParcel(pdaChain));
+
+    await sleep(1);
+
+    const cdaChain = await generateCDAChain(pdaChain);
+    const ccaSerialized = await generateCCA(
+      GW_GOGRPC_URL,
+      cdaChain,
+      pdaChain.publicGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
+    );
+    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    let collectedCargoes: readonly Buffer[];
+    try {
+      collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
+    } finally {
+      cogrpcClient.close();
+    }
+
+    const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
+    await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
+  });
+
+  test('Unauthorized CCA should be refused', async () => {
     const unauthorizedSenderKeyPair = await generateRSAKeyPair();
     const unauthorizedCertificate = await issueGatewayCertificate({
       issuerPrivateKey: unauthorizedSenderKeyPair.privateKey,
@@ -123,9 +149,10 @@ describe('Cargo collection', () => {
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
     try {
-      await expect(
+      const error = await getPromiseRejection<CogRPCError>(
         asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-      ).resolves.toHaveLength(0);
+      );
+      expect(error.cause()).toHaveProperty('code', grpc.status.UNAUTHENTICATED);
     } finally {
       cogrpcClient.close();
     }
@@ -133,24 +160,36 @@ describe('Cargo collection', () => {
 
   test('CCAs should not be reusable', async () => {
     const pdaChain = await generatePdaChain();
-    const cca = new CargoCollectionAuthorization(
+    const cdaChain = await generateCDAChain(pdaChain);
+    const ccaSerialized = await generateCCA(
       GW_GOGRPC_URL,
-      pdaChain.privateGatewayCert,
-      Buffer.from([]),
+      cdaChain,
+      pdaChain.publicGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
     );
-    const ccaSerialized = Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey));
 
     const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
     try {
       await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
-      await expect(
+      const error = await getPromiseRejection<CogRPCError>(
         asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-      ).rejects.toBeInstanceOf(CogRPCError);
+      );
+      expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
     } finally {
       cogrpcClient.close();
     }
   });
 });
+
+async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<ArrayBuffer> {
+  const parcel = new Parcel(
+    await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    pdaChain.pdaCert,
+    Buffer.from([]),
+    { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
+  );
+  return parcel.serialize(pdaChain.pdaGranteePrivateKey);
+}
 
 async function getLastQueueMessage(): Promise<Buffer | undefined> {
   const stanConnection = await connectToNatsStreaming();

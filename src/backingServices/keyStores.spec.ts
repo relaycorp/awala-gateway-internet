@@ -1,7 +1,9 @@
 import * as vaultKeyStore from '@relaycorp/keystore-vault';
+import { Connection } from 'mongoose';
 
 import { configureMockEnvVars } from '../services/_test_utils';
-import { initVaultKeyStore } from './privateKeyStore';
+import { MongoPublicKeyStore } from '../services/MongoPublicKeyStore';
+import { initMongoDBKeyStore, initVaultKeyStore } from './keyStores';
 
 jest.mock('@relaycorp/keystore-vault');
 
@@ -31,5 +33,15 @@ describe('initVaultKeyStore', () => {
       BASE_ENV_VARS.VAULT_TOKEN,
       BASE_ENV_VARS.VAULT_KV_PREFIX,
     );
+  });
+});
+
+describe('initMongoDBKeyStore', () => {
+  const mongooseConnection = ({ model: { bind: jest.fn() } } as any) as Connection;
+
+  test('MongoPublicKeyStore instance should be returned', () => {
+    const keyStore = initMongoDBKeyStore(mongooseConnection);
+
+    expect(keyStore).toBeInstanceOf(MongoPublicKeyStore);
   });
 });

@@ -2,7 +2,6 @@ import { CogRPCClient } from '@relaycorp/cogrpc';
 import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   Cargo,
-  CargoCollectionAuthorization,
   CargoMessageSet,
   Certificate,
   issueDeliveryAuthorization,
@@ -19,9 +18,15 @@ import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
-import { asyncIterableToArray, iterableTake } from '../_test_utils';
+import {
+  asyncIterableToArray,
+  ExternalPdaChain,
+  generateCCA,
+  generateCDAChain,
+  iterableTake,
+} from '../_test_utils';
 import { GW_GOGRPC_URL, GW_POWEB_LOCAL_PORT, PONG_ENDPOINT_ADDRESS } from './services';
-import { arrayToIterable, ExternalPdaChain, generatePdaChain, IS_GITHUB, sleep } from './utils';
+import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep } from './utils';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
@@ -64,14 +69,14 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
 
 test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
-  const gwPDAChain = await generatePdaChain();
+  const pdaChain = await generatePdaChain();
 
   const pingId = Buffer.from(uuid());
   const pingParcelData = await makePingParcel(
     pingId,
     pongEndpointSessionCertificate.identityCert,
     pongEndpointSessionCertificate.sessionCert,
-    gwPDAChain,
+    pdaChain,
   );
 
   const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
@@ -79,7 +84,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     // Deliver the ping message encapsulated in a cargo
     const cargoSerialized = await encapsulateParcelsInCargo(
       [pingParcelData.parcelSerialized],
-      gwPDAChain,
+      pdaChain,
     );
     await asyncIterableToArray(
       cogRPCClient.deliverCargo(
@@ -90,11 +95,16 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     await sleep(IS_GITHUB ? 4 : 2);
 
     // Collect the pong message encapsulated in a cargo
-    const collectedCargoes = await asyncIterableToArray(
-      cogRPCClient.collectCargo(await makeCCA(gwPDAChain)),
+    const cdaChain = await generateCDAChain(pdaChain);
+    const ccaSerialized = await generateCCA(
+      GW_GOGRPC_URL,
+      cdaChain,
+      pdaChain.publicGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
     );
+    const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
     expect(collectedCargoes).toHaveLength(1);
-    const collectedMessages = await extractMessagesFromCargo(collectedCargoes[0], gwPDAChain);
+    const collectedMessages = await extractMessagesFromCargo(collectedCargoes[0], pdaChain);
     expect(collectedMessages).toHaveLength(2);
     expect(ParcelCollectionAck.deserialize(collectedMessages[0])).toHaveProperty(
       'parcelId',
@@ -198,15 +208,6 @@ async function encapsulateParcelsInCargo(
     Buffer.from(messageSetCiphertext.serialize()),
   );
   return Buffer.from(await cargo.serialize(gwPDAChain.privateGatewayPrivateKey));
-}
-
-async function makeCCA(gwPDAChain: ExternalPdaChain): Promise<Buffer> {
-  const cca = new CargoCollectionAuthorization(
-    GW_GOGRPC_URL,
-    gwPDAChain.privateGatewayCert,
-    Buffer.from([]),
-  );
-  return Buffer.from(await cca.serialize(gwPDAChain.privateGatewayPrivateKey));
 }
 
 async function extractMessagesFromCargo(

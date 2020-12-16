@@ -12,7 +12,7 @@ const NETLOC = '0.0.0.0:8080';
 
 const MAX_RECEIVED_MESSAGE_LENGTH = MAX_RAMF_MESSAGE_SIZE + 256; // Include protobuf overhead
 const MAX_CONCURRENT_CALLS = 3;
-const MAX_METADATA_SIZE = 4_000; // ~2.8 kib for a base64-encoded CCA + overhead
+const MAX_METADATA_SIZE = 6_000; // ~4.9 kib for a base64-encoded CCA + overhead
 const MAX_CONNECTION_AGE_MINUTES = 15;
 const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
 const MAX_CONNECTION_IDLE_SECONDS = 5;

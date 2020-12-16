@@ -14,10 +14,10 @@ import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 import pino from 'pino';
 
+import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
-import { initVaultKeyStore } from '../backingServices/privateKeyStore';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 

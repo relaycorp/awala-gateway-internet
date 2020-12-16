@@ -15,13 +15,12 @@ import { Logger } from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
+import { initMongoDBKeyStore, initVaultKeyStore } from '../../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../../backingServices/objectStorage';
-import { initVaultKeyStore } from '../../backingServices/privateKeyStore';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
-import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
 import { generatePCAs } from '../parcelCollection';
 import { ParcelObject, ParcelStore } from '../parcelStore';
 
@@ -187,10 +186,12 @@ async function collectCargo(
     return;
   }
 
+  const publicKeyStore = initMongoDBKeyStore(mongooseConnection);
+  const gateway = new Gateway(vaultKeyStore, publicKeyStore);
+
   let ccr: CargoCollectionRequest;
   try {
-    const payload = await cca.unwrapPayload(vaultKeyStore);
-    ccr = payload.payload;
+    ccr = await gateway.unwrapMessagePayload(cca);
   } catch (err) {
     ccaAwareLogger.info({ err }, 'Failed to extract Cargo Collection Request');
     call.emit('error', {
@@ -212,8 +213,6 @@ async function collectCargo(
   let cargoesCollected = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    const publicKeyStore = new MongoPublicKeyStore(mongooseConnection);
-    const gateway = new Gateway(vaultKeyStore, publicKeyStore);
     const { privateKey } = await vaultKeyStore.fetchNodeKey(currentKeyId);
     yield* await gateway.generateCargoes(
       messages,

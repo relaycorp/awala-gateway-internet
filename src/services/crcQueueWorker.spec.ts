@@ -19,10 +19,10 @@ import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
 import { mockPino, mockSpy, PdaChain } from '../_test_utils';
+import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { ObjectStoreClient } from '../backingServices/objectStorage';
-import * as privateKeyStore from '../backingServices/privateKeyStore';
 import {
   castMock,
   configureMockEnvVars,

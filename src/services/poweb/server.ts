@@ -31,6 +31,7 @@ export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstanc
       keyPairRetriever: makeKeyPairRetriever(),
     },
     logger,
+    'poweb',
   );
 }
 

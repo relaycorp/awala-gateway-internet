@@ -57,6 +57,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
   logger: FastifyLogger = true,
+  mongoAppName?: string,
 ): Promise<FastifyInstance> {
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_SIZE,
@@ -72,7 +73,8 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   server.log.debug('Before configuring fastify-mongoose');
   await server.register(require('fastify-mongoose'), {
     ...mongoConnectionArgs.options,
-    logLevel: "debug",
+    appname: `relaynet-internet-gateway${mongoAppName ? `-${mongoAppName}` : ''}`,
+    logLevel: 'debug',
     socketTimeoutMS: 5_000,
     uri: mongoConnectionArgs.uri,
   });

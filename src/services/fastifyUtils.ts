@@ -83,6 +83,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   });
   server.log.debug('Before listening for Mongoose events');
   const mongooseConnection = (server as any).mongo.db as Connection;
+  (mongooseConnection as any).set('debug', true);
   mongooseConnection.on('connecting', () => {
     server.log.debug('Mongoose connecting');
   });

@@ -77,9 +77,10 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
     bufferCommands: false,
     bufferMaxEntries: 0,
     connectTimeoutMS: 10_000,
-    maxIdleTimeMS: 5 * 60_000,
+    maxIdleTimeMS: 60_000,
     socketTimeoutMS: 5_000,
     uri: mongoConnectionArgs.uri,
+    waitQueueTimeoutMS: 5_000,
   });
   server.log.debug('Before listening for Mongoose events');
   const mongooseConnection = (server as any).mongo.db as Connection;

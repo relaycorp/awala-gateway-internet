@@ -74,6 +74,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   await server.register(require('fastify-mongoose'), {
     ...mongoConnectionArgs.options,
     appname: `relaynet-internet-gateway${mongoAppName ? `-${mongoAppName}` : ''}`,
+    bufferCommands: false,
     logLevel: 'debug',
     maxIdleTimeMS: 5 * 60_000,
     socketTimeoutMS: 5_000,

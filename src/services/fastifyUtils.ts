@@ -75,6 +75,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
     ...mongoConnectionArgs.options,
     appname: `relaynet-internet-gateway${mongoAppName ? `-${mongoAppName}` : ''}`,
     logLevel: 'debug',
+    maxIdleTimeMS: 5 * 60_000,
     socketTimeoutMS: 5_000,
     uri: mongoConnectionArgs.uri,
   });

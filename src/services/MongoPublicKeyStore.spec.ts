@@ -70,7 +70,7 @@ describe('fetchKey', () => {
     });
   });
 
-  test('Exiting key should be returned', async () => {
+  test('Existing key should be returned', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
     const key = await store.fetchLastSessionKey(PEER_CERTIFICATE);

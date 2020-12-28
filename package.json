@@ -76,7 +76,7 @@
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "aws-sdk": "^2.814.0",
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^7.0.0",
     "fastify": "^3.9.2",

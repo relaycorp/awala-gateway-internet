@@ -81,6 +81,7 @@ Each gateway component has the following options:
 | `pdcQueue.replicas` | number | `1` | Number of workers (pods) for the PDC queue |
 | `pdcQueue.resources` | object | `{}` | Container resources for the PDC queue |
 | `pdcQueue.affinity` | object | | Affinity settings for the PDC queue |
+| `pdcQueue.pohttpAddress` | string | | Override the public address sent by the PDC queue when delivering parcels (unlikely to be needed outside testing) |
 | `crcQueue.replicas` | number | `1` | Number of workers (pods) for the CRC queue |
 | `crcQueue.resources` | object | `{}` | Container resources for the CRC queue |
 | `crcQueue.affinity` | object | | Affinity settings for the CRC queue |

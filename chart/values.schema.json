@@ -82,21 +82,15 @@
     "publicAddress": {
       "type": "string"
     },
-    "cogrpcHost": {
-      "type": "string"
-    },
-    "pohttpHost": {
-      "type": "string"
-    },
-    "powebHost": {
-      "type": "string"
-    },
     "pdcQueue": {
       "type": "object",
       "required": ["replicas"],
       "properties": {
         "replicas": {
           "type": "number"
+        },
+        "pohttpAddress": {
+          "type": "string"
         }
       }
     },

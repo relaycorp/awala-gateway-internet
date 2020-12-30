@@ -35,7 +35,7 @@ export interface ServiceImplementationOptions {
   readonly parcelStoreBucket: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
-  readonly cogrpcAddress: string;
+  readonly publicAddress: string;
 }
 
 export async function makeServiceImplementation(
@@ -79,7 +79,7 @@ export async function makeServiceImplementation(
       await collectCargo(
         call,
         mongooseConnection,
-        options.cogrpcAddress,
+        options.publicAddress,
         currentKeyId,
         parcelStore,
         vaultKeyStore,
@@ -152,7 +152,7 @@ async function deliverCargo(
 async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongooseConnection: Connection,
-  ownCogrpcAddress: string,
+  ownPublicAddress: string,
   currentKeyId: Buffer,
   parcelStore: ParcelStore,
   vaultKeyStore: VaultPrivateKeyStore,
@@ -174,7 +174,22 @@ async function collectCargo(
   const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
   const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
-  if (cca.recipientAddress !== ownCogrpcAddress) {
+  let ccaRecipientURL: URL | null = null;
+  try {
+    ccaRecipientURL = new URL(cca.recipientAddress);
+  } catch (err) {
+    ccaAwareLogger.info(
+      { ccaRecipientAddress: cca.recipientAddress },
+      'Refusing CCA with malformed recipient',
+    );
+    call.emit('error', {
+      code: grpc.status.INVALID_ARGUMENT,
+      message: 'CCA recipient is malformed',
+    });
+    return;
+  }
+
+  if (ccaRecipientURL.hostname !== ownPublicAddress) {
     ccaAwareLogger.info(
       { ccaRecipientAddress: cca.recipientAddress },
       'Refusing CCA bound for another gateway',

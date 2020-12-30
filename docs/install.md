@@ -8,13 +8,11 @@ The Relaynet-Internet Gateway is distributed as a Helm chart. Note that deployin
 
 ## Example
 
-At a minimum, you have to specify the domain names for the services and the connection settings for the backing services; e.g.:
+At a minimum, you have to specify the public address and the connection settings for the backing services; e.g.:
 
 ```yaml
 # values.yaml
-cogrpcHost: gogrpc.eu.relaycorp.tech
-pohttpHost: pohttp.eu.relaycorp.tech
-powebHost: poweb.eu.relaycorp.tech
+publicAddress: eu.relaycorp.tech
 mongo:
   uri: mongodb+srv://foo.gcp.mongodb.net
   db: db
@@ -57,6 +55,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `podAnnotations` | object | `{}` | Annotations to be attached to the pods |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
 | `service.type` | string | `ClusterIP` | The service type for the PoWeb, PoHTTP and CogRPC servers |
+| `publicAddress` | string | | The public address of this gateway |
 | `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoWeb, PoHTTP and CogRPC servers |
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
 
@@ -66,16 +65,16 @@ Each gateway component has the following options:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `cogrpcHost` | string | | Domain name for the CogRPC service |
+| `ingress.serviceDomains.cogrpc` | string | `cogrpc.${publicAddress}` | Domain name for the CogRPC service |
 | `cogrpc.serviceAnnotations` | object | `{}` | Service annotations for the CogRPC service |
 | `cogrpc.replicas` | number | `1` | Number of servers in CogRPC service |
 | `cogrpc.resources` | object | `{}` | Container resources for the gRPC server in the CogRPC service |
 | `cogrpc.affinity` | object | | Affinity settings for CogRPC |
-| `pohttpHost` | string | | Domain name for the PoHTTP service |
+| `ingress.serviceDomains.pohttp` | string | `pohttp.${publicAddress}` | Domain name for the PoHTTP service |
 | `pohttp.replicas` | number | `1` | Number of servers in the PoHTTP service |
 | `pohttp.resources` | object | `{}` | Container resources for the HTTP server in the PoHTTP service |
 | `pohttp.affinity` | object | | Affinity settings for PoHTTP |
-| `powebHost` | string | | Domain name for the PoWeb service |
+| `ingress.serviceDomains.poweb` | string | `poweb.${publicAddress}` | Domain name for the PoWeb service |
 | `poweb.replicas` | number | `1` | Number of servers in the PoWeb service |
 | `poweb.resources` | object | `{}` | Container resources for the HTTP server in the PoWeb service |
 | `poweb.affinity` | object | | Affinity settings for PoWeb |

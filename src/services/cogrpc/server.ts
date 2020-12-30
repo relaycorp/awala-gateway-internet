@@ -19,7 +19,7 @@ const MAX_CONNECTION_IDLE_SECONDS = 5;
 
 export async function runServer(logger?: Logger): Promise<void> {
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
-  const cogrpcAddress = getEnvVar('COGRPC_ADDRESS').required().asString();
+  const publicAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
   const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
@@ -36,11 +36,11 @@ export async function runServer(logger?: Logger): Promise<void> {
   const baseLogger = logger ?? pino();
   const serviceImplementation = await makeServiceImplementation({
     baseLogger,
-    cogrpcAddress,
     gatewayKeyIdBase64,
     natsClusterId,
     natsServerUrl,
     parcelStoreBucket,
+    publicAddress,
   });
   server.addService(CargoRelayService, serviceImplementation);
 

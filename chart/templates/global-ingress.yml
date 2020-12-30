@@ -14,24 +14,24 @@ spec:
   {{- if .Values.ingress.enableTls }}
   tls:
     - hosts:
-      - {{ .Values.pohttpHost | quote }}
-      - {{ .Values.powebHost | quote }}
-      - {{ .Values.cogrpcHost | quote }}
+      - {{ include "relaynet-internet-gateway.pohttpHost" . }}
+      - {{ include "relaynet-internet-gateway.powebHost" . }}
+      - {{ include "relaynet-internet-gateway.cogrpcHost" . }}
   {{- end }}
   rules:
-    - host: {{ .Values.pohttpHost | quote }}
+    - host: {{ include "relaynet-internet-gateway.pohttpHost" . }}
       http:
         paths:
           - backend:
               serviceName: {{ $fullName }}-pohttp
               servicePort: http
-    - host: {{ .Values.powebHost | quote }}
+    - host: {{ include "relaynet-internet-gateway.powebHost" . }}
       http:
         paths:
           - backend:
               serviceName: {{ $fullName }}-poweb
               servicePort: poweb
-    - host: {{ .Values.cogrpcHost | quote }}
+    - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
       http:
         paths:
           - backend:

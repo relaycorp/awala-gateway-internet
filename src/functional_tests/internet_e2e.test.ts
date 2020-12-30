@@ -29,7 +29,7 @@ import {
   GW_COGRPC_URL,
   GW_POWEB_LOCAL_PORT,
   GW_PUBLIC_ADDRESS_URL,
-  PONG_ENDPOINT_ADDRESS
+  PONG_ENDPOINT_ADDRESS,
 } from './services';
 import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep } from './utils';
 

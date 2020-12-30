@@ -20,7 +20,7 @@ import {
   getPromiseRejection,
 } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
-import { GW_GOGRPC_URL, GW_POHTTP_URL } from './services';
+import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
 import { arrayToIterable, connectToNatsStreaming, generatePdaChain, sleep } from './utils';
 
 const TOMORROW = new Date();
@@ -29,11 +29,11 @@ TOMORROW.setDate(TOMORROW.getDate() + 1);
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
     const pdaChain = await generatePdaChain();
-    const cargo = new Cargo(GW_GOGRPC_URL, pdaChain.privateGatewayCert, Buffer.from([]));
+    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from([]));
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
     const deliveryId = 'random-delivery-id';
-    const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
     try {
       const ackDeliveryIds = await cogRPCClient.deliverCargo(
         arrayToIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
@@ -54,12 +54,12 @@ describe('Cargo delivery', () => {
       validityEndDate: TOMORROW,
     });
 
-    const cargo = new Cargo(GW_GOGRPC_URL, unauthorizedCertificate, Buffer.from([]));
+    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, unauthorizedCertificate, Buffer.from([]));
     const cargoSerialized = Buffer.from(
       await cargo.serialize(unauthorizedSenderKeyPair.privateKey),
     );
 
-    const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
     try {
       await asyncIterableToArray(
         await cogRPCClient.deliverCargo(
@@ -82,12 +82,12 @@ describe('Cargo collection', () => {
     await sleep(1);
 
     const ccaSerialized = await generateCCA(
-      GW_GOGRPC_URL,
+      GW_PUBLIC_ADDRESS_URL,
       await generateCDAChain(pdaChain),
       pdaChain.publicGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
     let collectedCargoes: readonly Buffer[];
     try {
       collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
@@ -116,12 +116,12 @@ describe('Cargo collection', () => {
 
     const cdaChain = await generateCDAChain(pdaChain);
     const ccaSerialized = await generateCCA(
-      GW_GOGRPC_URL,
+      GW_PUBLIC_ADDRESS_URL,
       cdaChain,
       pdaChain.publicGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
     let collectedCargoes: readonly Buffer[];
     try {
       collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
@@ -142,12 +142,12 @@ describe('Cargo collection', () => {
     });
 
     const cca = new CargoCollectionAuthorization(
-      GW_GOGRPC_URL,
+      GW_PUBLIC_ADDRESS_URL,
       unauthorizedCertificate,
       Buffer.from([]),
     );
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
-    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
     try {
       const error = await getPromiseRejection<CogRPCError>(
         asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
@@ -162,13 +162,13 @@ describe('Cargo collection', () => {
     const pdaChain = await generatePdaChain();
     const cdaChain = await generateCDAChain(pdaChain);
     const ccaSerialized = await generateCCA(
-      GW_GOGRPC_URL,
+      GW_PUBLIC_ADDRESS_URL,
       cdaChain,
       pdaChain.publicGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
 
-    const cogrpcClient = await CogRPCClient.init(GW_GOGRPC_URL);
+    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
     try {
       await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
       const error = await getPromiseRejection<CogRPCError>(

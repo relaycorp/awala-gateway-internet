@@ -25,7 +25,12 @@ import {
   generateCDAChain,
   iterableTake,
 } from '../_test_utils';
-import { GW_GOGRPC_URL, GW_POWEB_LOCAL_PORT, PONG_ENDPOINT_ADDRESS } from './services';
+import {
+  GW_COGRPC_URL,
+  GW_POWEB_LOCAL_PORT,
+  GW_PUBLIC_ADDRESS_URL,
+  PONG_ENDPOINT_ADDRESS,
+} from './services';
 import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep } from './utils';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
@@ -79,7 +84,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     pdaChain,
   );
 
-  const cogRPCClient = await CogRPCClient.init(GW_GOGRPC_URL);
+  const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
   try {
     // Deliver the ping message encapsulated in a cargo
     const cargoSerialized = await encapsulateParcelsInCargo(
@@ -97,7 +102,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     // Collect the pong message encapsulated in a cargo
     const cdaChain = await generateCDAChain(pdaChain);
     const ccaSerialized = await generateCCA(
-      GW_GOGRPC_URL,
+      GW_PUBLIC_ADDRESS_URL,
       cdaChain,
       pdaChain.publicGatewayCert,
       pdaChain.privateGatewayPrivateKey,
@@ -203,7 +208,7 @@ async function encapsulateParcelsInCargo(
     gwPDAChain.publicGatewayCert,
   );
   const cargo = new Cargo(
-    GW_GOGRPC_URL,
+    GW_PUBLIC_ADDRESS_URL,
     gwPDAChain.privateGatewayCert,
     Buffer.from(messageSetCiphertext.serialize()),
   );

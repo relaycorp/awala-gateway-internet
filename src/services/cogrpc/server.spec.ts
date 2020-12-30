@@ -1,5 +1,3 @@
-/* tslint:disable:no-let */
-
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpc from 'grpc';
 import * as grpcHealthCheck from 'grpc-health-check';
@@ -35,11 +33,11 @@ const mockSelfSignedOutput = {
 const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSelfSignedOutput);
 
 const BASE_ENV_VARS = {
-  COGRPC_ADDRESS: 'https://cogrpc.example.com/',
   GATEWAY_KEY_ID: 'base64-encoded key id',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
   OBJECT_STORE_BUCKET: 'bucket-name',
+  PUBLIC_ADDRESS: 'gateway.com',
   SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
@@ -49,8 +47,8 @@ describe('runServer', () => {
     'GATEWAY_KEY_ID',
     'NATS_SERVER_URL',
     'NATS_CLUSTER_ID',
-    'COGRPC_ADDRESS',
     'OBJECT_STORE_BUCKET',
+    'PUBLIC_ADDRESS',
     'SERVER_IP_ADDRESS',
   ])('Environment variable %s should be present', async (envVar) => {
     mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
@@ -117,11 +115,11 @@ describe('runServer', () => {
         debug: expect.anything(),
         error: expect.anything(),
       }),
-      cogrpcAddress: BASE_ENV_VARS.COGRPC_ADDRESS,
       gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
       parcelStoreBucket: BASE_ENV_VARS.OBJECT_STORE_BUCKET,
+      publicAddress: BASE_ENV_VARS.PUBLIC_ADDRESS,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

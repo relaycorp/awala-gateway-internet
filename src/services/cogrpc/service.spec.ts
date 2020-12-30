@@ -57,7 +57,8 @@ import { makeServiceImplementation, ServiceImplementationOptions } from './servi
 
 //region Fixtures
 
-const COGRPC_ADDRESS = 'https://cogrpc.example.com/';
+const PUBLIC_ADDRESS = 'gateway.com';
+const PUBLIC_ADDRESS_URL = `https://${PUBLIC_ADDRESS}`;
 const OBJECT_STORE_BUCKET = 'parcels-bucket';
 const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
@@ -97,11 +98,11 @@ beforeEach(() => {
   MOCK_LOGS = mockLogging.logs;
   SERVICE_IMPLEMENTATION_OPTIONS = {
     baseLogger: mockLogging.logger,
-    cogrpcAddress: COGRPC_ADDRESS,
     gatewayKeyIdBase64: pdaChain.publicGatewayCert.getSerialNumber().toString('base64'),
     natsClusterId: NATS_CLUSTER_ID,
     natsServerUrl: NATS_SERVER_URL,
     parcelStoreBucket: OBJECT_STORE_BUCKET,
+    publicAddress: PUBLIC_ADDRESS,
   };
 });
 
@@ -150,7 +151,7 @@ describe('deliverCargo', () => {
   let CARGO: Cargo;
   let CARGO_SERIALIZATION: Buffer;
   beforeAll(async () => {
-    CARGO = new Cargo(COGRPC_ADDRESS, pdaChain.privateGatewayCert, Buffer.from('payload'));
+    CARGO = new Cargo(PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from('payload'));
     CARGO_SERIALIZATION = Buffer.from(await CARGO.serialize(pdaChain.privateGatewayPrivateKey));
   });
 
@@ -238,7 +239,7 @@ describe('deliverCargo', () => {
     test('Well-formed yet invalid message should be ACKd but discarded', async () => {
       // The invalid message is followed by a valid one to check that processing continues
       const invalidCargo = new Cargo(
-        COGRPC_ADDRESS,
+        PUBLIC_ADDRESS_URL,
         pdaChain.peerEndpointCert,
         Buffer.from('payload'),
       );
@@ -473,7 +474,7 @@ describe('collectCargo', () => {
   let ccaSerialized: Buffer;
   beforeAll(async () => {
     ccaSerialized = await generateCCA(
-      COGRPC_ADDRESS,
+      PUBLIC_ADDRESS_URL,
       cdaChain,
       pdaChain.publicGatewayCert,
       pdaChain.privateGatewayPrivateKey,
@@ -576,7 +577,10 @@ describe('collectCargo', () => {
         cb();
       });
 
-      const invalidCCASerialized = await generateCCAForPayload(COGRPC_ADDRESS, new ArrayBuffer(0));
+      const invalidCCASerialized = await generateCCAForPayload(
+        PUBLIC_ADDRESS_URL,
+        new ArrayBuffer(0),
+      );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -597,7 +601,10 @@ describe('collectCargo', () => {
         new ArrayBuffer(0),
         pdaChain.pdaCert, // The public gateway doesn't have this key
       );
-      const invalidCCASerialized = await generateCCAForPayload(COGRPC_ADDRESS, payload.serialize());
+      const invalidCCASerialized = await generateCCAForPayload(
+        PUBLIC_ADDRESS_URL,
+        payload.serialize(),
+      );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -618,7 +625,41 @@ describe('collectCargo', () => {
         arrayBufferFrom('not a valid CCR'),
         pdaChain.publicGatewayCert,
       );
-      const invalidCCASerialized = await generateCCAForPayload(COGRPC_ADDRESS, payload.serialize());
+      const invalidCCASerialized = await generateCCAForPayload(
+        PUBLIC_ADDRESS_URL,
+        payload.serialize(),
+      );
+      CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+
+      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    });
+
+    test('INVALID_ARGUMENT should be returned if CCA recipient is malformed', async (cb) => {
+      const cca = new CargoCollectionAuthorization(
+        '0deadbeef',
+        pdaChain.privateGatewayCert,
+        Buffer.from([]),
+      );
+      CALL.on('error', (error) => {
+        expect(MOCK_LOGS).toContainEqual(
+          partialPinoLog('info', 'Refusing CCA with malformed recipient', {
+            ccaRecipientAddress: cca.recipientAddress,
+            grpcClient: CALL.getPeer(),
+            grpcMethod: 'collectCargo',
+            peerGatewayAddress,
+          }),
+        );
+        expect(error).toEqual({
+          code: grpc.status.INVALID_ARGUMENT,
+          message: 'CCA recipient is malformed',
+        });
+
+        cb();
+      });
+
+      const invalidCCASerialized = Buffer.from(
+        await cca.serialize(pdaChain.privateGatewayPrivateKey),
+      );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -626,7 +667,7 @@ describe('collectCargo', () => {
 
     test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
       const cca = new CargoCollectionAuthorization(
-        `${COGRPC_ADDRESS}/path`,
+        `https://different-${PUBLIC_ADDRESS}`,
         pdaChain.privateGatewayCert,
         Buffer.from([]),
       );
@@ -879,7 +920,7 @@ describe('collectCargo', () => {
       'Authorization',
       serializeAuthzMetadata(
         await generateCCAForPayload(
-          COGRPC_ADDRESS,
+          PUBLIC_ADDRESS_URL,
           ccaPayloadEncryptionResult.envelopedData.serialize(),
         ),
       ),

@@ -38,8 +38,8 @@ spec:
             - node
             - build/main/bin/cogrpc-server.js
           env:
-            - name: COGRPC_ADDRESS
-              value: {{ include "relaynet-internet-gateway.cogrpcUri" . }}
+            - name: PUBLIC_ADDRESS
+              value: {{ .Values.publicAddress }}
             - name: SERVER_IP_ADDRESS
               {{- if .Values.tags.dev }}
               value: 127.0.0.1

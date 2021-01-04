@@ -70,7 +70,7 @@
     "@relaycorp/cogrpc": "^1.2.0",
     "@relaycorp/keystore-vault": "^1.2.0",
     "@relaycorp/relaynet-core": "^1.42.1",
-    "@relaycorp/relaynet-pohttp": "^1.5.4",
+    "@relaycorp/relaynet-pohttp": "^1.6.0",
     "@typegoose/typegoose": "^7.4.5",
     "@types/pino": "^6.3.4",
     "abort-controller": "^3.0.0",

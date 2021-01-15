@@ -16,6 +16,13 @@ import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/nodes';
 
+/**
+ * Number of hours in the past, when the the private gateway's certificate validity should start.
+ *
+ * This is needed to account for clock drift.
+ */
+const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
+
 const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 3;
 
 export default async function registerRoutes(
@@ -99,6 +106,10 @@ async function issuePrivateGatewayCertificate(
   publicGatewayPrivateKey: CryptoKey,
   publicGatewayCertificate: Certificate,
 ): Promise<Certificate> {
+  const validityStartDate = new Date();
+  validityStartDate.setHours(
+    validityStartDate.getHours() - PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS,
+  );
   const validityEndDate = new Date();
   validityEndDate.setFullYear(
     validityEndDate.getFullYear() + PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS,
@@ -108,5 +119,6 @@ async function issuePrivateGatewayCertificate(
     issuerPrivateKey: publicGatewayPrivateKey,
     subjectPublicKey: privateGatewayPublicKey,
     validityEndDate,
+    validityStartDate,
   });
 }

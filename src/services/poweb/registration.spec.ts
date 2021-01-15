@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import {
   derSerializePublicKey,
   InvalidMessageError,
@@ -9,6 +7,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
+import LightMyRequest from 'light-my-request';
 
 import {
   arrayBufferFrom,
@@ -18,7 +17,7 @@ import {
   sha256,
 } from '../../_test_utils';
 import { testDisallowedMethods } from '../_test_utils';
-import { setUpCommonFixtures } from './_test_utils';
+import { FixtureSet, setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
 
@@ -117,40 +116,89 @@ test('HTTP 403 should be returned if PNRA is used with unauthorized key', async 
   );
 });
 
-test('HTTP 200 with the registration should be returned if the PNRA is valid', async () => {
-  const fixtures = getFixtures();
-  const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
-  const privateGatewayPublicKeySerialized = await derSerializePublicKey(privateGatewayPublicKey);
-  const pnraSerialized = await generatePNRA(privateGatewayPublicKeySerialized);
-  const pnrr = new PrivateNodeRegistrationRequest(privateGatewayPublicKey, pnraSerialized);
-  const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
+describe('Successful registration', () => {
+  test('HTTP 200 with the registration should be returned', async () => {
+    const fixtures = getFixtures();
 
-  const response = await fastify.inject({
-    headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
-    method: 'POST',
-    payload: Buffer.from(payload),
-    url: ENDPOINT_URL,
+    const response = await completeRegistration(fixtures);
+
+    expect(response).toHaveProperty('statusCode', 200);
+    expect(response.headers['content-type']).toEqual(
+      CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION,
+    );
+
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
   });
 
-  expect(response).toHaveProperty('statusCode', 200);
-  expect(response.headers['content-type']).toEqual(CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION);
+  test('Private gateway certificate should be issued by public gateway', async () => {
+    const fixtures = getFixtures();
 
-  const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
-  expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    const response = await completeRegistration(fixtures);
 
-  // Validate the private gateway's certificate
-  const threeYearsInTheFuture = new Date();
-  threeYearsInTheFuture.setFullYear(threeYearsInTheFuture.getFullYear() + 3);
-  expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
-    threeYearsInTheFuture.getTime() - 3_000,
-    threeYearsInTheFuture.getTime(),
-  );
-  await expect(
-    derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
-  ).resolves.toEqual(privateGatewayPublicKeySerialized);
-  await expect(
-    registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
-  ).resolves.toHaveLength(2);
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    await expect(
+      registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
+    ).resolves.toHaveLength(2);
+  });
+
+  test('Private gateway certificate should be valid starting 3 hours in the past', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const threeHoursInThePast = new Date();
+    threeHoursInThePast.setHours(threeHoursInThePast.getHours() - 3);
+    expect(registration.privateNodeCertificate.startDate.getTime()).toBeWithin(
+      threeHoursInThePast.getTime() - 3_000,
+      threeHoursInThePast.getTime(),
+    );
+  });
+
+  test('Private gateway certificate should be valid for 3 years', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const threeYearsInTheFuture = new Date();
+    threeYearsInTheFuture.setFullYear(threeYearsInTheFuture.getFullYear() + 3);
+    expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
+      threeYearsInTheFuture.getTime() - 3_000,
+      threeYearsInTheFuture.getTime(),
+    );
+  });
+
+  test('Private gateway certificate should honor subject public key', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+
+    const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
+    const privateGatewayPublicKeySerialized = await derSerializePublicKey(privateGatewayPublicKey);
+    await expect(
+      derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
+    ).resolves.toEqual(privateGatewayPublicKeySerialized);
+  });
+
+  async function completeRegistration(fixtures: FixtureSet): Promise<LightMyRequest.Response> {
+    const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
+    const pnraSerialized = await generatePNRA(await derSerializePublicKey(privateGatewayPublicKey));
+    const pnrr = new PrivateNodeRegistrationRequest(privateGatewayPublicKey, pnraSerialized);
+    const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
+
+    return fastify.inject({
+      headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
+      method: 'POST',
+      payload: Buffer.from(payload),
+      url: ENDPOINT_URL,
+    });
+  }
 });
 
 async function generatePNRA(privateGatewayPublicKeySerialized: Buffer): Promise<ArrayBuffer> {

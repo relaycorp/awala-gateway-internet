@@ -143,6 +143,20 @@ describe('Successful registration', () => {
     ).resolves.toHaveLength(2);
   });
 
+  test('Private gateway certificate should be valid starting 3 hours in the past', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const threeHoursInThePast = new Date();
+    threeHoursInThePast.setHours(threeHoursInThePast.getHours() - 3);
+    expect(registration.privateNodeCertificate.startDate.getTime()).toBeWithin(
+      threeHoursInThePast.getTime() - 3_000,
+      threeHoursInThePast.getTime(),
+    );
+  });
+
   test('Private gateway certificate should be valid for 3 years', async () => {
     const fixtures = getFixtures();
 

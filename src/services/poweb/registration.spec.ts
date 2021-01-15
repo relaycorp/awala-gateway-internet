@@ -157,14 +157,14 @@ describe('Successful registration', () => {
     );
   });
 
-  test('Private gateway certificate should be valid for 3 years', async () => {
+  test('Private gateway certificate should be valid for 1 year', async () => {
     const fixtures = getFixtures();
 
     const response = await completeRegistration(fixtures);
 
     const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
     const threeYearsInTheFuture = new Date();
-    threeYearsInTheFuture.setFullYear(threeYearsInTheFuture.getFullYear() + 3);
+    threeYearsInTheFuture.setFullYear(threeYearsInTheFuture.getFullYear() + 1);
     expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
       threeYearsInTheFuture.getTime() - 3_000,
       threeYearsInTheFuture.getTime(),

@@ -23,7 +23,7 @@ const ENDPOINT_URL = '/v1/nodes';
  */
 const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
 
-const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 3;
+const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 1;
 
 export default async function registerRoutes(
   fastify: FastifyInstance,

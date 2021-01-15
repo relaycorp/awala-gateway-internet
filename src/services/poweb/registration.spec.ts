@@ -163,11 +163,11 @@ describe('Successful registration', () => {
     const response = await completeRegistration(fixtures);
 
     const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
-    const threeYearsInTheFuture = new Date();
-    threeYearsInTheFuture.setFullYear(threeYearsInTheFuture.getFullYear() + 1);
+    const expectedExpiryDate = new Date();
+    expectedExpiryDate.setFullYear(expectedExpiryDate.getFullYear() + 1);
     expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
-      threeYearsInTheFuture.getTime() - 3_000,
-      threeYearsInTheFuture.getTime(),
+      expectedExpiryDate.getTime() - 3_000,
+      expectedExpiryDate.getTime(),
     );
   });
 

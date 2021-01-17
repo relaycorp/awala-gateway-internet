@@ -28,7 +28,6 @@
     "@relaycorp/ws-mock": "^1.4.10",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.20",
-    "@types/mongoose": "^5.10.3",
     "@types/pkijs": "0.0.6",
     "@types/split2": "^2.1.6",
     "@types/verror": "^1.10.4",

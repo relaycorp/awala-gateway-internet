@@ -96,7 +96,7 @@ async function deliverCargo(
   natsClusterId: string,
   logger: Logger,
 ): Promise<void> {
-  const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
+  const trustedCerts = await retrieveOwnCertificates(mongooseConnection, logger);
 
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');

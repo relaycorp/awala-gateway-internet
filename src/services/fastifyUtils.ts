@@ -71,10 +71,11 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
 
   const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
   server.log.debug('Before configuring fastify-mongoose');
+  const bufferCommands = false;
   await server.register(require('fastify-mongoose'), {
     ...mongoConnectionArgs.options,
     appname: `relaynet-internet-gateway${mongoAppName ? `-${mongoAppName}` : ''}`,
-    bufferCommands: false,
+    bufferCommands,
     bufferMaxEntries: 0,
     connectTimeoutMS: 10_000,
     maxIdleTimeMS: 60_000,
@@ -85,6 +86,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   server.log.debug('Before listening for Mongoose events');
   const mongooseConnection = (server as any).mongo.db as Connection;
   (mongooseConnection as any).set('debug', true);
+  (mongooseConnection as any).set('bufferCommands', bufferCommands);
   mongooseConnection.on('connecting', () => {
     server.log.debug('Mongoose connecting');
   });

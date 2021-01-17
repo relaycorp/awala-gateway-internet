@@ -198,7 +198,7 @@ export class ParcelStore {
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string> {
-    const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+    const trustedCertificates = await retrieveOwnCertificates(mongooseConnection, logger);
     const certificationPath = (await parcel.validate(
       RecipientAddressType.PRIVATE,
       trustedCertificates,

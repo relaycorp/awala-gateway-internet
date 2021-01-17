@@ -115,7 +115,7 @@ async function verifyCountersignature(
     return null;
   }
   logger.debug({ readyState: mongooseConnection.readyState }, 'Before retrieving own certificates');
-  const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+  const trustedCertificates = await retrieveOwnCertificates(mongooseConnection, logger);
   logger.debug('After retrieving own certificates');
   try {
     return await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(

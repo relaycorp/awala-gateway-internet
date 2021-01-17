@@ -166,7 +166,7 @@ async function doHandshake(
         return resolve(null);
       }
 
-      const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+      const trustedCertificates = await retrieveOwnCertificates(mongooseConnection, logger);
 
       // tslint:disable-next-line:no-let
       let peerGatewayCertificate: Certificate;

@@ -10,10 +10,7 @@ export async function retrieveOwnCertificates(
   connection: Connection,
   logger: BasicLogger | null = null,
 ): Promise<readonly Certificate[]> {
-  logger?.info(
-    { models: connection.modelNames(), states: connection.states } as any,
-    'Before getModelForClass()',
-  );
+  logger?.info('Before getModelForClass()');
   const ownCertificateModel = getModelForClass(OwnCertificate, { existingConnection: connection });
   logger?.info('Before find()');
   const findOne = ownCertificateModel.find({});

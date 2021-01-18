@@ -9,8 +9,6 @@ export async function retrieveOwnCertificates(
   connection: Connection,
 ): Promise<readonly Certificate[]> {
   const ownCertificateModel = getModelForClass(OwnCertificate, { existingConnection: connection });
-  const findOne = ownCertificateModel.find({});
-  const ownCerts = (await findOne.exec()) as readonly OwnCertificate[];
-
+  const ownCerts = await ownCertificateModel.find({});
   return ownCerts.map((c) => Certificate.deserialize(bufferToArray(c.serializationDer)));
 }

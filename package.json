@@ -78,7 +78,7 @@
     "aws-sdk": "^2.828.0",
     "buffer-to-arraybuffer": "0.0.5",
     "env-var": "^7.0.0",
-    "fastify": "^3.9.2",
+    "fastify": "^3.10.1",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.4",
     "grpc-health-check": "^1.8.0",

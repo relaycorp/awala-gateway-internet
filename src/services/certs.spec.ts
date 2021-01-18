@@ -1,4 +1,4 @@
-/* tslint:disable:no-let no-object-mutation */
+/* tslint:disable:no-object-mutation */
 
 import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
@@ -12,8 +12,7 @@ import { OwnCertificate } from './models';
 
 const stubConnection: Connection = { whoAreYou: 'the-stub-connection' } as any;
 
-const stubModelExec = mockSpy(jest.fn(), async () => []);
-const stubFind = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
+const stubFind = mockSpy(jest.fn(), () => []);
 const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'), () => ({
   find: stubFind,
 }));
@@ -59,8 +58,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('A single certificate should be returned when there is one certificate', async () => {
-    stubModelExec.mockReset();
-    stubModelExec.mockResolvedValueOnce([stubOwnCerts[0]]);
+    stubFind.mockReset();
+    stubFind.mockResolvedValueOnce([stubOwnCerts[0]]);
 
     const certs = await retrieveOwnCertificates(stubConnection);
 
@@ -69,8 +68,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('Multiple certificates should be retuned when there are multiple certificates', async () => {
-    stubModelExec.mockReset();
-    stubModelExec.mockResolvedValueOnce(stubOwnCerts);
+    stubFind.mockReset();
+    stubFind.mockResolvedValueOnce(stubOwnCerts);
 
     const certs = await retrieveOwnCertificates(stubConnection);
 

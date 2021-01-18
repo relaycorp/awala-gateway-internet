@@ -13,9 +13,7 @@ export async function retrieveOwnCertificates(
   logger?.info('Before getModelForClass()');
   const ownCertificateModel = getModelForClass(OwnCertificate, { existingConnection: connection });
   logger?.info('Before find()');
-  const findOne = ownCertificateModel.find({});
-  logger?.info('Before exec()');
-  const ownCerts = (await findOne.exec()) as readonly OwnCertificate[];
+  const ownCerts = await ownCertificateModel.find({});
 
   logger?.info('Before map()');
   return ownCerts.map((c) => Certificate.deserialize(bufferToArray(c.serializationDer)));

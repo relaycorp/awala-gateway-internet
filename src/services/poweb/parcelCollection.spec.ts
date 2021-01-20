@@ -13,7 +13,6 @@ import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
-import { Connection } from 'mongoose';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
@@ -27,7 +26,6 @@ import {
   partialPinoLogger,
   UUID4_REGEX,
 } from '../../_test_utils';
-import * as mongo from '../../backingServices/mongo';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import * as certs from '../certs';
@@ -44,7 +42,11 @@ let mockWSServer: WSServer;
 let mockLogging: MockLogging;
 beforeEach(() => {
   mockLogging = makeMockLogging();
-  mockWSServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+  mockWSServer = makeWebSocketServer(
+    getFixtures().mongooseConnection,
+    REQUEST_ID_HEADER,
+    mockLogging.logger,
+  );
 });
 
 let nonceSigner: Signer;
@@ -55,15 +57,10 @@ beforeAll(async () => {
   peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
-const MOCK_MONGOOSE_CONNECTION: Connection = { close: mockSpy(jest.fn()) } as any;
-const MOCK_MONGOOSE_CONNECTION_CREATION = mockSpy(
-  jest.spyOn(mongo, 'createMongooseConnectionFromEnv'),
-  jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
-);
 const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
   async (connection) => {
-    expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
+    expect(connection).toBe(getFixtures().mongooseConnection);
     const fixtures = getFixtures();
     return [fixtures.publicGatewayCert];
   },
@@ -84,19 +81,31 @@ mockSpy(jest.spyOn(WS, 'createWebSocketStream'), createMockWebSocketStream);
 
 describe('WebSocket server configuration', () => {
   test('Path should be /v1/parcel-collection', () => {
-    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+    const wsServer = makeWebSocketServer(
+      getFixtures().mongooseConnection,
+      REQUEST_ID_HEADER,
+      mockLogging.logger,
+    );
 
     expect(wsServer.options.path).toEqual('/v1/parcel-collection');
   });
 
   test('Maximum incoming payload size should be 2 kib', () => {
-    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+    const wsServer = makeWebSocketServer(
+      getFixtures().mongooseConnection,
+      REQUEST_ID_HEADER,
+      mockLogging.logger,
+    );
 
     expect(wsServer.options.maxPayload).toEqual(2 * 1024);
   });
 
   test('Clients should not be tracked', () => {
-    const wsServer = makeWebSocketServer(REQUEST_ID_HEADER, mockLogging.logger);
+    const wsServer = makeWebSocketServer(
+      getFixtures().mongooseConnection,
+      REQUEST_ID_HEADER,
+      mockLogging.logger,
+    );
 
     expect(wsServer.options.clientTracking).toBeFalse();
   });
@@ -300,16 +309,6 @@ describe('Handshake', () => {
         reqId: UUID4_REGEX,
       }),
     );
-  });
-
-  test('Mongoose connection should be closed by the end of the handshake', async () => {
-    const client = new MockPoWebClient(mockWSServer);
-    expect(MOCK_MONGOOSE_CONNECTION_CREATION).not.toBeCalled();
-
-    await completeHandshake(client);
-
-    expect(MOCK_MONGOOSE_CONNECTION_CREATION).toBeCalled();
-    expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalled();
   });
 });
 

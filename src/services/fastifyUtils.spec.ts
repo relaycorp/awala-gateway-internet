@@ -1,4 +1,3 @@
-/* tslint:disable:no-let */
 import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';

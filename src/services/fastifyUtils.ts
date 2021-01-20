@@ -67,13 +67,13 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
     trustProxy: true,
   });
 
-  await Promise.all(routes.map((route) => server.register(route, routeOptions)));
-
   const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
   await server.register(require('fastify-mongoose'), {
     ...mongoConnectionArgs.options,
     uri: mongoConnectionArgs.uri,
   });
+
+  await Promise.all(routes.map((route) => server.register(route, routeOptions)));
 
   await server.ready();
 

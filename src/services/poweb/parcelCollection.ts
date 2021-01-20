@@ -10,6 +10,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';
 import pipe from 'it-pipe';
+import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import { duplex } from 'stream-to-it';
 import uuid from 'uuid-random';
@@ -19,7 +20,6 @@ import WebSocket, {
   ServerOptions as WSServerOptions,
 } from 'ws';
 
-import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { retrieveOwnCertificates } from '../certs';
 import { ParcelStore, ParcelStreamMessage } from '../parcelStore';
@@ -38,12 +38,18 @@ export default async function (
   _options: any,
   done: () => void,
 ): Promise<void> {
-  const requestIdHeader = (fastify as any).initialConfig.requestIdHeader;
-  makeWebSocketServer(requestIdHeader, fastify.log as Logger, fastify.server);
+  const fastifyTypeless = fastify as any;
+  makeWebSocketServer(
+    fastifyTypeless.mongo.db,
+    fastifyTypeless.initialConfig.requestIdHeader,
+    fastify.log as Logger,
+    fastify.server,
+  );
   done();
 }
 
 export function makeWebSocketServer(
+  mongooseConnection: Connection,
   requestIdHeader: string,
   baseLogger: Logger,
   httpServer?: HTTPServer,
@@ -58,12 +64,13 @@ export function makeWebSocketServer(
     ...serverOptions,
   });
 
-  wsServer.on('connection', makeConnectionHandler(requestIdHeader, baseLogger));
+  wsServer.on('connection', makeConnectionHandler(mongooseConnection, requestIdHeader, baseLogger));
 
   return wsServer;
 }
 
 function makeConnectionHandler(
+  mongooseConnection: Connection,
   requestIdHeader: string,
   baseLogger: Logger,
 ): (ws: WebSocket, request: IncomingMessage) => void {
@@ -84,7 +91,11 @@ function makeConnectionHandler(
     }
     const abortController = makeAbortController(wsConnection, requestAwareLogger);
 
-    const peerGatewayAddress = await doHandshake(wsConnection, requestAwareLogger);
+    const peerGatewayAddress = await doHandshake(
+      wsConnection,
+      mongooseConnection,
+      requestAwareLogger,
+    );
     if (!peerGatewayAddress) {
       return;
     }
@@ -122,7 +133,11 @@ function makeAbortController(wsConnection: WebSocket, logger: Logger): AbortCont
   return abortController;
 }
 
-async function doHandshake(wsConnection: WebSocket, logger: Logger): Promise<string | null> {
+async function doHandshake(
+  wsConnection: WebSocket,
+  mongooseConnection: Connection,
+  logger: Logger,
+): Promise<string | null> {
   const nonce = bufferToArray(uuid.bin() as Buffer);
 
   return new Promise((resolve) => {
@@ -151,10 +166,7 @@ async function doHandshake(wsConnection: WebSocket, logger: Logger): Promise<str
         return resolve(null);
       }
 
-      const mongooseConnection = await createMongooseConnectionFromEnv();
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
-      // noinspection ES6MissingAwait
-      mongooseConnection.close();
 
       // tslint:disable-next-line:no-let
       let peerGatewayCertificate: Certificate;

@@ -44,7 +44,7 @@ describe('PoHTTP server', () => {
       const objectKey = message.getData() as string;
       await expect(
         OBJECT_STORAGE_CLIENT.getObject(objectKey, OBJECT_STORAGE_BUCKET),
-      ).resolves.toMatchObject({ Body: Buffer.from(parcelSerialized) });
+      ).resolves.toMatchObject({ body: Buffer.from(parcelSerialized) });
       cb();
     });
   });

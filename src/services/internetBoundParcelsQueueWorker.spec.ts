@@ -1,11 +1,9 @@
-// tslint:disable:no-let
-
 import * as pohttp from '@relaycorp/relaynet-pohttp';
 import { EnvVarError } from 'env-var';
 
 import { arrayToAsyncIterable, mockPino, mockSpy } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../backingServices/objectStorage';
+import * as objectStorage from '../backingServices/objectStorage';
 import { configureMockEnvVars, mockStanMessage, TOMORROW } from './_test_utils';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
@@ -40,7 +38,7 @@ const QUEUE_MESSAGE_DATA_SERIALIZED = Buffer.from(JSON.stringify(QUEUE_MESSAGE_D
 
 const PARCEL_SERIALIZED = Buffer.from('Pretend this is a RAMF-serialized parcel');
 
-mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => undefined);
+mockSpy(jest.spyOn(objectStorage, 'initObjectStoreFromEnv'), () => undefined);
 
 const MOCK_RETRIEVE_INTERNET_PARCEL = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'retrieveEndpointBoundParcel'),

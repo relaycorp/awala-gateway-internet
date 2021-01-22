@@ -22,7 +22,7 @@ import { mockPino, mockSpy, PdaChain } from '../_test_utils';
 import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../backingServices/objectStorage';
+import * as objectStorage from '../backingServices/objectStorage';
 import {
   castMock,
   configureMockEnvVars,
@@ -76,7 +76,7 @@ mockSpy(jest.spyOn(mongoPublicKeyStore, 'MongoPublicKeyStore'), () => mockPublic
 //region Parcel store-related fixtures
 const OBJECT_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
-mockSpy(jest.spyOn(ObjectStoreClient, 'initFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
+mockSpy(jest.spyOn(objectStorage, 'initObjectStoreFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteGatewayBoundParcel'), () => undefined);
 const mockStoreParcelFromPeerGateway = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),

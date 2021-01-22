@@ -5,7 +5,7 @@ import * as stan from 'node-nats-streaming';
 import pino from 'pino';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../backingServices/objectStorage';
+import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 interface ActiveParcelData {
@@ -22,7 +22,7 @@ export async function processInternetBoundParcels(
   ownPohttpAddress: string,
 ): Promise<void> {
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-  const parcelStore = new ParcelStore(ObjectStoreClient.initFromEnv(), parcelStoreBucket);
+  const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
 
   async function* parseMessages(
     messages: AsyncIterable<stan.Message>,

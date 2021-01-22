@@ -8,6 +8,7 @@ data:
   NATS_SERVER_URL: {{ .Values.nats.serverUrl }}
   NATS_CLUSTER_ID: {{ .Values.nats.clusterId }}
 
+  OBJECT_STORE_BACKEND: {{ .Values.objectStore.backend }}
   OBJECT_STORE_ENDPOINT: {{ .Values.objectStore.endpoint }}
   OBJECT_STORE_BUCKET: {{ .Values.objectStore.bucket }}
   OBJECT_STORE_ACCESS_KEY_ID: {{ .Values.objectStore.accessKeyId }}

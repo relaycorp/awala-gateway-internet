@@ -1,13 +1,14 @@
+import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
+import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
-import { Message } from 'node-nats-streaming';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
+import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { convertDateToTimestamp, sha256Hex } from '../utils';
 import { retrieveOwnCertificates } from './certs';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
@@ -41,7 +42,7 @@ export interface ParcelStreamMessage {
 
 export class ParcelStore {
   public static initFromEnv(): ParcelStore {
-    const objectStoreClient = ObjectStoreClient.initFromEnv();
+    const objectStoreClient = initObjectStoreFromEnv();
     const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
     return new ParcelStore(objectStoreClient, objectStoreBucket);
   }
@@ -338,7 +339,6 @@ export class ParcelStore {
       parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
     ): AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }> {
       for await (const parcelObjectMetadata of parcelObjectsMetadata) {
-        // tslint:disable-next-line:no-let
         let parcelObject: StoreObject;
         try {
           parcelObject = await objectStoreClient.getObject(parcelObjectMetadata.key, bucket);

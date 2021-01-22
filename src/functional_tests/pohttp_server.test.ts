@@ -43,10 +43,7 @@ describe('PoHTTP server', () => {
     subscription.on('message', async (message: Message) => {
       const objectKey = message.getData() as string;
       await expect(
-        OBJECT_STORAGE_CLIENT.getObject({
-          Bucket: OBJECT_STORAGE_BUCKET,
-          Key: objectKey,
-        }).promise(),
+        OBJECT_STORAGE_CLIENT.getObject(objectKey, OBJECT_STORAGE_BUCKET),
       ).resolves.toMatchObject({ Body: Buffer.from(parcelSerialized) });
       cb();
     });

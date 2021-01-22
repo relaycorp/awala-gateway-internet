@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import {
   Certificate,
   generateRSAKeyPair,
@@ -69,12 +67,14 @@ async function queueParcel(parcel: Parcel): Promise<void> {
   // TODO: Use PoWebSockets once it's available, instead of messing with backing services
 
   const objectKey = makeParcelObjectKey(parcel.id);
-  await OBJECT_STORAGE_CLIENT.putObject({
-    Body: Buffer.from(await parcel.serialize(senderPrivateKey)),
-    Bucket: OBJECT_STORAGE_BUCKET,
-    Key: objectKey,
-    Metadata: { 'parcel-expiry': Math.floor(parcel.expiryDate.getTime() / 1_000).toString() },
-  }).promise();
+  await OBJECT_STORAGE_CLIENT.putObject(
+    {
+      body: Buffer.from(await parcel.serialize(senderPrivateKey)),
+      metadata: { 'parcel-expiry': Math.floor(parcel.expiryDate.getTime() / 1_000).toString() },
+    },
+    objectKey,
+    OBJECT_STORAGE_BUCKET,
+  );
 
   const natsPublish = promisify(natsStreamingConnection.publish).bind(natsStreamingConnection);
   await natsPublish(
@@ -89,10 +89,7 @@ async function queueParcel(parcel: Parcel): Promise<void> {
 
 async function isParcelInStore(parcel: Parcel): Promise<boolean> {
   try {
-    await OBJECT_STORAGE_CLIENT.getObject({
-      Bucket: OBJECT_STORAGE_BUCKET,
-      Key: makeParcelObjectKey(parcel.id),
-    }).promise();
+    await OBJECT_STORAGE_CLIENT.getObject(makeParcelObjectKey(parcel.id), OBJECT_STORAGE_BUCKET);
   } catch (_) {
     return false;
   }

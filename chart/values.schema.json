@@ -132,12 +132,17 @@
     "objectStore": {
       "type": "object",
       "required": [
+        "backend",
         "endpoint",
         "bucket",
         "accessKeyId",
         "secretKey"
       ],
       "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["s3", "minio"]
+        },
         "endpoint": {
           "type": "string"
         },

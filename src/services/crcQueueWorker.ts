@@ -17,7 +17,7 @@ import pino from 'pino';
 import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../backingServices/objectStorage';
+import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 
@@ -29,7 +29,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   const mongooseConnection = await createMongooseConnectionFromEnv();
   const gateway = new Gateway(initVaultKeyStore(), new MongoPublicKeyStore(mongooseConnection));
 
-  const objectStoreClient = ObjectStoreClient.initFromEnv();
+  const objectStoreClient = initObjectStoreFromEnv();
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(objectStoreClient, parcelStoreBucket);
 

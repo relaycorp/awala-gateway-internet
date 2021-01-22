@@ -84,6 +84,7 @@ beforeEach(() => MOCK_MONGOOSE_CONNECTION.removeAllListeners());
 
 configureMockEnvVars({
   OBJECT_STORE_ACCESS_KEY_ID: 'id',
+  OBJECT_STORE_BACKEND: 'minio',
   OBJECT_STORE_ENDPOINT: 'http://localhost.example',
   OBJECT_STORE_SECRET_KEY: 's3cr3t',
   VAULT_KV_PREFIX: 'prefix',

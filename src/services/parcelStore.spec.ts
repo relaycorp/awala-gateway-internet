@@ -1,5 +1,4 @@
-// tslint:disable:no-let
-
+import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
 import { EnvVarError } from 'env-var';
@@ -19,7 +18,7 @@ import {
   sha256Hex,
 } from '../_test_utils';
 import * as natsStreaming from '../backingServices/natsStreaming';
-import { ObjectStoreClient, StoreObject } from '../backingServices/objectStorage';
+import * as objectStorage from '../backingServices/objectStorage';
 import {
   configureMockEnvVars,
   generatePdaChain,
@@ -834,7 +833,7 @@ describe('initFromEnv', () => {
   };
   const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 
-  jest.spyOn(ObjectStoreClient, 'initFromEnv').mockReturnValue(MOCK_OBJECT_STORE_CLIENT);
+  jest.spyOn(objectStorage, 'initObjectStoreFromEnv').mockReturnValue(MOCK_OBJECT_STORE_CLIENT);
 
   test('OBJECT_STORE_BUCKET should be required', () => {
     mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });

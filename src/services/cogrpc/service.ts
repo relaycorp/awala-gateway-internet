@@ -18,7 +18,7 @@ import uuid from 'uuid-random';
 import { initMongoDBKeyStore, initVaultKeyStore } from '../../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
-import { ObjectStoreClient } from '../../backingServices/objectStorage';
+import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
 import { retrieveOwnCertificates } from '../certs';
 import { generatePCAs } from '../parcelCollection';
@@ -41,7 +41,7 @@ export interface ServiceImplementationOptions {
 export async function makeServiceImplementation(
   options: ServiceImplementationOptions,
 ): Promise<CargoRelayServerMethodSet> {
-  const objectStoreClient = ObjectStoreClient.initFromEnv();
+  const objectStoreClient = initObjectStoreFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
   const currentKeyId = Buffer.from(options.gatewayKeyIdBase64, 'base64');

@@ -1,4 +1,4 @@
-import { initObjectStoreClientWithHMACKeys, ObjectStoreClient } from '@relaycorp/object-storage';
+import { initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
 import {
   Certificate,
   generateRSAKeyPair,
@@ -19,18 +19,18 @@ import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 
-export const OBJECT_STORAGE_CLIENT = initObjectStoreClient();
+export const OBJECT_STORAGE_CLIENT = initObjectStoreClientFromEnv();
 export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
 
 export async function sleep(seconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, seconds * 1_000));
 }
 
-function initObjectStoreClient(): ObjectStoreClient {
+function initObjectStoreClientFromEnv(): ObjectStoreClient {
   const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT').required().asString();
   const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID').required().asString();
   const secretAccessKey = getEnvVar('OBJECT_STORE_SECRET_KEY').required().asString();
-  return initObjectStoreClientWithHMACKeys('minio', endpoint, accessKeyId, secretAccessKey, false);
+  return initObjectStoreClient('minio', endpoint, accessKeyId, secretAccessKey, false);
 }
 
 export function connectToNatsStreaming(): Promise<Stan> {

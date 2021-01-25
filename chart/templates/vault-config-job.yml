@@ -16,7 +16,7 @@ spec:
       labels:
         {{- include "relaynet-internet-gateway.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-vault-config
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
       securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true

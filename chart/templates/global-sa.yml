@@ -2,5 +2,9 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
+  annotations:
+    {{- if .Values.serviceAccountAnnotations }}
+    {{- toYaml .Values.serviceAccountAnnotations | nindent 4 }}
+    {{- end }}
   labels:
     {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}

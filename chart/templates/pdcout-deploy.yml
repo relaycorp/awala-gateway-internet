@@ -21,7 +21,7 @@ spec:
       labels:
         {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-pdcout
+      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true

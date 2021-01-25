@@ -53,6 +53,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
 | `podAnnotations` | object | `{}` | Annotations to be attached to the pods |
+| `serviceAccountAnnotations` | object | `{}` | Annotations to be attached to the service account |
 | `securityContext` | object | `{}` | A custom `securityContext` to be attached to the deployments |
 | `service.type` | string | `ClusterIP` | The service type for the PoWeb, PoHTTP and CogRPC servers |
 | `publicAddress` | string | | The public address of this gateway |

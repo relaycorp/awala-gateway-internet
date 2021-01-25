@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-crcin
-  labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "crcin") .) | nindent 4 }}

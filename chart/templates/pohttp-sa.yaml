@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-pohttp
-  labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pohttp") .) | nindent 4 }}

@@ -30,6 +30,7 @@ nats:
     enabled: false
 
 objectStore:
+  backend: minio
   endpoint: minio:9000
   bucket: public-gateway
   accessKeyId: test-key

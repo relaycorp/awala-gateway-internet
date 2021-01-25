@@ -59,6 +59,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `publicAddress` | string | | The public address of this gateway |
 | `ingress.enabled` | boolean | `false` | Whether to use an ingress for the PoWeb, PoHTTP and CogRPC servers |
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
+| `objectStore.backend` | string | | The type of object store used. Any value supported by [`@relaycorp/object-storage`](https://github.com/relaycorp/object-storage-js) (e.g., `s3`). |
 
 ### Component-specific options
 

@@ -1,4 +1,4 @@
-import { initObjectStoreClientWithHMACKeys } from '@relaycorp/object-storage';
+import { initObjectStoreClient } from '@relaycorp/object-storage';
 import { EnvVarError } from 'env-var';
 
 import { configureMockEnvVars } from '../services/_test_utils';
@@ -29,7 +29,7 @@ describe('initFromEnv', () => {
 
     initObjectStoreFromEnv();
 
-    expect(initObjectStoreClientWithHMACKeys).toBeCalledWith(
+    expect(initObjectStoreClient).toBeCalledWith(
       expect.anything(),
       expect.anything(),
       expect.anything(),
@@ -43,7 +43,7 @@ describe('initFromEnv', () => {
 
     initObjectStoreFromEnv();
 
-    expect(initObjectStoreClientWithHMACKeys).toBeCalledWith(
+    expect(initObjectStoreClient).toBeCalledWith(
       expect.anything(),
       expect.anything(),
       expect.anything(),
@@ -57,7 +57,7 @@ describe('initFromEnv', () => {
 
     initObjectStoreFromEnv();
 
-    expect(initObjectStoreClientWithHMACKeys).toBeCalledWith(
+    expect(initObjectStoreClient).toBeCalledWith(
       requiredEnvVars.OBJECT_STORE_BACKEND,
       requiredEnvVars.OBJECT_STORE_ENDPOINT,
       requiredEnvVars.OBJECT_STORE_ACCESS_KEY_ID,

@@ -1,8 +1,4 @@
-import {
-  AdapterType,
-  initObjectStoreClientWithHMACKeys,
-  ObjectStoreClient,
-} from '@relaycorp/object-storage';
+import { AdapterType, initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
 import { get as getEnvVar } from 'env-var';
 
 export function initObjectStoreFromEnv(): ObjectStoreClient {
@@ -11,7 +7,7 @@ export function initObjectStoreFromEnv(): ObjectStoreClient {
   const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID').required().asString();
   const secretKey = getEnvVar('OBJECT_STORE_SECRET_KEY').required().asString();
   const tlsEnabled = getEnvVar('OBJECT_STORE_TLS_ENABLED').default('true').asBool();
-  return initObjectStoreClientWithHMACKeys(
+  return initObjectStoreClient(
     backend as AdapterType,
     endpoint,
     accessKeyId,

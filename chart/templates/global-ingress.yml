@@ -11,13 +11,6 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.ingress.enableTls }}
-  tls:
-    - hosts:
-      - {{ include "relaynet-internet-gateway.pohttpHost" . }}
-      - {{ include "relaynet-internet-gateway.powebHost" . }}
-      - {{ include "relaynet-internet-gateway.cogrpcHost" . }}
-  {{- end }}
   rules:
     - host: {{ include "relaynet-internet-gateway.pohttpHost" . }}
       http:

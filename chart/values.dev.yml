@@ -10,6 +10,9 @@ tags:
 
 logLevel: debug
 
+ingress:
+  enableTls: false
+
 publicAddress: gateway.tld
 
 pdcQueue:

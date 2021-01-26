@@ -37,7 +37,7 @@ ingress:
   enabled: false
   apiVersion: networking.k8s.io/v1beta1
   annotations: {}
-  enableTls: false
+  enableTls: true
   serviceDomains: {}
 
 autoscaling:

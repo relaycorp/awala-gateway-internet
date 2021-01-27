@@ -630,8 +630,8 @@ describe('storeEndpointBoundParcel', () => {
   );
 
   test('Parcel should be refused if it is invalid', async () => {
-    const invalidParcelCreationDate = new Date(pdaChain.pdaCert.startDate.getTime());
-    invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() - 1);
+    const invalidParcelCreationDate = new Date();
+    invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() + 5);
     const invalidParcel = new Parcel(
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       pdaChain.pdaCert,

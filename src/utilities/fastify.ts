@@ -10,8 +10,8 @@ import {
 import { Logger } from 'pino';
 
 import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
-import { makeLogger } from '../utilities/logging';
-import { MAX_RAMF_MESSAGE_SIZE } from './constants';
+import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
+import { makeLogger } from './logging';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;

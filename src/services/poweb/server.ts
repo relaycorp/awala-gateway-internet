@@ -3,7 +3,7 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 
 import { initVaultKeyStore } from '../../backingServices/keyStores';
-import { configureFastify, FastifyLogger } from '../fastifyUtils';
+import { configureFastify, FastifyLogger } from '../../utilities/fastify';
 import healthcheck from './healthcheck';
 import parcelCollection from './parcelCollection';
 import parcelDelivery from './parcelDelivery';

@@ -1,5 +1,5 @@
 import { mockSpy } from '../../_test_utils';
-import * as fastifyUtils from '../fastifyUtils';
+import * as fastifyUtils from '../../utilities/fastify';
 import { makeServer } from './server';
 
 const mockFastifyInstance = {};

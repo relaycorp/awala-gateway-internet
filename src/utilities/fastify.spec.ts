@@ -3,10 +3,10 @@ import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
 import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
-import * as logging from '../utilities/logging';
-import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
-import { MAX_RAMF_MESSAGE_SIZE } from './constants';
-import { configureFastify, runFastify } from './fastifyUtils';
+import { configureMockEnvVars, getMockContext, getMockInstance } from '../services/_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
+import { configureFastify, runFastify } from './fastify';
+import * as logging from './logging';
 
 const mockFastify: FastifyInstance = {
   listen: mockSpy(jest.fn()),

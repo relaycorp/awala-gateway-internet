@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
 data:
+  GATEWAY_VERSION: {{ .Chart.Version }}
+
   NATS_SERVER_URL: {{ .Values.nats.serverUrl }}
   NATS_CLUSTER_ID: {{ .Values.nats.clusterId }}
 

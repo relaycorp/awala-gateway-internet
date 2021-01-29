@@ -64,6 +64,7 @@ jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 describe('receiveParcel', () => {
   configureMockEnvVars({
     ...MONGO_ENV_VARS,
+    GATEWAY_VERSION: '1.0.2',
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
   });

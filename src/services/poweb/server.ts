@@ -26,6 +26,7 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  */
 export async function makeServer(logger?: FastifyLogger): Promise<FastifyInstance> {
   return configureFastify(
+    'poweb',
     ROUTES,
     {
       keyPairRetriever: makeKeyPairRetriever(),

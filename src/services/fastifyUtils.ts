@@ -10,13 +10,14 @@ import {
 import { Logger } from 'pino';
 
 import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
+import { makeLogger } from '../utilities/logging';
 import { MAX_RAMF_MESSAGE_SIZE } from './constants';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
 const SERVER_HOST = '0.0.0.0';
 
-export type FastifyLogger = boolean | FastifyLoggerOptions | Logger;
+export type FastifyLogger = FastifyLoggerOptions | Logger;
 
 export const HTTP_METHODS: readonly HTTPMethods[] = [
   'POST',
@@ -53,13 +54,14 @@ export function registerDisallowedMethods(
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
 export async function configureFastify<RouteOptions extends FastifyPluginOptions = {}>(
+  serviceName: string,
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
-  logger: FastifyLogger = true,
+  logger?: FastifyLogger,
 ): Promise<FastifyInstance> {
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_SIZE,
-    logger: getFinalLogger(logger),
+    logger: logger ?? makeLogger(serviceName),
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
       .default(DEFAULT_REQUEST_ID_HEADER)
       .asString()
@@ -78,14 +80,6 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   await server.ready();
 
   return server;
-}
-
-function getFinalLogger(logger: FastifyLogger): FastifyLogger {
-  if (logger !== true) {
-    return logger;
-  }
-  const logLevelEnvVar = getEnvVar('LOG_LEVEL').asString()?.toLowerCase();
-  return logLevelEnvVar ? { level: logLevelEnvVar } : logger;
 }
 
 export async function runFastify(fastifyInstance: FastifyInstance): Promise<void> {

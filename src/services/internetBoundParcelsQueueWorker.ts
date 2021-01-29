@@ -2,10 +2,10 @@ import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-poh
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
-import pino from 'pino';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { makeLogger } from '../utilities/logging';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 interface ActiveParcelData {
@@ -15,12 +15,12 @@ interface ActiveParcelData {
   readonly ack: () => void;
 }
 
-const LOGGER = pino();
-
 export async function processInternetBoundParcels(
   workerName: string,
   ownPohttpAddress: string,
 ): Promise<void> {
+  const logger = makeLogger('pdcout');
+
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
 
@@ -53,7 +53,6 @@ export async function processInternetBoundParcels(
         parcelData.parcelObjectKey,
       );
 
-      // tslint:disable-next-line:no-let
       let wasParcelDelivered = true;
       try {
         await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {
@@ -62,12 +61,12 @@ export async function processInternetBoundParcels(
       } catch (err) {
         wasParcelDelivered = false;
         if (err instanceof PoHTTPInvalidParcelError) {
-          LOGGER.info(
+          logger.info(
             { err, parcelObjectKey: parcelData.parcelObjectKey },
             'Parcel was rejected as invalid',
           );
         } else {
-          LOGGER.warn(
+          logger.warn(
             { err, parcelObjectKey: parcelData.parcelObjectKey },
             'Failed to deliver parcel',
           );
@@ -76,7 +75,7 @@ export async function processInternetBoundParcels(
       }
 
       if (wasParcelDelivered) {
-        LOGGER.debug(
+        logger.debug(
           { parcelObjectKey: parcelData.parcelObjectKey },
           'Parcel was successfully delivered',
         );

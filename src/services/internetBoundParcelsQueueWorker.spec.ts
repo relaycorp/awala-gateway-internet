@@ -1,14 +1,19 @@
 import * as pohttp from '@relaycorp/relaynet-pohttp';
 import { EnvVarError } from 'env-var';
 
-import { arrayToAsyncIterable, mockPino, mockSpy } from '../_test_utils';
+import {
+  arrayToAsyncIterable,
+  makeMockLogging,
+  MockLogging,
+  mockSpy,
+  partialPinoLog,
+} from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import * as logging from '../utilities/logging';
 import { configureMockEnvVars, mockStanMessage, TOMORROW } from './_test_utils';
-import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
-
-const MOCK_PINO = mockPino();
 import { processInternetBoundParcels } from './internetBoundParcelsQueueWorker';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
 const OWN_POHTTP_ADDRESS = 'https://gateway.endpoint/';
 
@@ -49,6 +54,12 @@ const MOCK_DELETE_INTERNET_PARCEL = mockSpy(
   async () => undefined,
 );
 
+let mockLogging: MockLogging;
+beforeAll(() => {
+  mockLogging = makeMockLogging();
+});
+const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
+
 describe('processInternetBoundParcels', () => {
   test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
     MOCK_ENV_VARS({ ...ENV_VARS, [envVar]: undefined });
@@ -56,6 +67,14 @@ describe('processInternetBoundParcels', () => {
     await expect(
       processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS),
     ).rejects.toBeInstanceOf(EnvVarError);
+  });
+
+  test('Logger should be configured', async () => {
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(mockMakeLogger).toBeCalledWith('pdcout');
   });
 
   test('Expired parcels should be skipped and deleted from store', async () => {
@@ -130,9 +149,10 @@ describe('processInternetBoundParcels', () => {
 
     expect(message.ack).toBeCalledTimes(1);
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
-    expect(MOCK_PINO.debug).toBeCalledWith(
-      { parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey },
-      'Parcel was successfully delivered',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel was successfully delivered', {
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+      }),
     );
   });
 
@@ -146,9 +166,11 @@ describe('processInternetBoundParcels', () => {
 
     expect(message.ack).toBeCalledTimes(1);
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
-    expect(MOCK_PINO.info).toBeCalledWith(
-      { err, parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey },
-      'Parcel was rejected as invalid',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Parcel was rejected as invalid', {
+        err: expect.objectContaining({ type: err.name }),
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+      }),
     );
   });
 
@@ -160,9 +182,11 @@ describe('processInternetBoundParcels', () => {
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
-    expect(MOCK_PINO.warn).toBeCalledWith(
-      { err, parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey },
-      'Failed to deliver parcel',
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Failed to deliver parcel', {
+        err: expect.objectContaining({ type: err.name }),
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+      }),
     );
     expect(message.ack).not.toBeCalled();
     expect(MOCK_DELETE_INTERNET_PARCEL).not.toBeCalled();

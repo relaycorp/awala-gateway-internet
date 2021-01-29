@@ -2,9 +2,10 @@ import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
 import { KeyCertPair, Server, ServerCredentials } from 'grpc';
 import grpcHealthCheck from 'grpc-health-check';
-import pino, { Logger } from 'pino';
+import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
 
+import { makeLogger } from '../../utilities/logging';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { makeServiceImplementation } from './service';
 
@@ -33,7 +34,7 @@ export async function runServer(logger?: Logger): Promise<void> {
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
 
-  const baseLogger = logger ?? pino();
+  const baseLogger = logger ?? makeLogger('cogrpc');
   const serviceImplementation = await makeServiceImplementation({
     baseLogger,
     gatewayKeyIdBase64,

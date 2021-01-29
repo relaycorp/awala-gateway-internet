@@ -12,18 +12,19 @@ import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
-import pino from 'pino';
+import { Logger } from 'pino';
 
 import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { makeLogger } from '../utilities/logging';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 
-const LOGGER = pino();
-
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
+  const logger = makeLogger('crcin');
+
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
 
   const mongooseConnection = await createMongooseConnectionFromEnv();
@@ -45,7 +46,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
           // Vault is down or returned an unexpected response
           throw err;
         }
-        LOGGER.info(
+        logger.info(
           { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
           'Cargo payload is invalid',
         );
@@ -57,9 +58,9 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
         let item: Parcel | ParcelCollectionAck;
         try {
           item = await CargoMessageSet.deserializeItem(itemSerialized);
-        } catch (error) {
-          LOGGER.info(
-            { cargoId: cargo.id, error, peerGatewayAddress, worker: workerName },
+        } catch (err) {
+          logger.info(
+            { cargoId: cargo.id, err, peerGatewayAddress, worker: workerName },
             'Cargo contains an invalid message',
           );
           continue;
@@ -74,6 +75,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
             mongooseConnection,
             natsStreamingClient,
             workerName,
+            logger,
           );
         } else {
           await parcelStore.deleteGatewayBoundParcel(
@@ -109,6 +111,7 @@ async function processParcel(
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
   workerName: string,
+  logger: Logger,
 ): Promise<void> {
   let parcelObjectKey: string | null;
   try {
@@ -118,18 +121,18 @@ async function processParcel(
       peerGatewayAddress,
       mongooseConnection,
       natsStreamingClient,
-      LOGGER,
+      logger,
     );
   } catch (err) {
     if (err instanceof InvalidMessageError) {
-      LOGGER.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
+      logger.info({ cargoId, err, peerGatewayAddress, worker: workerName }, 'Parcel is invalid');
       return;
     }
 
     throw err;
   }
 
-  LOGGER.debug(
+  logger.debug(
     {
       cargoId,
       parcelId: parcel.id,

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/schema#",
   "type": "object",
   "required": [
-    "logLevel",
+    "logging",
     "publicAddress",
     "pdcQueue",
     "mongo",
@@ -10,9 +10,15 @@
     "vault"
   ],
   "properties": {
-    "logLevel": {
-      "type": "string",
-      "enum": ["debug", "info", "warn", "error"]
+    "logging": {
+      "type": "object",
+      "required": ["level"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error", "fatal"]
+        }
+      }
     },
     "ingress": {
       "type": "object",

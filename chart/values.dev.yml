@@ -8,7 +8,8 @@ fullnameOverride: public-gateway
 tags:
   dev: true
 
-logLevel: debug
+logging:
+  level: debug
 
 ingress:
   enableTls: false

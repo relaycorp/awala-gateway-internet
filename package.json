@@ -17,7 +17,7 @@
     "test:ci:unit": "run-s build test:ci:unit:jest",
     "test:ci:unit:jest": "jest --config jest.config.ci.js --coverage",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
-    "clean": "trash build test"
+    "clean": "trash build test coverage"
   },
   "engines": {
     "node": ">=12"
@@ -70,6 +70,7 @@
     "@relaycorp/cogrpc": "^1.3.1",
     "@relaycorp/keystore-vault": "^1.2.1",
     "@relaycorp/object-storage": "^1.3.2",
+    "@relaycorp/pino-cloud": "^1.0.2",
     "@relaycorp/relaynet-core": "^1.42.3",
     "@relaycorp/relaynet-pohttp": "^1.6.0",
     "@typegoose/typegoose": "^7.4.8",

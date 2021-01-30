@@ -41,8 +41,6 @@ spec:
             - name: REQUEST_ID_HEADER
               value: {{ .Values.proxyRequestIdHeader | quote }}
             {{- end }}
-            - name: LOG_LEVEL
-              value: {{ .Values.logLevel | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}

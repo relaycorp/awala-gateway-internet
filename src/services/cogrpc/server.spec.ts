@@ -5,7 +5,8 @@ import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
 import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
-import { configureMockEnvVars } from '../_test_utils';
+import * as logging from '../../utilities/logging';
+import { configureMockEnvVars, getMockContext } from '../_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { runServer } from './server';
 import * as cogrpcService from './service';
@@ -41,6 +42,9 @@ const BASE_ENV_VARS = {
   SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
+
+const mockLogger = makeMockLogging().logger;
+const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogger);
 
 describe('runServer', () => {
   test.each([
@@ -124,6 +128,16 @@ describe('runServer', () => {
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 
     expect(mockServer.addService).toBeCalledWith(CargoRelayService, serviceImplementation);
+  });
+
+  test('Logger should be configured if custom logger is absent', async () => {
+    await runServer();
+
+    expect(mockMakeLogger).toBeCalledWith();
+    const logger = getMockContext(mockMakeLogger).results[0].value;
+    expect(makeServiceImplementationSpy).toBeCalledWith(
+      expect.objectContaining({ baseLogger: logger }),
+    );
   });
 
   test('Health check service should be added', async () => {

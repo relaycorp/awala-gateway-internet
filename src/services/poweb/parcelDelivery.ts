@@ -9,8 +9,8 @@ import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Connection } from 'mongoose';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
+import { registerDisallowedMethods } from '../../utilities/fastify';
 import { retrieveOwnCertificates } from '../certs';
-import { registerDisallowedMethods } from '../fastifyUtils';
 import { ParcelStore } from '../parcelStore';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';

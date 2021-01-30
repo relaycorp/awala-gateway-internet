@@ -57,6 +57,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     mockEnvVars({
       ...MONGO_ENV_VARS,
       GATEWAY_KEY_ID: gatewayCertificate.getSerialNumber().toString('base64'),
+      GATEWAY_VERSION: '1.0.2',
     });
   });
 

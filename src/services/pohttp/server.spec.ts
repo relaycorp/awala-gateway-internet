@@ -1,5 +1,5 @@
 import { mockSpy } from '../../_test_utils';
-import * as fastifyUtils from '../fastifyUtils';
+import * as fastifyUtils from '../../utilities/fastify';
 import { makeServer } from './server';
 
 const mockFastifyInstance = {};
@@ -12,7 +12,6 @@ describe('makeServer', () => {
   test('Routes should be loaded', async () => {
     await makeServer();
 
-    expect(mockConfigureFastify).toBeCalledTimes(1);
     expect(mockConfigureFastify).toBeCalledWith([require('./routes').default]);
   });
 

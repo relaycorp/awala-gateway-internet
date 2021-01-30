@@ -3,9 +3,10 @@ import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
 import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
-import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
-import { MAX_RAMF_MESSAGE_SIZE } from './constants';
-import { configureFastify, runFastify } from './fastifyUtils';
+import { configureMockEnvVars, getMockContext, getMockInstance } from '../services/_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
+import { configureFastify, runFastify } from './fastify';
+import * as logging from './logging';
 
 const mockFastify: FastifyInstance = {
   listen: mockSpy(jest.fn()),
@@ -22,43 +23,20 @@ afterAll(() => {
 
 const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
 
+const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'));
+
 const dummyRoutes: FastifyPluginCallback = () => null;
 
 describe('configureFastify', () => {
   test('Logger should be enabled by default', () => {
     configureFastify([dummyRoutes]);
 
-    const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('logger', true);
+    expect(mockMakeLogger).toBeCalledWith();
+    const logger = getMockContext(mockMakeLogger).results[0].value;
+    expect(fastify).toBeCalledWith(expect.objectContaining({ logger }));
   });
 
-  test('Log level in LOG_LEVEL env var should be honoured if present', () => {
-    const loglevel = 'debug';
-    mockEnvVars({ ...MONGO_ENV_VARS, LOG_LEVEL: loglevel });
-
-    configureFastify([dummyRoutes]);
-
-    const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('logger', { level: loglevel });
-  });
-
-  test('Log level in LOG_LEVEL env var should be lower-cased if present', () => {
-    mockEnvVars({ ...MONGO_ENV_VARS, LOG_LEVEL: 'DEBUG' });
-
-    configureFastify([dummyRoutes]);
-
-    const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('logger', { level: 'debug' });
-  });
-
-  test('LOG_LEVEL env var should be ignored if a custom logger is used', () => {
-    configureFastify([dummyRoutes], undefined, false);
-
-    const fastifyCallArgs = getMockContext(fastify).calls[0];
-    expect(fastifyCallArgs[0]).toHaveProperty('logger', false);
-  });
-
-  test('Custom logger should be supported', () => {
+  test('Custom logger should be honoured', () => {
     const customLogger = pino();
     configureFastify([dummyRoutes], undefined, customLogger);
 

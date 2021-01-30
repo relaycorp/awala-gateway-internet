@@ -9,8 +9,8 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
+import { registerDisallowedMethods } from '../../utilities/fastify';
 import { sha256 } from '../../utils';
-import { registerDisallowedMethods } from '../fastifyUtils';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
-import { configureFastify } from '../fastifyUtils';
+import { configureFastify } from '../../utilities/fastify';
 import routes from './routes';
 
 /**

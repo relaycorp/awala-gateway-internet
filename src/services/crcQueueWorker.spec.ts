@@ -18,11 +18,12 @@ import {
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
-import { mockPino, mockSpy, PdaChain } from '../_test_utils';
+import { makeMockLogging, MockLogging, mockSpy, partialPinoLog, PdaChain } from '../_test_utils';
 import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import * as logging from '../utilities/logging';
 import {
   castMock,
   configureMockEnvVars,
@@ -30,11 +31,9 @@ import {
   getMockInstance,
   mockStanMessage,
 } from './_test_utils';
+import { processIncomingCrcCargo } from './crcQueueWorker';
 import * as mongoPublicKeyStore from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
-
-const mockLogger = mockPino();
-import { processIncomingCrcCargo } from './crcQueueWorker';
 
 //region Stan-related fixtures
 
@@ -88,6 +87,7 @@ const mockStoreParcelFromPeerGateway = mockSpy(
 //endregion
 
 const BASE_ENV_VARS = {
+  GATEWAY_VERSION: '1',
   OBJECT_STORE_BUCKET,
 };
 configureMockEnvVars(BASE_ENV_VARS);
@@ -130,7 +130,19 @@ beforeAll(async () => {
   PARCEL_SERIALIZED = await PARCEL.serialize(CERT_CHAIN.pdaGranteePrivateKey);
 });
 
+let mockLogging: MockLogging;
+beforeAll(() => {
+  mockLogging = makeMockLogging();
+});
+const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
+
 describe('Queue subscription', () => {
+  test('Logger should be configured', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockMakeLogger).toBeCalledWith();
+  });
+
   test('Worker should subscribe to channel "crc-cargo"', async () => {
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
@@ -193,14 +205,13 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-  expect(mockLogger.info).toBeCalledWith(
-    {
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Cargo payload is invalid', {
       cargoId: cargo.id,
       err: expect.objectContaining({ message: expect.stringMatching(/Could not deserialize/) }),
       peerGatewayAddress: await cargo.senderCertificate.calculateSubjectPrivateAddress(),
       worker: STUB_WORKER_NAME,
-    },
-    `Cargo payload is invalid`,
+    }),
   );
 
   expect(stanMessage.ack).toBeCalledTimes(1);
@@ -266,18 +277,17 @@ describe('Parcel processing', () => {
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       mockNatsClient,
-      mockLogger,
+      mockLogging.logger,
     );
-    expect(mockLogger.debug).toBeCalledWith(
-      {
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Parcel was stored', {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
         parcelObjectKey: `parcels/${PARCEL.id}`,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
         peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
-      },
-      'Parcel was stored',
+      }),
     );
   });
 
@@ -291,16 +301,15 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockLogger.debug).toBeCalledWith(
-      {
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Ignoring previously processed parcel', {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
         parcelObjectKey: null,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectPrivateAddress(),
         peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
-      },
-      'Ignoring previously processed parcel',
+      }),
     );
   });
 
@@ -313,14 +322,13 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockLogger.info).toBeCalledWith(
-      {
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Parcel is invalid', {
         cargoId: cargo.id,
-        err: expect.any(InvalidMessageError),
+        err: expect.objectContaining({ type: InvalidMessageError.name }),
         peerGatewayAddress: await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
         worker: STUB_WORKER_NAME,
-      },
-      'Parcel is invalid',
+      }),
     );
   });
 
@@ -394,14 +402,13 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
   const cargoSenderAddress = await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress();
-  expect(mockLogger.info).toBeCalledWith(
-    {
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Cargo contains an invalid message', {
       cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
-      error: expect.any(InvalidMessageError),
+      err: expect.objectContaining({ type: InvalidMessageError.name }),
       peerGatewayAddress: cargoSenderAddress,
       worker: STUB_WORKER_NAME,
-    },
-    `Cargo contains an invalid message`,
+    }),
   );
 });
 

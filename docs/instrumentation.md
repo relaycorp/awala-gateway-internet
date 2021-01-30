@@ -4,7 +4,7 @@ permalink: /instrumentation
 ---
 # Instrumentation
 
-We use [pino](https://getpino.io/) to provide structured logs, which could in turn be consumed to provide [instrumentation](https://john-millikin.com/sre-school/instrumentation).
+We use [pino](https://getpino.io/) with [`@relaycorp/pino-cloud`](https://www.npmjs.com/package/@relaycorp/pino-cloud) to provide structured logs, which could in turn be consumed to provide [instrumentation](https://john-millikin.com/sre-school/instrumentation).
 
 ## Common logging attributes
 
@@ -22,4 +22,4 @@ We use log levels as follows:
 - `info`: Events for any outcome observed outside the gateway, or any unusual interaction with a backing service.
 - `warning`: Something has gone wrong but it's being handled gracefully. Triage can start on the next working day.
 - `error`: Something has gone wrong and triage must start within a few minutes. Wake up an SRE if necessary.
-- `critical`: Not used.
+- `fatal`: Not used.

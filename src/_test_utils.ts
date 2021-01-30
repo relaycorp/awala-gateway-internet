@@ -72,20 +72,6 @@ export function mockSpy<T, Y extends any[]>(
   return spy;
 }
 
-/**
- * @deprecated Use `makeMockLogging()` instead.
- */
-export function mockPino(): pino.Logger {
-  const mockPinoLogger = {
-    debug: mockSpy(jest.fn()),
-    error: mockSpy(jest.fn()),
-    info: mockSpy(jest.fn()),
-    warn: mockSpy(jest.fn()),
-  };
-  jest.mock('pino', () => jest.fn().mockImplementation(() => mockPinoLogger));
-  return mockPinoLogger as any;
-}
-
 // tslint:disable-next-line:readonly-array
 export type MockLogSet = object[];
 

@@ -4,7 +4,7 @@ permalink: /instrumentation
 ---
 # Instrumentation
 
-We use [pino](https://getpino.io/) to provide structured logs, which could in turn be consumed to provide [instrumentation](https://john-millikin.com/sre-school/instrumentation).
+We use [pino](https://getpino.io/) with [`@relaycorp/pino-cloud`](https://www.npmjs.com/package/@relaycorp/pino-cloud) to provide structured logs, which could in turn be consumed to provide [instrumentation](https://john-millikin.com/sre-school/instrumentation).
 
 ## Common logging attributes
 

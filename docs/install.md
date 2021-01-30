@@ -62,6 +62,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `ingress.enableTls` | boolean | `true` | Whether the ingress should use TLS. You still have to configure TLS through your cloud provider; see [GKE documentation](https://cloud.google.com/kubernetes-engine/docs/concepts/ingress), for example. |
 | `objectStore.backend` | string | | The type of object store used. Any value supported by [`@relaycorp/object-storage`](https://github.com/relaycorp/object-storage-js) (e.g., `s3`). |
 | `logging.level` | string | `info` | The [log level](./instrumentation.md). |
+| `logging.target` | string | | Any target supported by [@relaycorp/pino-cloud](https://www.npmjs.com/package/@relaycorp/pino-cloud); e.g., `gcp`. |
 
 ### Component-specific options
 

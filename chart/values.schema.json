@@ -17,6 +17,10 @@
         "level": {
           "type": "string",
           "enum": ["debug", "info", "warn", "error", "fatal"]
+        },
+        "target": {
+          "type": "string",
+          "enum": ["gcp"]
         }
       }
     },

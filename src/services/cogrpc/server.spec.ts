@@ -130,10 +130,10 @@ describe('runServer', () => {
     expect(mockServer.addService).toBeCalledWith(CargoRelayService, serviceImplementation);
   });
 
-  test('Pino should be configured with service name if custom logger is absent', async () => {
+  test('Logger should be configured if custom logger is absent', async () => {
     await runServer();
 
-    expect(mockMakeLogger).toBeCalledWith('cogrpc');
+    expect(mockMakeLogger).toBeCalledWith();
     const logger = getMockContext(mockMakeLogger).results[0].value;
     expect(makeServiceImplementationSpy).toBeCalledWith(
       expect.objectContaining({ baseLogger: logger }),

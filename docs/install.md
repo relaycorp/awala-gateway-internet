@@ -63,6 +63,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `objectStore.backend` | string | | The type of object store used. Any value supported by [`@relaycorp/object-storage`](https://github.com/relaycorp/object-storage-js) (e.g., `s3`). |
 | `logging.level` | string | `info` | The [log level](./instrumentation.md). |
 | `logging.target` | string | | Any target supported by [@relaycorp/pino-cloud](https://www.npmjs.com/package/@relaycorp/pino-cloud); e.g., `gcp`. |
+| `logging.envName` | string | `relaynet-internet-gateway` | A unique name for this instance of the gateway. Used by the `gcp` target as the _service name_ when pushing errors to Google Error Reporting, for example. |
 
 ### Component-specific options
 

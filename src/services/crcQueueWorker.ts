@@ -23,7 +23,7 @@ import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
-  const logger = makeLogger('crcin');
+  const logger = makeLogger();
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
 

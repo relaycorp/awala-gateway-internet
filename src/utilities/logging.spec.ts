@@ -10,8 +10,6 @@ const REQUIRED_ENV_VARS = {
 };
 const mockEnvVars = configureMockEnvVars(REQUIRED_ENV_VARS);
 
-const COMPONENT = 'the-component';
-
 jest.mock('@relaycorp/pino-cloud', () => ({
   getPinoOptions: jest.fn().mockReturnValue({}),
 }));
@@ -20,7 +18,7 @@ describe('makeLogger', () => {
   test('Log level should be info if LOG_LEVEL env var is absent', () => {
     mockEnvVars(REQUIRED_ENV_VARS);
 
-    const logger = makeLogger(COMPONENT);
+    const logger = makeLogger();
 
     expect(logger).toHaveProperty('level', 'info');
   });
@@ -29,7 +27,7 @@ describe('makeLogger', () => {
     const loglevel = 'debug';
     mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_LEVEL: loglevel });
 
-    const logger = makeLogger(COMPONENT);
+    const logger = makeLogger();
 
     expect(logger).toHaveProperty('level', loglevel);
   });
@@ -38,7 +36,7 @@ describe('makeLogger', () => {
     const loglevel = 'DEBUG';
     mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_LEVEL: loglevel });
 
-    const logger = makeLogger(COMPONENT);
+    const logger = makeLogger();
 
     expect(logger).toHaveProperty('level', loglevel.toLowerCase());
   });
@@ -46,32 +44,56 @@ describe('makeLogger', () => {
   test('GATEWAY_VERSION env var should be required', () => {
     mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_VERSION: undefined });
 
-    expect(() => makeLogger(COMPONENT)).toThrowWithMessage(EnvVarError, /GATEWAY_VERSION/);
+    expect(() => makeLogger()).toThrowWithMessage(EnvVarError, /GATEWAY_VERSION/);
   });
 
   test('Cloud logging options should be used', () => {
     const messageKey = 'foo';
     getMockInstance(getPinoOptions).mockReturnValue({ messageKey });
-    const logger = makeLogger(COMPONENT);
+    const logger = makeLogger();
 
     expect(logger[pino.symbols.messageKeySym as any]).toEqual(messageKey);
-    expect(getPinoOptions).toBeCalledWith(undefined, {
-      name: COMPONENT,
-      version: REQUIRED_ENV_VARS.GATEWAY_VERSION,
-    });
+  });
+
+  test('App name should be set to LOG_ENV_NAME if present', () => {
+    const envName = 'env-name';
+    mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_ENV_NAME: envName });
+    makeLogger();
+
+    expect(getPinoOptions).toBeCalledWith(undefined, expect.objectContaining({ name: envName }));
+  });
+
+  test('App name should be "relaynet-internet-gateway" if LOG_ENV_NAME if absent', () => {
+    makeLogger();
+
+    expect(getPinoOptions).toBeCalledWith(
+      undefined,
+      expect.objectContaining({ name: 'relaynet-internet-gateway' }),
+    );
+  });
+
+  test('GATEWAY_VERSION should be passed to cloud logging config', () => {
+    makeLogger();
+
+    expect(getPinoOptions).toBeCalledWith(
+      undefined,
+      expect.objectContaining({
+        version: REQUIRED_ENV_VARS.GATEWAY_VERSION,
+      }),
+    );
   });
 
   test('LOG_TARGET env var should be honoured if present', () => {
     const loggingTarget = 'the-logging-target';
     mockEnvVars({ ...REQUIRED_ENV_VARS, LOG_TARGET: loggingTarget });
 
-    makeLogger(COMPONENT);
+    makeLogger();
 
     expect(getPinoOptions).toBeCalledWith(loggingTarget, expect.anything());
   });
 
   test('Logging target should be unset if LOG_TARGET env var is absent', () => {
-    makeLogger(COMPONENT);
+    makeLogger();
 
     expect(getPinoOptions).toBeCalledWith(undefined, expect.anything());
   });

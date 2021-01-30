@@ -140,7 +140,7 @@ describe('Queue subscription', () => {
   test('Logger should be configured', async () => {
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockMakeLogger).toBeCalledWith('crcin');
+    expect(mockMakeLogger).toBeCalledWith();
   });
 
   test('Worker should subscribe to channel "crc-cargo"', async () => {

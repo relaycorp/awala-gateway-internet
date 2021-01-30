@@ -9,16 +9,10 @@ const mockConfigureFastify = mockSpy(
 );
 
 describe('makeServer', () => {
-  test('Service name should be passed to fastify configuration', async () => {
-    await makeServer();
-
-    expect(mockConfigureFastify).toBeCalledWith('pohttp', expect.anything());
-  });
-
   test('Routes should be loaded', async () => {
     await makeServer();
 
-    expect(mockConfigureFastify).toBeCalledWith(expect.anything(), [require('./routes').default]);
+    expect(mockConfigureFastify).toBeCalledWith([require('./routes').default]);
   });
 
   test('Fastify instance should be returned', async () => {

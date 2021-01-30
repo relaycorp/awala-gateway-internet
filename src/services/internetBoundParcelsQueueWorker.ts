@@ -19,7 +19,7 @@ export async function processInternetBoundParcels(
   workerName: string,
   ownPohttpAddress: string,
 ): Promise<void> {
-  const logger = makeLogger('pdcout');
+  const logger = makeLogger();
 
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);

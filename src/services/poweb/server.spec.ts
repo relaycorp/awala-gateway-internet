@@ -13,21 +13,10 @@ const mockConfigureFastify = mockSpy(
 );
 
 describe('makeServer', () => {
-  test('Service name should be passed to fastify configuration', async () => {
-    await makeServer();
-
-    expect(mockConfigureFastify).toBeCalledWith(
-      'poweb',
-      expect.anything(),
-      expect.anything(),
-      undefined,
-    );
-  });
-
   test('Function to retrieve the key pair should be added to the options', async () => {
     await makeServer();
 
-    const routeOptions = mockConfigureFastify.mock.calls[0][2] as RouteOptions;
+    const routeOptions = mockConfigureFastify.mock.calls[0][1] as RouteOptions;
     const retriever = routeOptions.keyPairRetriever;
     const retrieverCertificate = (await retriever()).certificate;
     expect(retrieverCertificate.isEqual(getFixtures().publicGatewayCert)).toBeTrue();
@@ -36,12 +25,7 @@ describe('makeServer', () => {
   test('No logger should be passed by default', async () => {
     await makeServer();
 
-    expect(mockConfigureFastify).toBeCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      undefined,
-    );
+    expect(mockConfigureFastify).toBeCalledWith(expect.anything(), expect.anything(), undefined);
   });
 
   test('Any explicit logger should be honored', async () => {
@@ -49,12 +33,7 @@ describe('makeServer', () => {
 
     await makeServer(logger);
 
-    expect(mockConfigureFastify).toBeCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      logger,
-    );
+    expect(mockConfigureFastify).toBeCalledWith(expect.anything(), expect.anything(), logger);
   });
 
   test('Fastify instance should be returned', async () => {

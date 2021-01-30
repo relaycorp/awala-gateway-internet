@@ -54,14 +54,13 @@ export function registerDisallowedMethods(
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
 export async function configureFastify<RouteOptions extends FastifyPluginOptions = {}>(
-  serviceName: string,
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
   logger?: FastifyLogger,
 ): Promise<FastifyInstance> {
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_SIZE,
-    logger: logger ?? makeLogger(serviceName),
+    logger: logger ?? makeLogger(),
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
       .default(DEFAULT_REQUEST_ID_HEADER)
       .asString()

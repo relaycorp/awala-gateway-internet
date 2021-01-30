@@ -74,7 +74,7 @@ describe('processInternetBoundParcels', () => {
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
-    expect(mockMakeLogger).toBeCalledWith('pdcout');
+    expect(mockMakeLogger).toBeCalledWith();
   });
 
   test('Expired parcels should be skipped and deleted from store', async () => {

@@ -34,7 +34,7 @@ export async function runServer(logger?: Logger): Promise<void> {
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
 
-  const baseLogger = logger ?? makeLogger('cogrpc');
+  const baseLogger = logger ?? makeLogger();
   const serviceImplementation = await makeServiceImplementation({
     baseLogger,
     gatewayKeyIdBase64,

@@ -49,15 +49,19 @@ function makeCargoProcessor(
     const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
     const parcelStore = new ParcelStore(objectStoreClient, parcelStoreBucket);
 
-    for await (const message of messages) {
-      await processCargo(
-        message,
-        gateway,
-        logger.child({ worker: workerName }),
-        parcelStore,
-        mongooseConnection,
-        natsStreamingClient,
-      );
+    try {
+      for await (const message of messages) {
+        await processCargo(
+          message,
+          gateway,
+          logger.child({ worker: workerName }),
+          parcelStore,
+          mongooseConnection,
+          natsStreamingClient,
+        );
+      }
+    } finally {
+      await mongooseConnection.close();
     }
   };
 }

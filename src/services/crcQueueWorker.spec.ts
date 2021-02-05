@@ -277,7 +277,7 @@ describe('Parcel processing', () => {
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       mockNatsClient,
-      mockLogging.logger,
+      expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was stored', {

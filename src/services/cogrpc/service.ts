@@ -258,7 +258,7 @@ async function collectCargo(
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
-    ccaAwareLogger.error({ err, peerGatewayAddress }, 'Failed to send cargo');
+    ccaAwareLogger.error({ err }, 'Failed to send cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
     return;
   }

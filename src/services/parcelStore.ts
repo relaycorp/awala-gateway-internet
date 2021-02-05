@@ -9,10 +9,10 @@ import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { BasicLogger } from '../utilities/types';
 import { convertDateToTimestamp, sha256Hex } from '../utils';
 import { retrieveOwnCertificates } from './certs';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
-import { BasicLogger } from './types';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';

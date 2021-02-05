@@ -31,7 +31,7 @@ describe('configureExitHandling', () => {
 
       handler(ERROR);
 
-      expect(mockLogging.logs).toBeEmpty()
+      expect(mockLogging.logs).toBeEmpty();
       expect(mockFinalLogging.logs).toContainEqual(
         partialPinoLog('fatal', 'uncaughtException', {
           err: expect.objectContaining({ message: ERROR.message }),

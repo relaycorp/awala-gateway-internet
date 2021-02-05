@@ -18,7 +18,14 @@ import {
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
-import { makeMockLogging, MockLogging, mockSpy, partialPinoLog, PdaChain } from '../_test_utils';
+import {
+  arrayBufferFrom,
+  makeMockLogging,
+  MockLogging,
+  mockSpy,
+  partialPinoLog,
+  PdaChain,
+} from '../_test_utils';
 import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
@@ -58,7 +65,7 @@ mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
 
 //region Mongoose-related fixtures
 
-const MOCK_MONGOOSE_CONNECTION: Connection = { what: 'mongooseConnection' } as any;
+const MOCK_MONGOOSE_CONNECTION: Connection = { close: jest.fn() } as any;
 mockSpy(jest.spyOn(mongo, 'createMongooseConnectionFromEnv'), () => MOCK_MONGOOSE_CONNECTION);
 
 //region Keystore-related fixtures
@@ -277,7 +284,7 @@ describe('Parcel processing', () => {
       await CERT_CHAIN.privateGatewayCert.calculateSubjectPrivateAddress(),
       MOCK_MONGOOSE_CONNECTION,
       mockNatsClient,
-      mockLogging.logger,
+      expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was stored', {
@@ -423,6 +430,15 @@ test('Cargo should be acknowledged after messages have been processed', async ()
   await processIncomingCrcCargo(STUB_WORKER_NAME);
 
   expect(stanMessage.ack).toBeCalledTimes(1);
+});
+
+test('Mongoose connection should be closed when the queue ends', async () => {
+  const stanMessage = mockStanMessage(arrayBufferFrom('This is malformed'));
+  mockQueueMessages = [stanMessage];
+
+  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).toReject();
+
+  expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
 });
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {

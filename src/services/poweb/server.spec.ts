@@ -1,3 +1,5 @@
+import pino from 'pino';
+
 import { mockSpy } from '../../_test_utils';
 import * as fastifyUtils from '../../utilities/fastify';
 import { setUpCommonFixtures } from './_test_utils';
@@ -29,7 +31,7 @@ describe('makeServer', () => {
   });
 
   test('Any explicit logger should be honored', async () => {
-    const logger: fastifyUtils.FastifyLogger = { level: 'debug' };
+    const logger = pino();
 
     await makeServer(logger);
 

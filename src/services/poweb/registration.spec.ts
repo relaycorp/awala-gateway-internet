@@ -21,6 +21,8 @@ import { FixtureSet, setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
 
+jest.mock('../../utilities/exitHandling');
+
 const ENDPOINT_URL = '/v1/nodes';
 
 const getFixtures = setUpCommonFixtures();

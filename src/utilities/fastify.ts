@@ -2,7 +2,6 @@ import { get as getEnvVar } from 'env-var';
 import {
   fastify,
   FastifyInstance,
-  FastifyLoggerOptions,
   FastifyPluginCallback,
   FastifyPluginOptions,
   HTTPMethods,
@@ -11,13 +10,12 @@ import { Logger } from 'pino';
 
 import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
+import { configureExitHandling } from './exitHandling';
 import { makeLogger } from './logging';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
 const SERVER_HOST = '0.0.0.0';
-
-export type FastifyLogger = FastifyLoggerOptions | Logger;
 
 export const HTTP_METHODS: readonly HTTPMethods[] = [
   'POST',
@@ -56,11 +54,14 @@ export function registerDisallowedMethods(
 export async function configureFastify<RouteOptions extends FastifyPluginOptions = {}>(
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
-  logger?: FastifyLogger,
+  customLogger?: Logger,
 ): Promise<FastifyInstance> {
+  const logger = customLogger ?? makeLogger();
+  configureExitHandling(logger);
+
   const server = fastify({
     bodyLimit: MAX_RAMF_MESSAGE_SIZE,
-    logger: logger ?? makeLogger(),
+    logger,
     requestIdHeader: getEnvVar('REQUEST_ID_HEADER')
       .default(DEFAULT_REQUEST_ID_HEADER)
       .asString()

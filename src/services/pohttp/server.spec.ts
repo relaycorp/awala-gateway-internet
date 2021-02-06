@@ -2,6 +2,8 @@ import { mockSpy } from '../../_test_utils';
 import * as fastifyUtils from '../../utilities/fastify';
 import { makeServer } from './server';
 
+jest.mock('../../utilities/exitHandling');
+
 const mockFastifyInstance = {};
 const mockConfigureFastify = mockSpy(
   jest.spyOn(fastifyUtils, 'configureFastify'),

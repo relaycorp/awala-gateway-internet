@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 
@@ -7,6 +5,8 @@ import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
+
+jest.mock('../../utilities/exitHandling');
 
 const ENDPOINT_URL = '/v1/pre-registrations';
 

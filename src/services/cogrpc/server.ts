@@ -4,6 +4,7 @@ import { KeyCertPair, Server, ServerCredentials } from 'grpc';
 import grpcHealthCheck from 'grpc-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
+import { configureExitHandling } from '../../utilities/exitHandling';
 
 import { makeLogger } from '../../utilities/logging';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
@@ -19,6 +20,9 @@ const MAX_CONNECTION_AGE_GRACE_SECONDS = 30;
 const MAX_CONNECTION_IDLE_SECONDS = 5;
 
 export async function runServer(logger?: Logger): Promise<void> {
+  const baseLogger = logger ?? makeLogger();
+  configureExitHandling(baseLogger);
+
   const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
   const publicAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
@@ -34,7 +38,6 @@ export async function runServer(logger?: Logger): Promise<void> {
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
 
-  const baseLogger = logger ?? makeLogger();
   const serviceImplementation = await makeServiceImplementation({
     baseLogger,
     gatewayKeyIdBase64,

@@ -11,6 +11,7 @@ export function configureExitHandling(logger: Logger): void {
     }),
   );
 
+  // tslint:disable-next-line:no-object-mutation
   makePromisesSafe.logError = pino.final(logger, (err, finalLogger) => {
     finalLogger.fatal({ err }, 'unhandledRejection');
   });

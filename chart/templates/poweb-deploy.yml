@@ -34,8 +34,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "relaynet-internet-gateway.image" . }}
           imagePullPolicy: IfNotPresent
-          command:
-            - node
+          args:
             - build/main/bin/poweb-server.js
           env:
             {{- if .Values.proxyRequestIdHeader }}

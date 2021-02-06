@@ -24,8 +24,7 @@ spec:
         - name: keygen
           image: {{ include "relaynet-internet-gateway.image" . }}
           imagePullPolicy: IfNotPresent
-          command:
-            - node
+          args:
             - build/main/bin/generate-keypairs.js
           envFrom:
             - configMapRef:

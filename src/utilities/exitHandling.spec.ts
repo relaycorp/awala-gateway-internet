@@ -1,11 +1,8 @@
-import makePromisesSafe from 'make-promises-safe';
 import pino from 'pino';
 
 import { makeMockLogging, MockLogging, mockSpy, partialPinoLog } from '../_test_utils';
 import { getMockContext } from '../services/_test_utils';
 import { configureExitHandling } from './exitHandling';
-
-jest.mock('make-promises-safe');
 
 const ERROR = new Error('Oh noes');
 
@@ -51,19 +48,6 @@ describe('configureExitHandling', () => {
       handler(ERROR);
 
       expect(mockProcessExit).toBeCalledWith(1);
-    });
-  });
-
-  describe('make-promises-safe logger', () => {
-    test('Error should be logged as fatal', () => {
-      makePromisesSafe.logError(ERROR);
-
-      expect(mockLogging.logs).toBeEmpty();
-      expect(mockFinalLogging.logs).toContainEqual(
-        partialPinoLog('fatal', 'unhandledRejection', {
-          err: expect.objectContaining({ message: ERROR.message }),
-        }),
-      );
     });
   });
 });

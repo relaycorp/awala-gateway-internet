@@ -10,6 +10,7 @@ import {
 } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { configureMockEnvVars, mockStanMessage, TOMORROW } from './_test_utils';
 import { processInternetBoundParcels } from './internetBoundParcelsQueueWorker';
@@ -30,7 +31,7 @@ const MOCK_NATS_CLIENT_INIT = mockSpy(
 const ENV_VARS = {
   OBJECT_STORE_BUCKET: 'the-bucket',
 };
-const MOCK_ENV_VARS = configureMockEnvVars(ENV_VARS);
+const mockEnvVars = configureMockEnvVars(ENV_VARS);
 
 const MOCK_DELIVER_PARCEL = mockSpy(jest.spyOn(pohttp, 'deliverParcel'), async () => undefined);
 
@@ -60,21 +61,43 @@ beforeAll(() => {
 });
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
+const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
+
 describe('processInternetBoundParcels', () => {
-  test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
-    MOCK_ENV_VARS({ ...ENV_VARS, [envVar]: undefined });
-
-    await expect(
-      processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS),
-    ).rejects.toBeInstanceOf(EnvVarError);
-  });
-
   test('Logger should be configured', async () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
     expect(mockMakeLogger).toBeCalledWith();
+  });
+
+  test('Exit handler should be configured as the very first step', async () => {
+    mockEnvVars({});
+
+    await expect(processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS)).toReject();
+
+    expect(mockExitHandler).toBeCalledWith(
+      expect.toSatisfy((logger) => logger.bindings().worker === WORKER_NAME),
+    );
+  });
+
+  test('Start of the queue should be logged', async () => {
+    mockEnvVars({});
+
+    await expect(processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS)).toReject();
+
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Starting queue worker', { worker: WORKER_NAME }),
+    );
+  });
+
+  test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
+    mockEnvVars({ ...ENV_VARS, [envVar]: undefined });
+
+    await expect(
+      processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS),
+    ).rejects.toBeInstanceOf(EnvVarError);
   });
 
   test('Expired parcels should be skipped and deleted from store', async () => {
@@ -152,6 +175,7 @@ describe('processInternetBoundParcels', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was successfully delivered', {
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        worker: WORKER_NAME,
       }),
     );
   });
@@ -170,6 +194,7 @@ describe('processInternetBoundParcels', () => {
       partialPinoLog('info', 'Parcel was rejected as invalid', {
         err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        worker: WORKER_NAME,
       }),
     );
   });
@@ -186,6 +211,7 @@ describe('processInternetBoundParcels', () => {
       partialPinoLog('warn', 'Failed to deliver parcel', {
         err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        worker: WORKER_NAME,
       }),
     );
     expect(message.ack).not.toBeCalled();

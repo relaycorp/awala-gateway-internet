@@ -18,11 +18,16 @@ import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 import { ParcelStore } from './parcelStore';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
+  const logger = makeLogger().child({ worker: workerName });
+  configureExitHandling(logger);
+  logger.info('Starting queue worker');
+
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
 
   const queueConsumer = natsStreamingClient.makeQueueConsumer(
@@ -32,16 +37,14 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     undefined,
     '-consumer',
   );
-  await pipe(queueConsumer, makeCargoProcessor(workerName, natsStreamingClient));
+  await pipe(queueConsumer, makeCargoProcessor(natsStreamingClient, logger));
 }
 
 function makeCargoProcessor(
-  workerName: string,
   natsStreamingClient: NatsStreamingClient,
+  logger: Logger,
 ): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
-    const logger = makeLogger();
-
     const mongooseConnection = await createMongooseConnectionFromEnv();
     const gateway = new Gateway(initVaultKeyStore(), new MongoPublicKeyStore(mongooseConnection));
 
@@ -54,7 +57,7 @@ function makeCargoProcessor(
         await processCargo(
           message,
           gateway,
-          logger.child({ worker: workerName }),
+          logger,
           parcelStore,
           mongooseConnection,
           natsStreamingClient,

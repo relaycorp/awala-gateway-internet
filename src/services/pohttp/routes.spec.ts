@@ -15,6 +15,8 @@ import {
 import { ParcelStore } from '../parcelStore';
 import { makeServer } from './server';
 
+jest.mock('../../utilities/exitHandling');
+
 const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' } as any, ObjectId: {} };
 mockFastifyMongoose(mockFastifyMongooseObject);
 

@@ -5,6 +5,7 @@ import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
 import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
+import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
 import { configureMockEnvVars, getMockContext } from '../_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
@@ -33,6 +34,8 @@ const mockSelfSignedOutput = {
 };
 const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSelfSignedOutput);
 
+const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
+
 const BASE_ENV_VARS = {
   GATEWAY_KEY_ID: 'base64-encoded key id',
   NATS_CLUSTER_ID: 'nats-cluster-id',
@@ -47,6 +50,13 @@ const mockLogger = makeMockLogging().logger;
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogger);
 
 describe('runServer', () => {
+  test('Exit handler should be configured as the very first step', async () => {
+    mockEnvVars({});
+
+    await expect(runServer()).toReject();
+    expect(mockExitHandler).toBeCalledWith(mockLogger);
+  });
+
   test.each([
     'GATEWAY_KEY_ID',
     'NATS_SERVER_URL',

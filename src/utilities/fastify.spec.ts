@@ -5,6 +5,7 @@ import pino from 'pino';
 import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
 import { configureMockEnvVars, getMockContext, getMockInstance } from '../services/_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
+import * as exitHandling from './exitHandling';
 import { configureFastify, runFastify } from './fastify';
 import * as logging from './logging';
 
@@ -25,6 +26,8 @@ const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
 
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'));
 
+const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
+
 const dummyRoutes: FastifyPluginCallback = () => null;
 
 describe('configureFastify', () => {
@@ -34,6 +37,8 @@ describe('configureFastify', () => {
     expect(mockMakeLogger).toBeCalledWith();
     const logger = getMockContext(mockMakeLogger).results[0].value;
     expect(fastify).toBeCalledWith(expect.objectContaining({ logger }));
+
+    expect(mockExitHandler).toBeCalledWith(logger);
   });
 
   test('Custom logger should be honoured', () => {
@@ -45,6 +50,7 @@ describe('configureFastify', () => {
         logger: customLogger,
       }),
     );
+    expect(mockExitHandler).toBeCalledWith(customLogger);
   });
 
   test('X-Request-Id should be the default request id header', () => {

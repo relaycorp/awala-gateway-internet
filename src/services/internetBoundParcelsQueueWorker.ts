@@ -5,6 +5,7 @@ import * as stan from 'node-nats-streaming';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
 
@@ -19,7 +20,9 @@ export async function processInternetBoundParcels(
   workerName: string,
   ownPohttpAddress: string,
 ): Promise<void> {
-  const logger = makeLogger();
+  const logger = makeLogger().child({ worker: workerName });
+  configureExitHandling(logger);
+  logger.info('Starting queue worker');
 
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);

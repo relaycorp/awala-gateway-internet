@@ -30,6 +30,7 @@ import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import {
   castMock,
@@ -61,7 +62,10 @@ beforeEach(() => {
     makeQueueConsumer: jest.fn().mockImplementation(mockMakeQueueConsumer),
   });
 });
-mockSpy(jest.spyOn(NatsStreamingClient, 'initFromEnv'), () => mockNatsClient);
+const mockNatsInitFromEnv = mockSpy(
+  jest.spyOn(NatsStreamingClient, 'initFromEnv'),
+  () => mockNatsClient,
+);
 
 //region Mongoose-related fixtures
 
@@ -143,11 +147,33 @@ beforeAll(() => {
 });
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
 
+const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
+
 describe('Queue subscription', () => {
   test('Logger should be configured', async () => {
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
     expect(mockMakeLogger).toBeCalledWith();
+  });
+
+  test('Exit handler should be configured as the very first step', async () => {
+    const error = new Error('oh noes');
+    mockNatsInitFromEnv.mockImplementation(() => {
+      throw error;
+    });
+
+    await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(error);
+    expect(mockExitHandler).toBeCalledWith(
+      expect.toSatisfy((logger) => logger.bindings().worker === STUB_WORKER_NAME),
+    );
+  });
+
+  test('Start of the queue should be logged', async () => {
+    await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Starting queue worker', { worker: STUB_WORKER_NAME }),
+    );
   });
 
   test('Worker should subscribe to channel "crc-cargo"', async () => {

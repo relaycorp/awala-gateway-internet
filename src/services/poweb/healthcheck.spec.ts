@@ -2,6 +2,8 @@ import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeServer } from './server';
 
+jest.mock('../../utilities/exitHandling');
+
 describe('healthcheck', () => {
   setUpCommonFixtures();
 

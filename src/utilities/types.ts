@@ -16,5 +16,6 @@ export interface BasicLogger {
   readonly info: LogMethod;
   readonly warn: LogMethod;
   readonly error: LogMethod;
+  readonly fatal: LogMethod;
   readonly child: (bindings: Bindings) => BasicLogger;
 }

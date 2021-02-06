@@ -6,6 +6,8 @@ import { setUpCommonFixtures } from './_test_utils';
 import RouteOptions from './RouteOptions';
 import { makeServer } from './server';
 
+jest.mock('../../utilities/exitHandling');
+
 const getFixtures = setUpCommonFixtures();
 
 const mockFastifyInstance = {};

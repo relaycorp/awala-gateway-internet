@@ -34,6 +34,8 @@ import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer } from './parcelCollection';
 import { WebSocketCode } from './websockets';
 
+jest.mock('../../utilities/exitHandling');
+
 const REQUEST_ID_HEADER = 'X-Request';
 
 const getFixtures = setUpCommonFixtures();

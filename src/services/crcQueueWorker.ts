@@ -37,11 +37,10 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     undefined,
     '-consumer',
   );
-  await pipe(queueConsumer, makeCargoProcessor(workerName, natsStreamingClient, logger));
+  await pipe(queueConsumer, makeCargoProcessor(natsStreamingClient, logger));
 }
 
 function makeCargoProcessor(
-  workerName: string,
   natsStreamingClient: NatsStreamingClient,
   logger: Logger,
 ): (messages: AsyncIterable<Message>) => Promise<void> {
@@ -58,7 +57,7 @@ function makeCargoProcessor(
         await processCargo(
           message,
           gateway,
-          logger.child({ worker: workerName }),
+          logger,
           parcelStore,
           mongooseConnection,
           natsStreamingClient,

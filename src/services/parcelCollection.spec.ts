@@ -1,5 +1,3 @@
-/* tslint:disable:no-let */
-
 import { generateRSAKeyPair, Parcel, ParcelCollectionAck } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';

@@ -1,4 +1,3 @@
-// tslint:disable:no-console
 import {
   Certificate,
   generateECDHKeyPair,
@@ -13,6 +12,11 @@ import { get as getEnvVar } from 'env-var';
 import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { OwnCertificate } from '../services/models';
+import { configureExitHandling } from '../utilities/exitHandling';
+import { makeLogger } from '../utilities/logging';
+
+const LOGGER = makeLogger();
+configureExitHandling(LOGGER);
 
 const NODE_CERTIFICATE_TTL_DAYS = 180;
 const SESSION_CERTIFICATE_TTL_DAYS = 60;
@@ -25,10 +29,10 @@ async function main(): Promise<void> {
   const keyId = Buffer.from(KEY_ID_BASE64, 'base64');
   try {
     await sessionStore.fetchNodeKey(keyId);
-    console.warn(`Gateway key ${KEY_ID_BASE64} already exists`);
+    LOGGER.warn(`Gateway key ${KEY_ID_BASE64} already exists`);
     return;
   } catch (error) {
-    console.log(`Gateway key will be created because it doesn't already exist`);
+    LOGGER.info(`Gateway key will be created because it doesn't already exist`);
   }
 
   const gatewayKeyPair = await generateRSAKeyPair();
@@ -62,12 +66,13 @@ async function main(): Promise<void> {
   });
   await sessionStore.saveInitialSessionKey(initialSessionKeyPair.privateKey, initialKeyCertificate);
 
-  console.log(
-    JSON.stringify({
+  LOGGER.info(
+    {
       gatewayCertificate: base64Encode(gatewayCertificate.serialize()),
       initialSessionCertificate: base64Encode(initialKeyCertificate.serialize()),
       keyPairId: KEY_ID_BASE64,
-    }),
+    },
+    'Key pairs were successfully generated',
   );
 }
 

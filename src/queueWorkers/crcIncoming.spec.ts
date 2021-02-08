@@ -30,18 +30,18 @@ import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
-import * as exitHandling from '../utilities/exitHandling';
-import * as logging from '../utilities/logging';
 import {
   castMock,
   configureMockEnvVars,
   generatePdaChain,
   getMockInstance,
   mockStanMessage,
-} from './_test_utils';
-import { processIncomingCrcCargo } from './crcQueueWorker';
-import * as mongoPublicKeyStore from './MongoPublicKeyStore';
-import { ParcelStore } from './parcelStore';
+} from '../services/_test_utils';
+import * as mongoPublicKeyStore from '../services/MongoPublicKeyStore';
+import { ParcelStore } from '../services/parcelStore';
+import * as exitHandling from '../utilities/exitHandling';
+import * as logging from '../utilities/logging';
+import { processIncomingCrcCargo } from './crcIncoming';
 
 //region Stan-related fixtures
 

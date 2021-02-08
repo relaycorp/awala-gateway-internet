@@ -10,11 +10,11 @@ import {
 } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import { configureMockEnvVars, mockStanMessage, TOMORROW } from '../services/_test_utils';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from '../services/parcelStore';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
-import { configureMockEnvVars, mockStanMessage, TOMORROW } from './_test_utils';
-import { processInternetBoundParcels } from './internetBoundParcelsQueueWorker';
-import { ParcelStore, QueuedInternetBoundParcelMessage } from './parcelStore';
+import { processInternetBoundParcels } from './pdcOutgoing';
 
 const OWN_POHTTP_ADDRESS = 'https://gateway.endpoint/';
 

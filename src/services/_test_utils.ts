@@ -1,5 +1,3 @@
-/* tslint:disable:no-let */
-
 import {
   Certificate,
   generateRSAKeyPair,

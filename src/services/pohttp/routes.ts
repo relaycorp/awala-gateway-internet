@@ -4,8 +4,8 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { registerDisallowedMethods } from '../../utilities/fastify';
-import { ParcelStore } from '../parcelStore';
+import { ParcelStore } from '../../parcelStore';
+import { registerDisallowedMethods } from '../fastify';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -43,7 +43,6 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      // tslint:disable-next-line:no-let
       let parcel;
       try {
         parcel = await Parcel.deserialize(bufferToArray(request.body));

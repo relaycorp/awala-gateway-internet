@@ -1,4 +1,4 @@
-// tslint:disable:no-let no-object-mutation
+// tslint:disable:no-object-mutation
 
 import {
   Certificate,
@@ -11,7 +11,7 @@ import {
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';
 
-import { mockSpy } from '../_test_utils';
+import { mockSpy } from './_test_utils';
 import { PeerPublicKeyData } from './models';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 

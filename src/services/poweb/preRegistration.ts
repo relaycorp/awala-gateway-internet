@@ -2,7 +2,7 @@ import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { registerDisallowedMethods } from '../../utilities/fastify';
+import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 

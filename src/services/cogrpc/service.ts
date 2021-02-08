@@ -15,14 +15,14 @@ import { Logger } from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
-import { initMongoDBKeyStore, initVaultKeyStore } from '../../backingServices/keyStores';
-import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
+import { createMongooseConnectionFromEnv, initMongoDBKeyStore } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
-import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
-import { retrieveOwnCertificates } from '../certs';
-import { generatePCAs } from '../parcelCollection';
-import { ParcelObject, ParcelStore } from '../parcelStore';
+import { initVaultKeyStore } from '../../backingServices/vault';
+import { recordCCAFulfillment, wasCCAFulfilled } from '../../ccaFulfilments';
+import { retrieveOwnCertificates } from '../../certs';
+import { generatePCAs } from '../../parcelCollection';
+import { ParcelObject, ParcelStore } from '../../parcelStore';
 
 const INTERNAL_SERVER_ERROR = {
   code: grpc.status.UNAVAILABLE,
@@ -101,16 +101,13 @@ async function deliverCargo(
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');
 
-  // tslint:disable-next-line:no-let
   let cargoesDelivered = 0;
 
   async function* validateDelivery(
     source: AsyncIterable<CargoDelivery>,
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
-      // tslint:disable-next-line:no-let
       let peerGatewayAddress: string | null = null;
-      // tslint:disable-next-line:no-let
       let cargoId: string | null = null;
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));

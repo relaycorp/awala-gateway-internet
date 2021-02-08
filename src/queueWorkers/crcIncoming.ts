@@ -14,14 +14,14 @@ import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 
-import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
+import { initVaultKeyStore } from '../backingServices/vault';
+import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
-import { MongoPublicKeyStore } from './MongoPublicKeyStore';
-import { ParcelStore } from './parcelStore';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });

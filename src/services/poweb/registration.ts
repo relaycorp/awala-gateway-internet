@@ -8,9 +8,9 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
+import { sha256 } from '../../utilities/crypto';
 
-import { registerDisallowedMethods } from '../../utilities/fastify';
-import { sha256 } from '../../utils';
+import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
@@ -45,7 +45,6 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      // tslint:disable-next-line:no-let
       let registrationRequest: PrivateNodeRegistrationRequest;
       try {
         registrationRequest = await PrivateNodeRegistrationRequest.deserialize(
@@ -60,7 +59,6 @@ export default async function registerRoutes(
 
       const publicGatewayKeyPair = await options.keyPairRetriever();
 
-      // tslint:disable-next-line:no-let
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
         registrationAuthorization = await PrivateNodeRegistrationAuthorization.deserialize(

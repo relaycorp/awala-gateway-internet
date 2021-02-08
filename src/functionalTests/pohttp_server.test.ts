@@ -11,7 +11,6 @@ import {
 } from './utils';
 
 describe('PoHTTP server', () => {
-  // tslint:disable-next-line:no-let
   let stanConnection: Stan;
   beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
   afterEach(async () => {

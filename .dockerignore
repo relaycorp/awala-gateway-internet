@@ -1,7 +1,7 @@
 *
 
 !src
-src/functional_tests
+src/functionalTests
 src/**/*.spec.ts
 src/**/_test_utils.ts
 

@@ -5,10 +5,10 @@ import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
 import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
+import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
 import { configureMockEnvVars, getMockContext } from '../_test_utils';
-import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 

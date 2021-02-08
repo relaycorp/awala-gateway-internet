@@ -9,9 +9,9 @@ import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Connection } from 'mongoose';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { registerDisallowedMethods } from '../../utilities/fastify';
-import { retrieveOwnCertificates } from '../certs';
-import { ParcelStore } from '../parcelStore';
+import { retrieveOwnCertificates } from '../../certs';
+import { ParcelStore } from '../../parcelStore';
+import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 
@@ -54,7 +54,6 @@ export default async function registerRoutes(
           .send({ message: 'Parcel delivery countersignature is either missing or invalid' });
       }
 
-      // tslint:disable-next-line:no-let
       let parcel: Parcel;
       try {
         parcel = await Parcel.deserialize(parcelSerialized);
@@ -70,7 +69,6 @@ export default async function registerRoutes(
       const natsStreamingClient = NatsStreamingClient.initFromEnv(
         `poweb-parcel-delivery-${request.id}`,
       );
-      // tslint:disable-next-line:no-let
       let parcelObjectKey: string | null;
       try {
         parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(

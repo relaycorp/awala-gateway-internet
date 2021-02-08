@@ -21,8 +21,8 @@ import WebSocket, {
 } from 'ws';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { retrieveOwnCertificates } from '../certs';
-import { ParcelStore, ParcelStreamMessage } from '../parcelStore';
+import { retrieveOwnCertificates } from '../../certs';
+import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { WebSocketCode } from './websockets';
 
 // The largest payload the client could send is the handshake response, which should be < 1.9 kib
@@ -142,7 +142,6 @@ async function doHandshake(
 
   return new Promise((resolve) => {
     wsConnection.once('message', async (message: Buffer) => {
-      // tslint:disable-next-line:no-let
       let handshakeResponse: HandshakeResponse;
       try {
         handshakeResponse = HandshakeResponse.deserialize(bufferToArray(message));
@@ -168,7 +167,6 @@ async function doHandshake(
 
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
 
-      // tslint:disable-next-line:no-let
       let peerGatewayCertificate: Certificate;
       try {
         peerGatewayCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(

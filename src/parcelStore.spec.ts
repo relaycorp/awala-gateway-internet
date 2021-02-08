@@ -16,15 +16,9 @@ import {
   partialPinoLog,
   PdaChain,
   sha256Hex,
-} from '../_test_utils';
-import * as natsStreaming from '../backingServices/natsStreaming';
-import * as objectStorage from '../backingServices/objectStorage';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  mockStanMessage,
 } from './_test_utils';
+import * as natsStreaming from './backingServices/natsStreaming';
+import * as objectStorage from './backingServices/objectStorage';
 import * as certs from './certs';
 import * as parcelCollection from './parcelCollection';
 import {
@@ -33,6 +27,12 @@ import {
   ParcelStore,
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
+import {
+  configureMockEnvVars,
+  generatePdaChain,
+  getMockInstance,
+  mockStanMessage,
+} from './services/_test_utils';
 
 const BUCKET = 'the-bucket-name';
 

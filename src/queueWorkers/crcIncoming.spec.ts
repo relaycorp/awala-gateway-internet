@@ -26,22 +26,22 @@ import {
   partialPinoLog,
   PdaChain,
 } from '../_test_utils';
-import * as privateKeyStore from '../backingServices/keyStores';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
-import * as exitHandling from '../utilities/exitHandling';
-import * as logging from '../utilities/logging';
+import * as vault from '../backingServices/vault';
+import * as mongoPublicKeyStore from '../MongoPublicKeyStore';
+import { ParcelStore } from '../parcelStore';
 import {
   castMock,
   configureMockEnvVars,
   generatePdaChain,
   getMockInstance,
   mockStanMessage,
-} from './_test_utils';
-import { processIncomingCrcCargo } from './crcQueueWorker';
-import * as mongoPublicKeyStore from './MongoPublicKeyStore';
-import { ParcelStore } from './parcelStore';
+} from '../services/_test_utils';
+import * as exitHandling from '../utilities/exitHandling';
+import * as logging from '../utilities/logging';
+import { processIncomingCrcCargo } from './crcIncoming';
 
 //region Stan-related fixtures
 
@@ -80,7 +80,7 @@ beforeEach(() => {
   mockPrivateKeyStore = new MockPrivateKeyStore();
   mockPublicKeyStore = new MockPublicKeyStore();
 });
-mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 mockSpy(jest.spyOn(mongoPublicKeyStore, 'MongoPublicKeyStore'), () => mockPublicKeyStore);
 
 //region Parcel store-related fixtures

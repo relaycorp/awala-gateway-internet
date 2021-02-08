@@ -7,12 +7,13 @@ import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
-import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
-import { BasicLogger } from '../utilities/types';
-import { convertDateToTimestamp, sha256Hex } from '../utils';
+import { NatsStreamingClient } from './backingServices/natsStreaming';
+import { initObjectStoreFromEnv } from './backingServices/objectStorage';
 import { retrieveOwnCertificates } from './certs';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
+import { sha256Hex } from './utilities/crypto';
+import { convertDateToTimestamp } from './utilities/time';
+import { BasicLogger } from './utilities/types';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';

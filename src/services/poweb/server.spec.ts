@@ -1,7 +1,7 @@
 import pino from 'pino';
 
 import { mockSpy } from '../../_test_utils';
-import * as fastifyUtils from '../../utilities/fastify';
+import * as fastifyUtils from '../fastify';
 import { setUpCommonFixtures } from './_test_utils';
 import RouteOptions from './RouteOptions';
 import { makeServer } from './server';

@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import {
   CargoCollectionAuthorization,
   generateRSAKeyPair,
@@ -8,7 +6,7 @@ import {
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';
 
-import { mockSpy } from '../_test_utils';
+import { mockSpy } from './_test_utils';
 import { recordCCAFulfillment, wasCCAFulfilled } from './ccaFulfilments';
 import { CCAFulfillment } from './models';
 

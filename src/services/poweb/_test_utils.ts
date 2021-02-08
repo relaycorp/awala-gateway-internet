@@ -2,9 +2,9 @@ import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
 import { arrayToAsyncIterable, mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
-import * as privateKeyStore from '../../backingServices/keyStores';
+import * as vault from '../../backingServices/vault';
+import { ParcelStore } from '../../parcelStore';
 import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
-import { ParcelStore } from '../parcelStore';
 
 export interface FixtureSet extends PdaChain {
   readonly mongooseConnection: Connection;
@@ -49,7 +49,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
       certificatePath.publicGatewayCert,
     );
   });
-  mockSpy(jest.spyOn(privateKeyStore, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
   const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
   beforeEach(() => {

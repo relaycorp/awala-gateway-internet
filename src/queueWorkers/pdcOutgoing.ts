@@ -5,7 +5,7 @@ import * as stan from 'node-nats-streaming';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
-import { ParcelStore, QueuedInternetBoundParcelMessage } from '../services/parcelStore';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 

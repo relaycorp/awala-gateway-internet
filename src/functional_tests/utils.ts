@@ -14,7 +14,7 @@ import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../_test_utils';
-import { initVaultKeyStore } from '../backingServices/keyStores';
+import { initVaultKeyStore } from '../backingServices/vault';
 import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();

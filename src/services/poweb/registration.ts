@@ -8,9 +8,9 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
+import { sha256 } from '../../utilities/crypto';
 
-import { registerDisallowedMethods } from '../../utilities/fastify';
-import { sha256 } from '../../utils';
+import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 

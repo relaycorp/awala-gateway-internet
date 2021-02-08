@@ -9,9 +9,9 @@ import {
 import { Logger } from 'pino';
 
 import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
-import { MAX_RAMF_MESSAGE_SIZE } from '../services/constants';
-import { configureExitHandling } from './exitHandling';
-import { makeLogger } from './logging';
+import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
+import { configureExitHandling } from '../utilities/exitHandling';
+import { makeLogger } from '../utilities/logging';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;

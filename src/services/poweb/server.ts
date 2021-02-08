@@ -3,8 +3,8 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 import { Logger } from 'pino';
 
-import { initVaultKeyStore } from '../../backingServices/keyStores';
-import { configureFastify } from '../../utilities/fastify';
+import { initVaultKeyStore } from '../../backingServices/vault';
+import { configureFastify } from '../fastify';
 import healthcheck from './healthcheck';
 import parcelCollection from './parcelCollection';
 import parcelDelivery from './parcelDelivery';

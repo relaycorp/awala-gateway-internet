@@ -10,8 +10,8 @@ import {
 } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
+import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureMockEnvVars, mockStanMessage, TOMORROW } from '../services/_test_utils';
-import { ParcelStore, QueuedInternetBoundParcelMessage } from '../services/parcelStore';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processInternetBoundParcels } from './pdcOutgoing';

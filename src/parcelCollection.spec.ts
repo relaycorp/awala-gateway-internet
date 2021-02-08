@@ -2,10 +2,10 @@ import { generateRSAKeyPair, Parcel, ParcelCollectionAck } from '@relaycorp/rela
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';
 
-import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from '../_test_utils';
-import { generateStubEndpointCertificate } from './_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, mockSpy } from './_test_utils';
 import { ParcelCollection } from './models';
 import { generatePCAs, recordParcelCollection, wasParcelCollected } from './parcelCollection';
+import { generateStubEndpointCertificate } from './services/_test_utils';
 
 const PEER_GATEWAY_PRIVATE_ADDRESS = '0deadbeef';
 

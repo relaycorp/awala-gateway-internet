@@ -4,6 +4,7 @@ import { InjectOptions } from 'light-my-request';
 
 import { mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
+import { ParcelStore } from '../../parcelStore';
 import {
   configureMockEnvVars,
   generatePdaChain,
@@ -12,7 +13,6 @@ import {
   mockFastifyMongoose,
   testDisallowedMethods,
 } from '../_test_utils';
-import { ParcelStore } from '../parcelStore';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');

@@ -4,8 +4,8 @@ import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { registerDisallowedMethods } from '../../utilities/fastify';
-import { ParcelStore } from '../parcelStore';
+import { ParcelStore } from '../../parcelStore';
+import { registerDisallowedMethods } from '../fastify';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,

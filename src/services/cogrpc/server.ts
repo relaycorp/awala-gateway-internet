@@ -6,8 +6,8 @@ import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
 import { configureExitHandling } from '../../utilities/exitHandling';
 
+import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import { makeLogger } from '../../utilities/logging';
-import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { makeServiceImplementation } from './service';
 
 const NETLOC = '0.0.0.0:8080';

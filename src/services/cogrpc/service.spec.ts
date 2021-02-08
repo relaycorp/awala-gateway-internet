@@ -39,19 +39,19 @@ import {
   PdaChain,
   UUID4_REGEX,
 } from '../../_test_utils';
-import * as keyStores from '../../backingServices/keyStores';
 import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
+import * as vault from '../../backingServices/vault';
+import * as ccaFulfillments from '../../ccaFulfilments';
+import * as certs from '../../certs';
+import * as parcelCollectionAck from '../../parcelCollection';
+import { ParcelStore } from '../../parcelStore';
 import {
   configureMockEnvVars,
   generatePdaChain,
   getMockInstance,
   reSerializeCertificate,
 } from '../_test_utils';
-import * as ccaFulfillments from '../ccaFulfilments';
-import * as certs from '../certs';
-import * as parcelCollectionAck from '../parcelCollection';
-import { ParcelStore } from '../parcelStore';
 import { MockGrpcBidiCall } from './_test_utils';
 import { makeServiceImplementation, ServiceImplementationOptions } from './service';
 
@@ -408,7 +408,7 @@ describe('deliverCargo', () => {
 
 describe('collectCargo', () => {
   const PRIVATE_KEY_STORE = new MockPrivateKeyStore();
-  mockSpy(jest.spyOn(keyStores, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
+  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
   beforeEach(async () => {
     PRIVATE_KEY_STORE.clear();
     await PRIVATE_KEY_STORE.registerNodeKey(
@@ -418,7 +418,7 @@ describe('collectCargo', () => {
   });
 
   const PUBLIC_KEYS_STORE = new MockPublicKeyStore();
-  mockSpy(jest.spyOn(keyStores, 'initMongoDBKeyStore'), (connection) => {
+  mockSpy(jest.spyOn(mongo, 'initMongoDBKeyStore'), (connection) => {
     expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
     return PUBLIC_KEYS_STORE;
   });

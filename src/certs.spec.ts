@@ -5,10 +5,10 @@ import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Connection } from 'mongoose';
 
-import { mockSpy } from '../_test_utils';
-import { expectBuffersToEqual, generateStubEndpointCertificate } from './_test_utils';
+import { mockSpy } from './_test_utils';
 import { retrieveOwnCertificates } from './certs';
 import { OwnCertificate } from './models';
+import { expectBuffersToEqual, generateStubEndpointCertificate } from './services/_test_utils';
 
 const stubConnection: Connection = { whoAreYou: 'the-stub-connection' } as any;
 

@@ -9,9 +9,9 @@ import { getModelForClass } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 
-import { initVaultKeyStore } from '../backingServices/keyStores';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
-import { OwnCertificate } from '../services/models';
+import { initVaultKeyStore } from '../backingServices/vault';
+import { OwnCertificate } from '../models';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 

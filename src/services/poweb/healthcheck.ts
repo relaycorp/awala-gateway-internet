@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 
-import { registerDisallowedMethods } from '../../utilities/fastify';
+import { registerDisallowedMethods } from '../fastify';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,

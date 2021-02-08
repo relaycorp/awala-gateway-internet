@@ -15,14 +15,14 @@ import { Logger } from 'pino';
 import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
-import { initMongoDBKeyStore, initVaultKeyStore } from '../../backingServices/keyStores';
-import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
+import { createMongooseConnectionFromEnv, initMongoDBKeyStore } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
-import { recordCCAFulfillment, wasCCAFulfilled } from '../ccaFulfilments';
-import { retrieveOwnCertificates } from '../certs';
-import { generatePCAs } from '../parcelCollection';
-import { ParcelObject, ParcelStore } from '../parcelStore';
+import { initVaultKeyStore } from '../../backingServices/vault';
+import { recordCCAFulfillment, wasCCAFulfilled } from '../../ccaFulfilments';
+import { retrieveOwnCertificates } from '../../certs';
+import { generatePCAs } from '../../parcelCollection';
+import { ParcelObject, ParcelStore } from '../../parcelStore';
 
 const INTERNAL_SERVER_ERROR = {
   code: grpc.status.UNAVAILABLE,

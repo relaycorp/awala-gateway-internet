@@ -27,9 +27,9 @@ import {
   UUID4_REGEX,
 } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
+import * as certs from '../../certs';
+import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
-import * as certs from '../certs';
-import { ParcelStore, ParcelStreamMessage } from '../parcelStore';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer } from './parcelCollection';
 import { WebSocketCode } from './websockets';

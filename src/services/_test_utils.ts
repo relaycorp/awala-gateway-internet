@@ -13,7 +13,7 @@ import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
 import { PdaChain } from '../_test_utils';
-import { HTTP_METHODS } from '../utilities/fastify';
+import { HTTP_METHODS } from './fastify';
 
 export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);

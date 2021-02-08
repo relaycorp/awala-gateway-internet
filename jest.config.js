@@ -30,7 +30,7 @@ module.exports = {
   // An array of regexp pattern strings used to skip coverage collection
   coveragePathIgnorePatterns: [
     "_test_utils\.ts",
-    "/functional_tests",
+    "/functionalTests",
     "/types",
     "/index\.ts",
   ],
@@ -148,7 +148,7 @@ module.exports = {
   // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
   testPathIgnorePatterns: [
     "/node_modules/",
-    "/src/functional_tests/"
+    "/src/functionalTests/"
   ],
 
   // The regexp pattern or array of patterns that Jest uses to detect test files

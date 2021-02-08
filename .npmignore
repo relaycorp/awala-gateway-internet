@@ -5,7 +5,7 @@ build/docs
 jest.*.js
 _test_utils.*
 coverage/
-build/*/functional_tests/**
+build/*/functionalTests/**
 
 tsconfig*.json
 tslint.json

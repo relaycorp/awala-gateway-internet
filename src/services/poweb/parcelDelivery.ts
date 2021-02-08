@@ -54,7 +54,6 @@ export default async function registerRoutes(
           .send({ message: 'Parcel delivery countersignature is either missing or invalid' });
       }
 
-      // tslint:disable-next-line:no-let
       let parcel: Parcel;
       try {
         parcel = await Parcel.deserialize(parcelSerialized);
@@ -70,7 +69,6 @@ export default async function registerRoutes(
       const natsStreamingClient = NatsStreamingClient.initFromEnv(
         `poweb-parcel-delivery-${request.id}`,
       );
-      // tslint:disable-next-line:no-let
       let parcelObjectKey: string | null;
       try {
         parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(

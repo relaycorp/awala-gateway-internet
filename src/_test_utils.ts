@@ -123,7 +123,6 @@ export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => As
       return;
     }
 
-    // tslint:disable-next-line:no-let
     let count = 0;
     for await (const item of iterable) {
       yield item;

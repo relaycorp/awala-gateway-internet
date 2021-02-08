@@ -101,16 +101,13 @@ async function deliverCargo(
   const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
   const natsPublisher = natsClient.makePublisher('crc-cargo');
 
-  // tslint:disable-next-line:no-let
   let cargoesDelivered = 0;
 
   async function* validateDelivery(
     source: AsyncIterable<CargoDelivery>,
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
-      // tslint:disable-next-line:no-let
       let peerGatewayAddress: string | null = null;
-      // tslint:disable-next-line:no-let
       let cargoId: string | null = null;
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));

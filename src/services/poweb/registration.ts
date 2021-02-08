@@ -45,7 +45,6 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      // tslint:disable-next-line:no-let
       let registrationRequest: PrivateNodeRegistrationRequest;
       try {
         registrationRequest = await PrivateNodeRegistrationRequest.deserialize(
@@ -60,7 +59,6 @@ export default async function registerRoutes(
 
       const publicGatewayKeyPair = await options.keyPairRetriever();
 
-      // tslint:disable-next-line:no-let
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
         registrationAuthorization = await PrivateNodeRegistrationAuthorization.deserialize(

@@ -1,4 +1,4 @@
-// tslint:disable:no-let no-object-mutation
+// tslint:disable:no-object-mutation
 
 import {
   Certificate,

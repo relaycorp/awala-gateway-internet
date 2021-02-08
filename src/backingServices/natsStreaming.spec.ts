@@ -1,4 +1,4 @@
-/* tslint:disable:no-let max-classes-per-file */
+/* tslint:disable:max-classes-per-file */
 
 import AbortController from 'abort-controller';
 import { EventEmitter } from 'events';

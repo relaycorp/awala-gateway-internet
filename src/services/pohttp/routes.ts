@@ -43,7 +43,6 @@ export default async function registerRoutes(
         return reply.code(415).send();
       }
 
-      // tslint:disable-next-line:no-let
       let parcel;
       try {
         parcel = await Parcel.deserialize(bufferToArray(request.body));

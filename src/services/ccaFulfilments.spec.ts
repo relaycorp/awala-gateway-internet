@@ -1,5 +1,3 @@
-// tslint:disable:no-let
-
 import {
   CargoCollectionAuthorization,
   generateRSAKeyPair,

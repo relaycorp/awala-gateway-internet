@@ -42,7 +42,7 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   );
 
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
-  const pingId = Buffer.from(uuid());
+  const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
     pongEndpointSessionCertificate.identityCert,
@@ -76,7 +76,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
   const pdaChain = await generatePdaChain();
 
-  const pingId = Buffer.from(uuid());
+  const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
     pongEndpointSessionCertificate.identityCert,
@@ -144,7 +144,7 @@ function base64DecodeEnvVar(envVarName: string): Buffer {
 }
 
 async function makePingParcel(
-  pingId: Buffer,
+  pingId: string,
   identityCert: Certificate,
   sessionCert: Certificate,
   gwPDAChain: ExternalPdaChain,
@@ -182,20 +182,20 @@ async function makePingParcel(
   };
 }
 
-function serializePing(id: Buffer, pda: Certificate): Buffer {
-  const pdaSerialized = Buffer.from(pda.serialize());
-  const pdaLengthPrefix = Buffer.allocUnsafe(2);
-  pdaLengthPrefix.writeUInt16LE(pdaSerialized.byteLength, 0);
-  return Buffer.concat([id, pdaLengthPrefix, pdaSerialized]);
+function serializePing(id: string, pda: Certificate): Buffer {
+  const pdaDerBase64 = Buffer.from(pda.serialize()).toString('base64');
+  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64 });
+  return Buffer.from(pingSerialized);
 }
 
 async function deserializePong(
   parcelSerialized: ArrayBuffer,
   sessionKey: CryptoKey,
-): Promise<Buffer> {
+): Promise<string> {
   const parcel = await Parcel.deserialize(parcelSerialized);
   const unwrapResult = await parcel.unwrapPayload(sessionKey);
-  return unwrapResult.payload.content;
+  const serviceMessageContent = unwrapResult.payload.content;
+  return serviceMessageContent.toString();
 }
 
 async function encapsulateParcelsInCargo(

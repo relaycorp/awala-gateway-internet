@@ -35,7 +35,7 @@ Create chart name and version as used by the chart label.
 Generate image repository and possibly tag
 */}}
 {{- define "relaynet-internet-gateway.image" -}}
-{{ .Values.image.repository }}{{ ternary "" (printf ":%s" (.Values.image.tag | default .Chart.AppVersion)) .Values.tags.dev }}
+{{ .Values.image.repository }}{{ ternary "" (printf ":%s" (.Values.image.tag | default .Chart.AppVersion)) .Values.tags.gwDev }}
 {{- end }}
 
 {{/*

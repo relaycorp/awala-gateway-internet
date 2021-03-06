@@ -40,7 +40,7 @@ spec:
             - name: PUBLIC_ADDRESS
               value: {{ .Values.publicAddress }}
             - name: SERVER_IP_ADDRESS
-              {{- if .Values.tags.dev }}
+              {{- if .Values.tags.gwDev }}
               value: 127.0.0.1
               {{- else }}
               valueFrom:

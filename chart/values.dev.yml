@@ -91,6 +91,7 @@ relaynet-pong:
   vault:
     host: public-gateway-vault
     token: root
+    enable_secret: true
   redis:
     host: redis-headless
 

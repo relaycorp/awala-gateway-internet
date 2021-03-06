@@ -6,7 +6,7 @@
 fullnameOverride: public-gateway
 
 tags:
-  dev: true
+  gwDev: true
 
 logging:
   level: debug
@@ -87,6 +87,7 @@ stan:
 relaynet-pong:
   fullnameOverride: relaynet-pong
   pohttp_tls_required: false
+  public_endpoint_address: relaynet-pong-pohttp
   vault:
     host: public-gateway-vault
     token: root

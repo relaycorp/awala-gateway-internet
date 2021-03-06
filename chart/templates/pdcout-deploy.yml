@@ -41,7 +41,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: POHTTP_TLS_REQUIRED
-              value: {{ ternary "false" "true" .Values.tags.dev | quote }}
+              value: {{ ternary "false" "true" .Values.tags.gwDev | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}

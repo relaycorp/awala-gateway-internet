@@ -195,7 +195,7 @@ async function deserializePong(
 ): Promise<Buffer> {
   const parcel = await Parcel.deserialize(parcelSerialized);
   const unwrapResult = await parcel.unwrapPayload(sessionKey);
-  return unwrapResult.payload.value;
+  return unwrapResult.payload.content;
 }
 
 async function encapsulateParcelsInCargo(

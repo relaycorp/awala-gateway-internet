@@ -145,8 +145,8 @@ function base64DecodeEnvVar(envVarName: string): Buffer {
 
 async function makePingParcel(
   pingId: string,
-  identityCert: Certificate,
-  sessionCert: Certificate,
+  recipientIdentityCert: Certificate,
+  recipientSessionCert: Certificate,
   gwPDAChain: ExternalPdaChain,
 ): Promise<{
   readonly parcelId: string;
@@ -156,10 +156,13 @@ async function makePingParcel(
   const pongEndpointPda = await issueDeliveryAuthorization({
     issuerCertificate: gwPDAChain.peerEndpointCert,
     issuerPrivateKey: gwPDAChain.peerEndpointPrivateKey,
-    subjectPublicKey: await identityCert.getPublicKey(),
+    subjectPublicKey: await recipientIdentityCert.getPublicKey(),
     validityEndDate: gwPDAChain.peerEndpointCert.expiryDate,
   });
-  const pingSerialized = serializePing(pingId, pongEndpointPda);
+  const pingSerialized = serializePing(pingId, pongEndpointPda, [
+    gwPDAChain.peerEndpointCert,
+    gwPDAChain.privateGatewayCert,
+  ]);
 
   const serviceMessage = new ServiceMessage(
     'application/vnd.relaynet.ping-v1.ping',
@@ -167,13 +170,12 @@ async function makePingParcel(
   );
   const pingEncryption = await SessionEnvelopedData.encrypt(
     serviceMessage.serialize(),
-    sessionCert,
+    recipientSessionCert,
   );
   const parcel = new Parcel(
     PONG_ENDPOINT_ADDRESS,
-    gwPDAChain.peerEndpointCert,
+    recipientIdentityCert,
     Buffer.from(pingEncryption.envelopedData.serialize()),
-    { senderCaCertificateChain: [gwPDAChain.privateGatewayCert] },
   );
   return {
     parcelId: parcel.id,
@@ -182,9 +184,10 @@ async function makePingParcel(
   };
 }
 
-function serializePing(id: string, pda: Certificate): Buffer {
-  const pdaDerBase64 = Buffer.from(pda.serialize()).toString('base64');
-  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64 });
+function serializePing(id: string, pda: Certificate, pdaChain: readonly Certificate[]): Buffer {
+  const pdaDerBase64 = serializeCertificate(pda);
+  const pdaChainSerialized = pdaChain.map(serializeCertificate);
+  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64, pdaChain: pdaChainSerialized });
   return Buffer.from(pingSerialized);
 }
 
@@ -196,6 +199,10 @@ async function deserializePong(
   const unwrapResult = await parcel.unwrapPayload(sessionKey);
   const serviceMessageContent = unwrapResult.payload.content;
   return serviceMessageContent.toString();
+}
+
+function serializeCertificate(certificate: Certificate): string {
+  return Buffer.from(certificate.serialize()).toString('base64');
 }
 
 async function encapsulateParcelsInCargo(

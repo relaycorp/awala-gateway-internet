@@ -194,7 +194,7 @@ async function deserializePong(
 ): Promise<string> {
   const parcel = await Parcel.deserialize(parcelSerialized);
   const unwrapResult = await parcel.unwrapPayload(sessionKey);
-  const serviceMessageContent = unwrapResult.payload.value;
+  const serviceMessageContent = unwrapResult.payload.content;
   return serviceMessageContent.toString();
 }
 

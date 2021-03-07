@@ -174,7 +174,7 @@ async function makePingParcel(
   );
   const parcel = new Parcel(
     PONG_ENDPOINT_ADDRESS,
-    recipientIdentityCert,
+    gwPDAChain.peerEndpointCert,
     Buffer.from(pingEncryption.envelopedData.serialize()),
   );
   return {

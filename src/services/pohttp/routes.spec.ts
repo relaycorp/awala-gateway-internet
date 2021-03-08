@@ -3,7 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
 import { mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
-import * as natsStreaming from '../../backingServices/natsStreaming';
+import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import {
   configureMockEnvVars,
@@ -50,11 +50,11 @@ beforeAll(async () => {
 
 const STUB_NATS_SERVER_URL = 'nats://example.com';
 const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
-const mockNatsClient: natsStreaming.NatsStreamingClient = {
+const mockNatsClient: NatsStreamingClient = {
   what: 'The NATS Streaming client',
 } as any;
-const mockNatsClientClass = mockSpy(
-  jest.spyOn(natsStreaming, 'NatsStreamingClient'),
+const mockNatsClientInit = mockSpy(
+  jest.spyOn(NatsStreamingClient, 'initFromEnv'),
   () => mockNatsClient,
 );
 
@@ -197,11 +197,7 @@ describe('receiveParcel', () => {
   test('Current request id should be part of the client id in the NATS connection', async () => {
     await serverInstance.inject(validRequestOptions);
 
-    expect(mockNatsClientClass).toBeCalledTimes(1);
-    expect(mockNatsClientClass).toBeCalledWith(
-      STUB_NATS_SERVER_URL,
-      STUB_NATS_CLUSTER_ID,
-      expect.stringMatching(/^pohttp-req-\d+$/),
-    );
+    expect(mockNatsClientInit).toBeCalledTimes(1);
+    expect(mockNatsClientInit).toBeCalledWith(expect.stringMatching(/^pohttp-req-\d+$/));
   });
 });

@@ -1,6 +1,5 @@
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
@@ -11,9 +10,6 @@ export default async function registerRoutes(
   fastify: FastifyInstance,
   _options: any,
 ): Promise<void> {
-  const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
-  const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
-
   const parcelStore = ParcelStore.initFromEnv();
 
   fastify.addContentTypeParser(
@@ -56,12 +52,7 @@ export default async function registerRoutes(
           .send({ message: 'Parcel recipient should be specified as a private address' });
       }
 
-      // TODO: Use NatsStreamingClient.initFromEnv() outside this handler closure
-      const natsClient = new NatsStreamingClient(
-        natsServerUrl,
-        natsClusterId,
-        `pohttp-req-${request.id}`,
-      );
+      const natsClient = NatsStreamingClient.initFromEnv(`pohttp-req-${request.id}`);
       try {
         await parcelStore.storeGatewayBoundParcel(
           parcel,

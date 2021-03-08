@@ -187,7 +187,7 @@ async function makePingParcel(
 function serializePing(id: string, pda: Certificate, pdaChain: readonly Certificate[]): Buffer {
   const pdaDerBase64 = serializeCertificate(pda);
   const pdaChainSerialized = pdaChain.map(serializeCertificate);
-  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64, pdaChain: pdaChainSerialized });
+  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64, pda_chain: pdaChainSerialized });
   return Buffer.from(pingSerialized);
 }
 

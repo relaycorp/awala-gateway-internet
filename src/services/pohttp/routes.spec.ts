@@ -198,6 +198,6 @@ describe('receiveParcel', () => {
     await serverInstance.inject(validRequestOptions);
 
     expect(mockNatsClientInit).toBeCalledTimes(1);
-    expect(mockNatsClientInit).toBeCalledWith(expect.stringMatching(/^pohttp-req-\d+$/));
+    expect(mockNatsClientInit).toBeCalledWith(expect.stringMatching(/^pohttp-req-req-\d+$/));
   });
 });

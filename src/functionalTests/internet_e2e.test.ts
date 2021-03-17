@@ -164,10 +164,7 @@ async function makePingParcel(
     gwPDAChain.privateGatewayCert,
   ]);
 
-  const serviceMessage = new ServiceMessage(
-    'application/vnd.relaynet.ping-v1.ping',
-    pingSerialized,
-  );
+  const serviceMessage = new ServiceMessage('application/vnd.awala.ping-v1.ping', pingSerialized);
   const pingEncryption = await SessionEnvelopedData.encrypt(
     serviceMessage.serialize(),
     recipientSessionCert,

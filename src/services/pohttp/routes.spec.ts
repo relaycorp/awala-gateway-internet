@@ -22,7 +22,7 @@ mockFastifyMongoose(mockFastifyMongooseObject);
 
 const validRequestOptions: InjectOptions = {
   headers: {
-    'Content-Type': 'application/vnd.relaynet.parcel',
+    'Content-Type': 'application/vnd.awala.parcel',
     Host: 'gw.relaycorp.tech:8000',
   },
   method: 'POST',
@@ -94,7 +94,7 @@ describe('receiveParcel', () => {
     expect(response.payload).toContain('PoHTTP');
   });
 
-  test('Content-Type other than application/vnd.relaynet.parcel should be refused', async () => {
+  test('Content-Type other than application/vnd.awala.parcel should be refused', async () => {
     const response = await serverInstance.inject({
       ...validRequestOptions,
       headers: {

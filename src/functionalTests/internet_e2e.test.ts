@@ -165,7 +165,7 @@ async function makePingParcel(
   ]);
 
   const serviceMessage = new ServiceMessage(
-    'application/vnd.relaynet.ping-v1.ping',
+    'application/vnd.awala.ping-v1.ping',
     pingSerialized,
   );
   const pingEncryption = await SessionEnvelopedData.encrypt(

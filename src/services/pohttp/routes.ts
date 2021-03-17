@@ -13,7 +13,7 @@ export default async function registerRoutes(
   const parcelStore = ParcelStore.initFromEnv();
 
   fastify.addContentTypeParser(
-    'application/vnd.relaynet.parcel',
+    'application/vnd.awala.parcel',
     { parseAs: 'buffer' },
     async (_req: any, rawBody: Buffer) => rawBody,
   );
@@ -35,7 +35,7 @@ export default async function registerRoutes(
     method: 'POST',
     url: '/',
     async handler(request, reply): Promise<FastifyReply<any>> {
-      if (request.headers['content-type'] !== 'application/vnd.relaynet.parcel') {
+      if (request.headers['content-type'] !== 'application/vnd.awala.parcel') {
         return reply.code(415).send();
       }
 

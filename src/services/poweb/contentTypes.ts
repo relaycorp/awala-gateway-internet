@@ -1,8 +1,8 @@
 export const CONTENT_TYPES = {
   GATEWAY_REGISTRATION: {
-    AUTHORIZATION: 'application/vnd.relaynet.node-registration.authorization',
-    REGISTRATION: 'application/vnd.relaynet.node-registration.registration',
-    REQUEST: 'application/vnd.relaynet.node-registration.request',
+    AUTHORIZATION: 'application/vnd.awala.node-registration.authorization',
+    REGISTRATION: 'application/vnd.awala.node-registration.registration',
+    REQUEST: 'application/vnd.awala.node-registration.request',
   },
-  PARCEL: 'application/vnd.relaynet.parcel',
+  PARCEL: 'application/vnd.awala.parcel',
 };

@@ -11,7 +11,12 @@ import {
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
-import { configureMockEnvVars, mockStanMessage, TOMORROW } from '../services/_test_utils';
+import {
+  configureMockEnvVars,
+  getMockInstance,
+  mockStanMessage,
+  TOMORROW,
+} from '../services/_test_utils';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processInternetBoundParcels } from './pdcOutgoing';
@@ -33,7 +38,16 @@ const ENV_VARS = {
 };
 const mockEnvVars = configureMockEnvVars(ENV_VARS);
 
-const MOCK_DELIVER_PARCEL = mockSpy(jest.spyOn(pohttp, 'deliverParcel'), async () => undefined);
+jest.mock('@relaycorp/relaynet-pohttp', () => {
+  const actualPohttp = jest.requireActual('@relaycorp/relaynet-pohttp');
+  return {
+    ...actualPohttp,
+    deliverParcel: jest.fn(),
+  };
+});
+beforeEach(() => {
+  getMockInstance(pohttp.deliverParcel).mockRestore();
+});
 
 const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
   parcelExpiryDate: TOMORROW,
@@ -56,7 +70,7 @@ const MOCK_DELETE_INTERNET_PARCEL = mockSpy(
 );
 
 let mockLogging: MockLogging;
-beforeAll(() => {
+beforeEach(() => {
   mockLogging = makeMockLogging();
 });
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
@@ -114,7 +128,7 @@ describe('processInternetBoundParcels', () => {
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
     expect(message.ack).toBeCalledTimes(1);
-    expect(MOCK_DELIVER_PARCEL).not.toBeCalled();
+    expect(pohttp.deliverParcel).not.toBeCalled();
 
     expect(MOCK_RETRIEVE_INTERNET_PARCEL).not.toBeCalled();
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(messageData.parcelObjectKey);
@@ -127,8 +141,8 @@ describe('processInternetBoundParcels', () => {
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
-    expect(MOCK_DELIVER_PARCEL).toBeCalledTimes(1);
-    expect(MOCK_DELIVER_PARCEL).toBeCalledWith(
+    expect(pohttp.deliverParcel).toBeCalledTimes(1);
+    expect(pohttp.deliverParcel).toBeCalledWith(
       QUEUE_MESSAGE_DATA.parcelRecipientAddress,
       PARCEL_SERIALIZED,
       expect.anything(),
@@ -155,7 +169,7 @@ describe('processInternetBoundParcels', () => {
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
-    expect(MOCK_DELIVER_PARCEL).toBeCalledWith(
+    expect(pohttp.deliverParcel).toBeCalledWith(
       expect.anything(),
       expect.anything(),
       expect.objectContaining({
@@ -182,7 +196,7 @@ describe('processInternetBoundParcels', () => {
 
   test('Parcel should be discarded when server refuses it invalid', async () => {
     const err = new pohttp.PoHTTPInvalidParcelError('Parcel smells funny');
-    MOCK_DELIVER_PARCEL.mockRejectedValue(err);
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
@@ -201,7 +215,7 @@ describe('processInternetBoundParcels', () => {
 
   test('Parcel should be redelivered later if transient delivery error occurs', async () => {
     const err = new pohttp.PoHTTPError('Server is down');
-    MOCK_DELIVER_PARCEL.mockRejectedValue(err);
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 

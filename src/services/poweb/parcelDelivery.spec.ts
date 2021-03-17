@@ -254,7 +254,7 @@ test('NATS Streaming connection should use the right arguments', async () => {
   await postParcel(PARCEL_SERIALIZED, fastify, makeAuthorizationHeaderValue(countersignature));
 
   expect(mockNatsStreamingInit).toBeCalledWith(
-    expect.stringMatching(/^poweb-parcel-delivery-\d+$/),
+    expect.stringMatching(/^poweb-parcel-delivery-req-\d+$/),
   );
 });
 

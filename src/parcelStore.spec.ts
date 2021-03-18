@@ -970,7 +970,7 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/deleted.parcel',
     };
-    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(undefined);
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
 
     await expect(
       pipe(

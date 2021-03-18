@@ -134,6 +134,23 @@ describe('processInternetBoundParcels', () => {
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(messageData.parcelObjectKey);
   });
 
+  test('Parcel should be skipped if its object cannot be found', async () => {
+    const stanMessage = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([stanMessage]));
+    MOCK_RETRIEVE_INTERNET_PARCEL.mockResolvedValue(null);
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(pohttp.deliverParcel).not.toBeCalled();
+    expect(stanMessage.ack).toBeCalled();
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Parcel object could not be found', {
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        worker: WORKER_NAME,
+      }),
+    );
+  });
+
   test('Parcel should be posted to server specified in queue message', async () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
       arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),

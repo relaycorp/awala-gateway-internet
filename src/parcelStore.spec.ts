@@ -615,6 +615,14 @@ describe('retrieveEndpointBoundParcel', () => {
 
     expect(retrievedParcelSerialized).toEqual(parcelSerialized);
   });
+
+  test('Nothing should be returned if the object does not exist', async () => {
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
+
+    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
+
+    expect(retrievedParcelSerialized).toBeNull();
+  });
 });
 
 describe('storeEndpointBoundParcel', () => {
@@ -962,8 +970,7 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/deleted.parcel',
     };
-    const error = new Error('That was deleted');
-    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockRejectedValue(error);
+    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
 
     await expect(
       pipe(
@@ -978,7 +985,6 @@ describe('makeActiveParcelRetriever', () => {
         'info',
         'Parcel object could not be found; it could have been deleted since keys were retrieved',
         {
-          err: expect.objectContaining({ message: error.message }),
           parcelObjectKey: parcelObjectMetadata.key,
         },
       ),

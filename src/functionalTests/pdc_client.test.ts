@@ -88,12 +88,11 @@ async function queueParcel(parcel: Parcel): Promise<void> {
 }
 
 async function isParcelInStore(parcel: Parcel): Promise<boolean> {
-  try {
-    await OBJECT_STORAGE_CLIENT.getObject(makeParcelObjectKey(parcel.id), OBJECT_STORAGE_BUCKET);
-  } catch (_) {
-    return false;
-  }
-  return true;
+  const parcelObject = await OBJECT_STORAGE_CLIENT.getObject(
+    makeParcelObjectKey(parcel.id),
+    OBJECT_STORAGE_BUCKET,
+  );
+  return !!parcelObject;
 }
 
 function makeParcelObjectKey(parcelId: string): string {

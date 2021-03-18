@@ -52,9 +52,16 @@ export async function processInternetBoundParcels(
 
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
     for await (const parcelData of activeParcels) {
+      const parcelAwareLogger = logger.child({ parcelObjectKey: parcelData.parcelObjectKey });
       const parcelSerialized = await parcelStore.retrieveEndpointBoundParcel(
         parcelData.parcelObjectKey,
       );
+
+      if (!parcelSerialized) {
+        parcelAwareLogger.warn('Parcel object could not be found');
+        parcelData.ack();
+        continue;
+      }
 
       let wasParcelDelivered = true;
       try {
@@ -64,24 +71,15 @@ export async function processInternetBoundParcels(
       } catch (err) {
         wasParcelDelivered = false;
         if (err instanceof PoHTTPInvalidParcelError) {
-          logger.info(
-            { err, parcelObjectKey: parcelData.parcelObjectKey },
-            'Parcel was rejected as invalid',
-          );
+          parcelAwareLogger.info({ err }, 'Parcel was rejected as invalid');
         } else {
-          logger.warn(
-            { err, parcelObjectKey: parcelData.parcelObjectKey },
-            'Failed to deliver parcel',
-          );
+          parcelAwareLogger.warn({ err }, 'Failed to deliver parcel');
           continue;
         }
       }
 
       if (wasParcelDelivered) {
-        logger.debug(
-          { parcelObjectKey: parcelData.parcelObjectKey },
-          'Parcel was successfully delivered',
-        );
+        parcelAwareLogger.debug('Parcel was successfully delivered');
       }
 
       await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);

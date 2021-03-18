@@ -259,12 +259,12 @@ export class ParcelStore {
     await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
   }
 
-  public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer> {
+  public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer | null> {
     const storeObject = await this.objectStoreClient.getObject(
       makeFullInternetBoundObjectKey(parcelObjectKey),
       this.bucket,
     );
-    return storeObject.body;
+    return storeObject?.body ?? null;
   }
 
   /**
@@ -340,12 +340,10 @@ export class ParcelStore {
       parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
     ): AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }> {
       for await (const parcelObjectMetadata of parcelObjectsMetadata) {
-        let parcelObject: StoreObject;
-        try {
-          parcelObject = await objectStoreClient.getObject(parcelObjectMetadata.key, bucket);
-        } catch (err) {
+        const parcelObject = await objectStoreClient.getObject(parcelObjectMetadata.key, bucket);
+        if (!parcelObject) {
           logger.info(
-            { err, parcelObjectKey: parcelObjectMetadata.key },
+            { parcelObjectKey: parcelObjectMetadata.key },
             'Parcel object could not be found; it could have been deleted since keys were retrieved',
           );
           continue;

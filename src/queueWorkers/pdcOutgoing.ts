@@ -57,6 +57,12 @@ export async function processInternetBoundParcels(
         parcelData.parcelObjectKey,
       );
 
+      if (!parcelSerialized) {
+        parcelAwareLogger.warn('Parcel object could not be found');
+        parcelData.ack();
+        continue;
+      }
+
       let wasParcelDelivered = true;
       try {
         await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {

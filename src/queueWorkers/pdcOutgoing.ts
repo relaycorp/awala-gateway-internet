@@ -1,4 +1,8 @@
-import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
+import {
+  deliverParcel,
+  PoHTTPClientBindingError,
+  PoHTTPInvalidParcelError,
+} from '@relaycorp/relaynet-pohttp';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
@@ -9,9 +13,9 @@ import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 
-interface ActiveParcelData {
-  readonly parcelObjectKey: string;
-  readonly parcelRecipientAddress: string;
+const MAX_DELIVERY_ATTEMPTS = 3;
+
+interface ActiveParcelData extends QueuedInternetBoundParcelMessage {
   // tslint:disable-next-line:no-mixed-interface
   readonly ack: () => void;
 }
@@ -27,6 +31,8 @@ export async function processInternetBoundParcels(
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
 
+  const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
+
   async function* parseMessages(
     messages: AsyncIterable<stan.Message>,
   ): AsyncIterable<ActiveParcelData> {
@@ -39,9 +45,8 @@ export async function processInternetBoundParcels(
       const parcelExpiryDate = new Date(messageData.parcelExpiryDate);
       if (now < parcelExpiryDate) {
         yield {
+          ...messageData,
           ack: () => message.ack(),
-          parcelObjectKey: messageData.parcelObjectKey,
-          parcelRecipientAddress: messageData.parcelRecipientAddress,
         };
       } else {
         await parcelStore.deleteEndpointBoundParcel(messageData.parcelObjectKey);
@@ -70,24 +75,45 @@ export async function processInternetBoundParcels(
         });
       } catch (err) {
         wasParcelDelivered = false;
+
         if (err instanceof PoHTTPInvalidParcelError) {
-          parcelAwareLogger.info({ err }, 'Parcel was rejected as invalid');
+          parcelAwareLogger.info({ reason: err.message }, 'Parcel was rejected as invalid');
+        } else if (err instanceof PoHTTPClientBindingError) {
+          // The server claimed we're violating the binding
+          parcelAwareLogger.info({ reason: err.message }, 'Discarding parcel due to binding issue');
         } else {
-          parcelAwareLogger.warn({ err }, 'Failed to deliver parcel');
-          continue;
+          // The server returned a 50X response or there was a networking issue
+
+          const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
+          if (deliveryAttempts < MAX_DELIVERY_ATTEMPTS) {
+            const retryParcelData: QueuedInternetBoundParcelMessage = {
+              ...{ ...parcelData, ack: undefined },
+              deliveryAttempts,
+            };
+            await natsStreamingClient.publishMessage(
+              JSON.stringify(retryParcelData),
+              'internet-parcels',
+            );
+
+            parcelAwareLogger.info({ err }, 'Failed to deliver parcel; will try again later');
+            parcelData.ack();
+            continue;
+          }
+
+          parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
         }
       }
+
+      parcelData.ack();
 
       if (wasParcelDelivered) {
         parcelAwareLogger.debug('Parcel was successfully delivered');
       }
 
       await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
-      parcelData.ack();
     }
   }
 
-  const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
   const queueConsumer = natsStreamingClient.makeQueueConsumer(
     'internet-parcels',
     'worker',

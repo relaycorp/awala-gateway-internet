@@ -23,6 +23,7 @@ export interface QueuedInternetBoundParcelMessage {
   readonly parcelObjectKey: string;
   readonly parcelRecipientAddress: string;
   readonly parcelExpiryDate: Date;
+  readonly deliveryAttempts: number;
 }
 
 export interface ParcelObjectMetadata<Extra> {
@@ -308,6 +309,7 @@ export class ParcelStore {
     keyAwareLogger.debug('Parcel object was successfully stored');
 
     const messageData: QueuedInternetBoundParcelMessage = {
+      deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey,
       parcelRecipientAddress: parcel.recipientAddress,

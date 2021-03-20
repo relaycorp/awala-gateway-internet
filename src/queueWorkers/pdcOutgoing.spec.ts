@@ -1,5 +1,6 @@
 import * as pohttp from '@relaycorp/relaynet-pohttp';
 import { EnvVarError } from 'env-var';
+import { Message } from 'node-nats-streaming';
 
 import {
   arrayToAsyncIterable,
@@ -203,9 +204,7 @@ describe('processInternetBoundParcels', () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
-
-    expect(message.ack).toBeCalledTimes(1);
-    expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
+    expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was successfully delivered', {
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
@@ -222,12 +221,29 @@ describe('processInternetBoundParcels', () => {
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
-    expect(message.ack).toBeCalledTimes(1);
-    expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
+    expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Parcel was rejected as invalid', {
-        err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        reason: err.message,
+        worker: WORKER_NAME,
+      }),
+    );
+  });
+
+  test('Parcel should be discarded if server claims we violated binding', async () => {
+    const err = new pohttp.PoHTTPClientBindingError('I did not understand that');
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
+    const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expectMessageToBeDiscarded(message);
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Discarding parcel due to binding issue', {
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        reason: err.message,
         worker: WORKER_NAME,
       }),
     );
@@ -330,3 +346,9 @@ describe('processInternetBoundParcels', () => {
     });
   });
 });
+
+function expectMessageToBeDiscarded(message: Message): void {
+  expect(message.ack).toBeCalledTimes(1);
+  expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
+  expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalledWith(QUEUE_MESSAGE_DATA.parcelObjectKey);
+}

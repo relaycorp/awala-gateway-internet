@@ -1,4 +1,8 @@
-import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
+import {
+  deliverParcel,
+  PoHTTPClientBindingError,
+  PoHTTPInvalidParcelError,
+} from '@relaycorp/relaynet-pohttp';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
@@ -71,9 +75,15 @@ export async function processInternetBoundParcels(
         });
       } catch (err) {
         wasParcelDelivered = false;
+
         if (err instanceof PoHTTPInvalidParcelError) {
-          parcelAwareLogger.info({ err }, 'Parcel was rejected as invalid');
+          parcelAwareLogger.info({ reason: err.message }, 'Parcel was rejected as invalid');
+        } else if (err instanceof PoHTTPClientBindingError) {
+          // The server claimed we're violating the binding
+          parcelAwareLogger.info({ reason: err.message }, 'Discarding parcel due to binding issue');
         } else {
+          // The server returned a 50X response or there was a networking issue
+
           const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
           if (deliveryAttempts < MAX_DELIVERY_ATTEMPTS) {
             const retryParcelData: QueuedInternetBoundParcelMessage = {
@@ -86,13 +96,11 @@ export async function processInternetBoundParcels(
             );
 
             parcelAwareLogger.info({ err }, 'Failed to deliver parcel; will try again later');
-          } else {
-            parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
-            await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+            parcelData.ack();
+            continue;
           }
 
-          parcelData.ack();
-          continue;
+          parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
         }
       }
 

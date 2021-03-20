@@ -27,6 +27,7 @@ const WORKER_NAME = 'the-worker';
 
 const MOCK_NATS_CLIENT = {
   makeQueueConsumer: mockSpy(jest.fn()),
+  publishMessage: mockSpy(jest.fn()),
 };
 const MOCK_NATS_CLIENT_INIT = mockSpy(
   jest.spyOn(NatsStreamingClient, 'initFromEnv'),
@@ -50,6 +51,7 @@ beforeEach(() => {
 });
 
 const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
+  deliveryAttempts: 0,
   parcelExpiryDate: TOMORROW,
   parcelObjectKey: 'foo.parcel',
   parcelRecipientAddress: 'https://endpoint.example/',
@@ -118,6 +120,7 @@ describe('processInternetBoundParcels', () => {
     const aSecondAgo = new Date();
     aSecondAgo.setSeconds(aSecondAgo.getSeconds() - 1);
     const messageData: QueuedInternetBoundParcelMessage = {
+      deliveryAttempts: 0,
       parcelExpiryDate: aSecondAgo,
       parcelObjectKey: 'expired.parcel',
       parcelRecipientAddress: '',
@@ -239,14 +242,44 @@ describe('processInternetBoundParcels', () => {
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
 
     expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('warn', 'Failed to deliver parcel', {
+      partialPinoLog('info', 'Failed to deliver parcel; will try again later', {
         err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         worker: WORKER_NAME,
       }),
     );
-    expect(message.ack).not.toBeCalled();
+    expect(message.ack).toBeCalled();
+    const expectedMessageData: QueuedInternetBoundParcelMessage = {
+      ...QUEUE_MESSAGE_DATA,
+      deliveryAttempts: 1,
+    };
+    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
+      JSON.stringify(expectedMessageData),
+      'internet-parcels',
+    );
     expect(MOCK_DELETE_INTERNET_PARCEL).not.toBeCalled();
+  });
+
+  test('Parcel redelivery should be attempted up to 3 times', async () => {
+    const err = new pohttp.PoHTTPError('Server is down');
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
+    const message = mockStanMessage(
+      Buffer.from(JSON.stringify({ ...QUEUE_MESSAGE_DATA, deliveryAttempts: 2 })),
+    );
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('info', 'Failed to deliver parcel again; will now give up', {
+        err: expect.objectContaining({ type: err.name }),
+        parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        worker: WORKER_NAME,
+      }),
+    );
+    expect(message.ack).toBeCalled();
+    expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
+    expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalled();
   });
 
   describe('NATS Streaming connection', () => {

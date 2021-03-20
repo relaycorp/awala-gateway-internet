@@ -9,9 +9,9 @@ import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 
-interface ActiveParcelData {
-  readonly parcelObjectKey: string;
-  readonly parcelRecipientAddress: string;
+const MAX_DELIVERY_ATTEMPTS = 3;
+
+interface ActiveParcelData extends QueuedInternetBoundParcelMessage {
   // tslint:disable-next-line:no-mixed-interface
   readonly ack: () => void;
 }
@@ -27,6 +27,8 @@ export async function processInternetBoundParcels(
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
 
+  const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
+
   async function* parseMessages(
     messages: AsyncIterable<stan.Message>,
   ): AsyncIterable<ActiveParcelData> {
@@ -39,9 +41,8 @@ export async function processInternetBoundParcels(
       const parcelExpiryDate = new Date(messageData.parcelExpiryDate);
       if (now < parcelExpiryDate) {
         yield {
+          ...messageData,
           ack: () => message.ack(),
-          parcelObjectKey: messageData.parcelObjectKey,
-          parcelRecipientAddress: messageData.parcelRecipientAddress,
         };
       } else {
         await parcelStore.deleteEndpointBoundParcel(messageData.parcelObjectKey);
@@ -73,21 +74,38 @@ export async function processInternetBoundParcels(
         if (err instanceof PoHTTPInvalidParcelError) {
           parcelAwareLogger.info({ err }, 'Parcel was rejected as invalid');
         } else {
-          parcelAwareLogger.warn({ err }, 'Failed to deliver parcel');
+          const deliveryAttempts = parcelData.deliveryAttempts + 1;
+          if (deliveryAttempts < MAX_DELIVERY_ATTEMPTS) {
+            const retryParcelData: QueuedInternetBoundParcelMessage = {
+              ...{ ...parcelData, ack: undefined },
+              deliveryAttempts,
+            };
+            await natsStreamingClient.publishMessage(
+              JSON.stringify(retryParcelData),
+              'internet-parcels',
+            );
+
+            parcelAwareLogger.info({ err }, 'Failed to deliver parcel; will try again later');
+          } else {
+            parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
+            await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+          }
+
+          parcelData.ack();
           continue;
         }
       }
+
+      parcelData.ack();
 
       if (wasParcelDelivered) {
         parcelAwareLogger.debug('Parcel was successfully delivered');
       }
 
       await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
-      parcelData.ack();
     }
   }
 
-  const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
   const queueConsumer = natsStreamingClient.makeQueueConsumer(
     'internet-parcels',
     'worker',

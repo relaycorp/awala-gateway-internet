@@ -799,6 +799,7 @@ describe('storeEndpointBoundParcel', () => {
     );
 
     const expectedMessageData: QueuedInternetBoundParcelMessage = {
+      deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey: parcelObjectKey!!,
       parcelRecipientAddress: parcel.recipientAddress,

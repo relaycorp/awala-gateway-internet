@@ -74,7 +74,7 @@ export async function processInternetBoundParcels(
         if (err instanceof PoHTTPInvalidParcelError) {
           parcelAwareLogger.info({ err }, 'Parcel was rejected as invalid');
         } else {
-          const deliveryAttempts = parcelData.deliveryAttempts + 1;
+          const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
           if (deliveryAttempts < MAX_DELIVERY_ATTEMPTS) {
             const retryParcelData: QueuedInternetBoundParcelMessage = {
               ...{ ...parcelData, ack: undefined },

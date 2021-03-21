@@ -298,6 +298,19 @@ describe('processInternetBoundParcels', () => {
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalled();
   });
 
+  test('Non-PoHTTP errors should be propagated', async () => {
+    const err = new Error('This is a bug');
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
+    const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await expect(processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS)).rejects.toEqual(err);
+
+    expect(message.ack).not.toBeCalled();
+    expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
+    expect(MOCK_DELETE_INTERNET_PARCEL).not.toBeCalled();
+  });
+
   describe('NATS Streaming connection', () => {
     test('NAT Streaming client id should match worker name', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));

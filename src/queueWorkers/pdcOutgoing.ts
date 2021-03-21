@@ -1,6 +1,7 @@
 import {
   deliverParcel,
   PoHTTPClientBindingError,
+  PoHTTPError,
   PoHTTPInvalidParcelError,
 } from '@relaycorp/relaynet-pohttp';
 import { get as getEnvVar } from 'env-var';
@@ -68,49 +69,36 @@ export async function processInternetBoundParcels(
         continue;
       }
 
-      let wasParcelDelivered = true;
+      const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
       try {
         await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {
           gatewayAddress: ownPohttpAddress,
         });
+        parcelAwareLogger.debug('Parcel was successfully delivered');
       } catch (err) {
-        wasParcelDelivered = false;
-
+        if (!(err instanceof PoHTTPError)) {
+          // There's a bug in the `try` block above or the PoHTTP library
+          throw err;
+        }
         if (err instanceof PoHTTPInvalidParcelError) {
           parcelAwareLogger.info({ reason: err.message }, 'Parcel was rejected as invalid');
         } else if (err instanceof PoHTTPClientBindingError) {
           // The server claimed we're violating the binding
           parcelAwareLogger.info({ reason: err.message }, 'Discarding parcel due to binding issue');
+        } else if (MAX_DELIVERY_ATTEMPTS <= deliveryAttempts) {
+          // The server returned a 50X response or there was a networking issue
+          parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
         } else {
           // The server returned a 50X response or there was a networking issue
-
-          const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
-          if (deliveryAttempts < MAX_DELIVERY_ATTEMPTS) {
-            const retryParcelData: QueuedInternetBoundParcelMessage = {
-              ...{ ...parcelData, ack: undefined },
-              deliveryAttempts,
-            };
-            await natsStreamingClient.publishMessage(
-              JSON.stringify(retryParcelData),
-              'internet-parcels',
-            );
-
-            parcelAwareLogger.info({ err }, 'Failed to deliver parcel; will try again later');
-            parcelData.ack();
-            continue;
-          }
-
-          parcelAwareLogger.info({ err }, 'Failed to deliver parcel again; will now give up');
+          parcelAwareLogger.info({ err }, 'Failed to deliver parcel; will try again later');
+          await addParcelBackToQueue(parcelData, deliveryAttempts, natsStreamingClient);
+          parcelData.ack();
+          continue;
         }
       }
 
-      parcelData.ack();
-
-      if (wasParcelDelivered) {
-        parcelAwareLogger.debug('Parcel was successfully delivered');
-      }
-
       await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+      parcelData.ack();
     }
   }
 
@@ -120,4 +108,16 @@ export async function processInternetBoundParcels(
     'worker',
   );
   await pipe(queueConsumer, parseMessages, deliverParcels);
+}
+
+async function addParcelBackToQueue(
+  parcelData: ActiveParcelData,
+  deliveryAttempts: number,
+  natsStreamingClient: NatsStreamingClient,
+): Promise<void> {
+  const retryParcelData: QueuedInternetBoundParcelMessage = {
+    ...{ ...parcelData, ack: undefined },
+    deliveryAttempts,
+  };
+  await natsStreamingClient.publishMessage(JSON.stringify(retryParcelData), 'internet-parcels');
 }

@@ -18,7 +18,7 @@ import { makeLogger } from '../utilities/logging';
 const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
 
-const NODE_CERTIFICATE_TTL_DAYS = 180;
+const NODE_CERTIFICATE_TTL_DAYS = 360;
 const SESSION_CERTIFICATE_TTL_DAYS = 60;
 
 const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID').required().asString();

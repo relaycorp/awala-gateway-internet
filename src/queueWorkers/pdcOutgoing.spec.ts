@@ -272,6 +272,7 @@ describe('processInternetBoundParcels', () => {
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       JSON.stringify(expectedMessageData),
       'internet-parcels',
+      'retry',
     );
     expect(MOCK_DELETE_INTERNET_PARCEL).not.toBeCalled();
   });

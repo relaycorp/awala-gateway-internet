@@ -51,7 +51,7 @@ describe('PDC client', () => {
     await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 
-  test('Undelivered parcels should remain in the queue', async () => {
+  test('Undelivered parcels should eventually be taken off the queue', async () => {
     const parcel = new Parcel('https://relaynet.local', senderCertificate, Buffer.from([]), {
       ttl: 10,
     });
@@ -59,7 +59,7 @@ describe('PDC client', () => {
     await queueParcel(parcel);
 
     await sleep(IS_GITHUB ? 5 : 2);
-    await expect(isParcelInStore(parcel)).resolves.toBeTrue();
+    await expect(isParcelInStore(parcel)).resolves.toBeFalse();
   });
 });
 

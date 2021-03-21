@@ -119,9 +119,5 @@ async function addParcelBackToQueue(
     ...{ ...parcelData, ack: undefined },
     deliveryAttempts,
   };
-  await natsStreamingClient.publishMessage(
-    JSON.stringify(retryParcelData),
-    'internet-parcels',
-    'retry',
-  );
+  await natsStreamingClient.publishMessage(JSON.stringify(retryParcelData), 'internet-parcels');
 }

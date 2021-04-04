@@ -42,11 +42,11 @@ beforeAll(async () => {
 });
 
 const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
+const mockFindOneExec = mockSpy(jest.fn(), async () => PEER_PUBLIC_KEY_DATA);
+const mockFindOne = mockSpy(jest.fn(), () => ({ exec: mockFindOneExec }));
 
 describe('fetchKey', () => {
-  const stubModelExec = mockSpy(jest.fn(), async () => PEER_PUBLIC_KEY_DATA);
-  const stubFindOne = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
-  beforeEach(() => stubGetModelForClass.mockReturnValue({ findOne: stubFindOne } as any));
+  beforeEach(() => stubGetModelForClass.mockReturnValue({ findOne: mockFindOne } as any));
 
   test('Existing connection should be used', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
@@ -64,8 +64,8 @@ describe('fetchKey', () => {
 
     await store.fetchLastSessionKey(PEER_CERTIFICATE);
 
-    expect(stubFindOne).toBeCalledTimes(1);
-    expect(stubFindOne).toBeCalledWith({
+    expect(mockFindOne).toBeCalledTimes(1);
+    expect(mockFindOne).toBeCalledWith({
       peerPrivateAddress: await PEER_CERTIFICATE.calculateSubjectPrivateAddress(),
     });
   });
@@ -81,17 +81,16 @@ describe('fetchKey', () => {
 
   test('Non-existing key should result in null', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
-    stubModelExec.mockResolvedValue(null);
+    mockFindOneExec.mockResolvedValue(null);
 
     await expect(store.fetchLastSessionKey(PEER_CERTIFICATE)).resolves.toBeNull();
   });
 });
 
 describe('saveKey', () => {
-  const stubModelExec = mockSpy(jest.fn());
-  const stubFindOneAndUpdate = mockSpy(jest.fn(), () => ({ exec: stubModelExec }));
+  const mockUpdateOne = mockSpy(jest.fn(), () => ({ exec: jest.fn() }));
   beforeEach(() =>
-    stubGetModelForClass.mockReturnValue({ updateOne: stubFindOneAndUpdate } as any),
+    stubGetModelForClass.mockReturnValue({ findOne: mockFindOne, updateOne: mockUpdateOne } as any),
   );
 
   let PEER_SESSION_KEY: OriginatorSessionKey;
@@ -112,17 +111,14 @@ describe('saveKey', () => {
 
   test('Key should be upserted', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
+    const creationDate = new Date();
 
-    await store.saveSessionKey(
-      PEER_SESSION_KEY,
-      PEER_CERTIFICATE,
-      PEER_PUBLIC_KEY_DATA.creationDate,
-    );
+    await store.saveSessionKey(PEER_SESSION_KEY, PEER_CERTIFICATE, creationDate);
 
-    expect(stubFindOneAndUpdate).toBeCalledTimes(1);
-    expect(stubFindOneAndUpdate).toBeCalledWith(
+    expect(mockUpdateOne).toBeCalledTimes(1);
+    expect(mockUpdateOne).toBeCalledWith(
       { peerPrivateAddress: await PEER_CERTIFICATE.calculateSubjectPrivateAddress() },
-      PEER_PUBLIC_KEY_DATA,
+      { ...PEER_PUBLIC_KEY_DATA, creationDate },
       { upsert: true },
     );
   });

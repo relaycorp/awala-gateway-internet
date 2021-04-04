@@ -75,17 +75,15 @@ describe('fetchKey', () => {
 
     const key = await store.fetchLastSessionKey(PEER_CERTIFICATE);
 
-    expect(key.keyId).toEqual(PEER_PUBLIC_KEY_DATA.keyId);
-    expect(await derSerializePublicKey(key.publicKey)).toEqual(PEER_PUBLIC_KEY_DATA.keyDer);
+    expect(key?.keyId).toEqual(PEER_PUBLIC_KEY_DATA.keyId);
+    expect(await derSerializePublicKey(key!.publicKey)).toEqual(PEER_PUBLIC_KEY_DATA.keyDer);
   });
 
-  test('Non-existing key should result in an error', async () => {
+  test('Non-existing key should result in null', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
     stubModelExec.mockResolvedValue(null);
 
-    await expect(store.fetchLastSessionKey(PEER_CERTIFICATE)).rejects.toMatchObject({
-      message: expect.stringMatching(/Key could not be found/),
-    });
+    await expect(store.fetchLastSessionKey(PEER_CERTIFICATE)).resolves.toBeNull();
   });
 });
 

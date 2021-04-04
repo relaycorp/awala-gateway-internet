@@ -1,8 +1,4 @@
-import {
-  PublicKeyStore,
-  PublicKeyStoreError,
-  SessionPublicKeyData,
-} from '@relaycorp/relaynet-core';
+import { PublicKeyStore, SessionPublicKeyData } from '@relaycorp/relaynet-core';
 import { getModelForClass } from '@typegoose/typegoose';
 import { Connection, Model } from 'mongoose';
 
@@ -19,11 +15,11 @@ export class MongoPublicKeyStore extends PublicKeyStore {
     });
   }
 
-  protected async fetchKey(peerPrivateAddress: string): Promise<SessionPublicKeyData> {
+  protected async fetchKey(peerPrivateAddress: string): Promise<SessionPublicKeyData | null> {
     const query = this.keyDataModel.findOne({ peerPrivateAddress });
     const keyData: null | PeerPublicKeyData = await query.exec();
     if (keyData === null) {
-      throw new PublicKeyStoreError('Key could not be found');
+      return null;
     }
     return {
       publicKeyCreationTime: keyData.creationDate,

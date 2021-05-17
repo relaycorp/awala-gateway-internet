@@ -11,8 +11,9 @@ import {
   SessionEnvelopedData,
   SessionlessEnvelopedData,
   Signer,
+  StreamingMode,
 } from '@relaycorp/relaynet-core';
-import { PoWebClient, StreamingMode } from '@relaycorp/relaynet-poweb';
+import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';

@@ -143,7 +143,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
   expect(fixtures.parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
 });
 
-test('Well-formed yet invalid parcels should be refused with an HTTP 403 response', async () => {
+test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
   const logging = makeMockLogging();
   const fastify = await makeServer(logging.logger);
   const fixtures = getFixtures();
@@ -161,7 +161,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 403 respons
     makeAuthorizationHeaderValue(countersignature),
   );
 
-  expect(response).toHaveProperty('statusCode', 403);
+  expect(response).toHaveProperty('statusCode', 422);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Parcel is invalid');
   expect(logging.logs).toContainEqual(
     partialPinoLog('info', 'Invalid parcel', {

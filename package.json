@@ -30,19 +30,19 @@
     "@types/jest": "^26.0.23",
     "@types/mongoose": "^5.10.5",
     "@types/pkijs": "^0.0.6",
-    "@types/split2": "^2.1.6",
+    "@types/split2": "^3.2.0",
     "@types/verror": "^1.10.4",
-    "@types/ws": "^7.4.2",
+    "@types/ws": "^7.4.4",
     "fastify-plugin": "^3.0.0",
     "jest": "^26.6.3",
     "jest-extended": "^0.11.5",
     "light-my-request": "^4.4.1",
     "npm-run-all": "^4.1.5",
     "pkijs": "^2.1.95",
-    "prettier": "^2.2.1",
+    "prettier": "^2.3.0",
     "split2": "^3.2.2",
     "trash-cli": "^4.0.0",
-    "ts-jest": "^26.5.5",
+    "ts-jest": "^26.5.6",
     "ts-node": "^9.1.1",
     "ts-node-dev": "^1.1.6",
     "tslint": "^5.18.0",
@@ -78,7 +78,7 @@
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
-    "env-var": "^7.0.0",
+    "env-var": "^7.0.1",
     "fastify": "^3.15.1",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.9",
@@ -87,13 +87,13 @@
     "mongoose": "^5.10.18",
     "node-nats-streaming": "^0.3.2",
     "pino": "^6.11.3",
-    "selfsigned": "^1.10.8",
+    "selfsigned": "^1.10.11",
     "stream-to-it": "^0.2.3",
     "uuid-random": "^1.3.2",
     "ws": "^7.4.5"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.3",
-    "utf-8-validate": "^5.0.4"
+    "utf-8-validate": "^5.0.5"
   }
 }

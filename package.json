@@ -78,7 +78,7 @@
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
-    "env-var": "^7.0.0",
+    "env-var": "^7.0.1",
     "fastify": "^3.15.1",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.9",

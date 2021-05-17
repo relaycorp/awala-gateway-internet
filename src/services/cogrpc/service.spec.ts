@@ -169,9 +169,9 @@ describe('deliverCargo', () => {
         yield message.id;
       }
     }
-    NATS_CLIENT = ({
+    NATS_CLIENT = {
       makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
-    } as unknown) as natsStreaming.NatsStreamingClient;
+    } as unknown as natsStreaming.NatsStreamingClient;
   });
   const mockNatsClientClass = mockSpy(
     jest.spyOn(natsStreaming, 'NatsStreamingClient'),

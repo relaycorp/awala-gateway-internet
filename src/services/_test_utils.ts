@@ -19,7 +19,7 @@ export const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export function getMockInstance(mockedObject: any): jest.MockInstance<any, any> {
-  return (mockedObject as unknown) as jest.MockInstance<any, any>;
+  return mockedObject as unknown as jest.MockInstance<any, any>;
 }
 
 export function getMockContext(mockedObject: any): jest.MockContext<any, any> {
@@ -55,7 +55,7 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
 }
 
 export function castMock<T>(partialMock: Partial<T>): T {
-  return (partialMock as unknown) as T;
+  return partialMock as unknown as T;
 }
 
 export async function generatePdaChain(): Promise<PdaChain> {

@@ -6,13 +6,13 @@ import {
   Parcel,
   PrivateNodeRegistrationRequest,
   Signer,
+  StreamingMode,
 } from '@relaycorp/relaynet-core';
 import {
   ParcelDeliveryError,
   PoWebClient,
   RefusedParcelError,
   ServerError,
-  StreamingMode,
 } from '@relaycorp/relaynet-poweb';
 import pipe from 'it-pipe';
 

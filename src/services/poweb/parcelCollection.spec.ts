@@ -7,8 +7,8 @@ import {
   InvalidMessageError,
   ParcelDelivery,
   Signer,
+  StreamingMode,
 } from '@relaycorp/relaynet-core';
-import { StreamingMode } from '@relaycorp/relaynet-poweb';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';

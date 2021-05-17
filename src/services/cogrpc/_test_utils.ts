@@ -51,6 +51,6 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
   public convertToGrpcStream(): grpc.ServerDuplexStream<Input, Output> {
     // Unfortunately, ServerDuplexStream's constructor is private so we have to resort to this
     // ugly hack
-    return (this as unknown) as grpc.ServerDuplexStream<Input, Output>;
+    return this as unknown as grpc.ServerDuplexStream<Input, Output>;
   }
 }

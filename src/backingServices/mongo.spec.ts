@@ -125,7 +125,7 @@ describe('createMongooseConnectionFromEnv', () => {
 });
 
 describe('initMongoDBKeyStore', () => {
-  const mongooseConnection = ({ model: { bind: jest.fn() } } as any) as Connection;
+  const mongooseConnection = { model: { bind: jest.fn() } } as any as Connection;
 
   test('MongoPublicKeyStore instance should be returned', () => {
     const keyStore = initMongoDBKeyStore(mongooseConnection);

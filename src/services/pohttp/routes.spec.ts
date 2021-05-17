@@ -43,9 +43,8 @@ beforeAll(async () => {
   // tslint:disable-next-line:no-object-mutation
   validRequestOptions.payload = payload;
   // tslint:disable-next-line:readonly-keyword no-object-mutation
-  (validRequestOptions.headers as { [key: string]: string })[
-    'Content-Length'
-  ] = payload.byteLength.toString();
+  (validRequestOptions.headers as { [key: string]: string })['Content-Length'] =
+    payload.byteLength.toString();
 });
 
 const STUB_NATS_SERVER_URL = 'nats://example.com';

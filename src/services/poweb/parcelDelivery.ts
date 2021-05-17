@@ -82,7 +82,7 @@ export default async function registerRoutes(
       } catch (err) {
         if (err instanceof InvalidMessageError) {
           parcelAwareLogger.info({ err }, 'Invalid parcel');
-          return reply.code(403).send({ message: 'Parcel is invalid' });
+          return reply.code(422).send({ message: 'Parcel is invalid' });
         }
 
         parcelAwareLogger.error({ err }, 'Failed to save parcel');

@@ -16,8 +16,9 @@ beforeEach(() => {
 const mockProcessOn = mockSpy(jest.spyOn(process, 'on'));
 const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'));
 
-mockSpy(jest.spyOn(pino, 'final'), (_, handler) => (err: Error) =>
-  handler(err, mockFinalLogging.logger),
+mockSpy(
+  jest.spyOn(pino, 'final'),
+  (_, handler) => (err: Error) => handler(err, mockFinalLogging.logger),
 );
 
 describe('configureExitHandling', () => {

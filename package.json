@@ -73,7 +73,7 @@
     "@relaycorp/pino-cloud": "^1.0.3",
     "@relaycorp/relaynet-core": "^1.45.1",
     "@relaycorp/relaynet-pohttp": "^1.7.4",
-    "@typegoose/typegoose": "^7.6.0",
+    "@typegoose/typegoose": "^7.6.1",
     "@types/pino": "^6.3.8",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",

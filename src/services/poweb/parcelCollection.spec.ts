@@ -320,7 +320,7 @@ describe('Keep alive', () => {
     await completeHandshake(client);
 
     await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
-    expect(client.popLastPeerMessage()).toBeUndefined();
+    expect(client.popOldestPeerMessage()).toBeUndefined();
     expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).toBeCalledWith(
       peerGatewayAddress,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),

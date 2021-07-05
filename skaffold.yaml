@@ -1,4 +1,4 @@
-apiVersion: skaffold/v2beta11
+apiVersion: skaffold/v2beta18
 kind: Config
 build:
   artifacts:
@@ -21,6 +21,9 @@ deploy:
         relaynet-pong.current_endpoint_session_key_id: OTc1MzEK
       wait: true
       skipBuildDependencies: true
+    flags:
+      global:
+        - "--timeout=360"
 portForward:
 - resourceType: service
   resourceName: public-gateway-vault

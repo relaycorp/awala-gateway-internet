@@ -36,3 +36,6 @@ for deployment in ${DEPLOYMENTS}; do
 
   kubectl logs "deploy/${deployment}" --all-containers=true
 done
+
+print_header "Jobs"
+kubectl get jobs

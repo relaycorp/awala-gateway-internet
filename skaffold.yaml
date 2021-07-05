@@ -21,9 +21,6 @@ deploy:
         relaynet-pong.current_endpoint_session_key_id: OTc1MzEK
       wait: true
       skipBuildDependencies: true
-    flags:
-      global:
-        - "--debug"
 portForward:
 - resourceType: service
   resourceName: public-gateway-vault

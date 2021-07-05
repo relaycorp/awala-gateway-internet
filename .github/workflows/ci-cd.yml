@@ -43,7 +43,7 @@ jobs:
         uses: hiberbee/github-action-skaffold@1.4.0
         with:
           command: run
-          skaffold-version: 1.19.0
+          skaffold-version: 1.27.0
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"

@@ -23,7 +23,7 @@ deploy:
       skipBuildDependencies: true
     flags:
       global:
-        - "--timeout=360"
+        - "--timeout=600"
 portForward:
 - resourceType: service
   resourceName: public-gateway-vault

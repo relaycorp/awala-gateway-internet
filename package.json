@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@relaycorp/relaynet-poweb": "^1.5.4",
-    "@relaycorp/shared-config": "^1.4.15",
+    "@relaycorp/shared-config": "^1.5.0",
     "@relaycorp/ws-mock": "^2.0.0",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.23",
@@ -44,7 +44,7 @@
     "trash-cli": "^4.0.0",
     "ts-jest": "^26.5.6",
     "ts-node": "^10.0.0",
-    "ts-node-dev": "^1.1.6",
+    "ts-node-dev": "^1.1.8",
     "tslint": "^5.18.0",
     "typescript": "^3.9.10"
   },
@@ -71,7 +71,7 @@
     "@relaycorp/keystore-vault": "^1.2.3",
     "@relaycorp/object-storage": "^1.4.2",
     "@relaycorp/pino-cloud": "^1.0.3",
-    "@relaycorp/relaynet-core": "^1.46.0",
+    "@relaycorp/relaynet-core": "^1.48.1",
     "@relaycorp/relaynet-pohttp": "^1.7.4",
     "@typegoose/typegoose": "^7.6.1",
     "@types/pino": "^6.3.8",
@@ -79,7 +79,7 @@
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "env-var": "^7.0.1",
-    "fastify": "^3.18.0",
+    "fastify": "^3.18.1",
     "fastify-mongoose": "^0.3.0",
     "grpc": "^1.24.10",
     "grpc-health-check": "^1.8.0",
@@ -90,7 +90,7 @@
     "selfsigned": "^1.10.11",
     "stream-to-it": "^0.2.3",
     "uuid-random": "^1.3.2",
-    "ws": "^7.5.0"
+    "ws": "^7.5.2"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.3",

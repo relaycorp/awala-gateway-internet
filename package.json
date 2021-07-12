@@ -69,7 +69,7 @@
   "dependencies": {
     "@relaycorp/cogrpc": "^1.3.9",
     "@relaycorp/keystore-vault": "^1.2.3",
-    "@relaycorp/object-storage": "^1.4.2",
+    "@relaycorp/object-storage": "^1.4.3",
     "@relaycorp/pino-cloud": "^1.0.3",
     "@relaycorp/relaynet-core": "^1.48.1",
     "@relaycorp/relaynet-pohttp": "^1.7.4",

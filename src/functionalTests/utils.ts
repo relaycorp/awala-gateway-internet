@@ -108,9 +108,3 @@ export async function registerPrivateGateway(
   );
   return client.registerNode(await registrationRequest.serialize(privateGatewayKeyPair.privateKey));
 }
-
-export function* arrayToIterable<T>(array: readonly T[]): IterableIterator<T> {
-  for (const item of array) {
-    yield item;
-  }
-}

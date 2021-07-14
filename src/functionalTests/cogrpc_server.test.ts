@@ -13,6 +13,7 @@ import grpc from 'grpc';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 
 import {
+  arrayToAsyncIterable,
   asyncIterableToArray,
   ExternalPdaChain,
   generateCCA,
@@ -21,7 +22,7 @@ import {
 } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
-import { arrayToIterable, connectToNatsStreaming, generatePdaChain, sleep } from './utils';
+import { connectToNatsStreaming, generatePdaChain, sleep } from './utils';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
@@ -36,7 +37,7 @@ describe('Cargo delivery', () => {
     const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
     try {
       const ackDeliveryIds = await cogRPCClient.deliverCargo(
-        arrayToIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
+        arrayToAsyncIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
       );
 
       await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
@@ -63,7 +64,7 @@ describe('Cargo delivery', () => {
     try {
       await asyncIterableToArray(
         await cogRPCClient.deliverCargo(
-          arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+          arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
         ),
       );
     } finally {

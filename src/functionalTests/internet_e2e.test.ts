@@ -20,6 +20,7 @@ import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
 import {
+  arrayToAsyncIterable,
   asyncIterableToArray,
   ExternalPdaChain,
   generateCCA,
@@ -32,7 +33,7 @@ import {
   GW_PUBLIC_ADDRESS_URL,
   PONG_ENDPOINT_ADDRESS,
 } from './services';
-import { arrayToIterable, generatePdaChain, IS_GITHUB, sleep } from './utils';
+import { generatePdaChain, IS_GITHUB, sleep } from './utils';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
@@ -94,7 +95,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     );
     await asyncIterableToArray(
       cogRPCClient.deliverCargo(
-        arrayToIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+        arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
       ),
     );
 

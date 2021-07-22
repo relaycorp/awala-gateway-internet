@@ -202,22 +202,21 @@ async function* streamActiveParcels(
   // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
   const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
 
-  if (!keepAlive) {
-    return parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
-  }
-
-  const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
-
-  try {
-    yield* await parcelStore.liveStreamActiveParcelsForGateway(
-      peerGatewayAddress,
-      natsStreamingClient,
-      abortSignal,
-      logger,
-    );
-  } catch (err) {
-    tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
-    logger.error({ err }, 'Failed to live stream parcels');
+  if (keepAlive) {
+    const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
+    try {
+      yield* await parcelStore.liveStreamActiveParcelsForGateway(
+        peerGatewayAddress,
+        natsStreamingClient,
+        abortSignal,
+        logger,
+      );
+    } catch (err) {
+      tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
+      logger.error({ err }, 'Failed to live stream parcels');
+    }
+  } else {
+    yield* await parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
   }
 }
 

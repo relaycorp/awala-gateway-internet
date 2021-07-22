@@ -17,6 +17,7 @@ import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
 import {
+  appendErrorToAsyncIterable,
   arrayBufferFrom,
   arrayToAsyncIterable,
   makeMockLogging,
@@ -26,7 +27,10 @@ import {
   partialPinoLogger,
   UUID4_REGEX,
 } from '../../_test_utils';
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
+import {
+  NatsStreamingClient,
+  NatsStreamingSubscriptionError,
+} from '../../backingServices/natsStreaming';
 import * as certs from '../../certs';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
@@ -379,13 +383,30 @@ describe('Keep alive', () => {
     expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
   });
 
-  test('Connection should be closed if streaming of active parcels failed', async () => {
-    const error = new Error('whoops!');
-    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockImplementation(
-      async function* (): AsyncIterable<string> {
-        yield* await arrayToAsyncIterable([]);
-        throw error;
-      },
+  test('Connection should be closed if NATS subscription failed', async () => {
+    const error = new NatsStreamingSubscriptionError('too many subscribers');
+    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockReturnValue(
+      appendErrorToAsyncIterable(error, []),
+    );
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
+    await completeHandshake(client);
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.SERVER_ERROR,
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('warn', 'Failed to subscribe to NATS queue to live stream active parcels', {
+        err: expect.objectContaining({ message: error.message }),
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
+
+  test('Non-NATS-related failure should close connection and be logged as error', async () => {
+    const error = new Error('this has nothing to do with NATS');
+    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockReturnValue(
+      appendErrorToAsyncIterable(error, []),
     );
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
     await completeHandshake(client);

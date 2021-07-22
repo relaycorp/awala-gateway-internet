@@ -20,7 +20,10 @@ import WebSocket, {
   ServerOptions as WSServerOptions,
 } from 'ws';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
+import {
+  NatsStreamingClient,
+  NatsStreamingSubscriptionError,
+} from '../../backingServices/natsStreaming';
 import { retrieveOwnCertificates } from '../../certs';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { WebSocketCode } from './websockets';
@@ -212,8 +215,12 @@ async function* streamActiveParcels(
         logger,
       );
     } catch (err) {
+      if (err instanceof NatsStreamingSubscriptionError) {
+        logger.warn({ err }, 'Failed to subscribe to NATS queue to live stream active parcels');
+      } else {
+        logger.error({ err }, 'Failed to live stream parcels');
+      }
       tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
-      logger.error({ err }, 'Failed to live stream parcels');
     }
   } else {
     yield* await parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);

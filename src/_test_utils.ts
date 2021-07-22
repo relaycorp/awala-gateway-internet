@@ -40,6 +40,14 @@ export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promi
   return values;
 }
 
+export async function* appendErrorToAsyncIterable<T>(
+  error: Error,
+  array: readonly T[],
+): AsyncIterable<T> {
+  yield* await arrayToAsyncIterable(array);
+  throw error;
+}
+
 export function arrayBufferFrom(value: string): ArrayBuffer {
   return bufferToArray(Buffer.from(value));
 }

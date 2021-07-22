@@ -112,6 +112,7 @@ function makeConnectionHandler(
         reqId,
         request.headers,
         abortController.signal,
+        tracker,
       ),
       makeDeliveryStream(wsConnection, tracker, peerAwareLogger),
       duplex(createWebSocketStream(wsConnection)),

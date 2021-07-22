@@ -20,7 +20,10 @@ import WebSocket, {
   ServerOptions as WSServerOptions,
 } from 'ws';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
+import {
+  NatsStreamingClient,
+  NatsStreamingSubscriptionError,
+} from '../../backingServices/natsStreaming';
 import { retrieveOwnCertificates } from '../../certs';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { WebSocketCode } from './websockets';
@@ -112,6 +115,7 @@ function makeConnectionHandler(
         reqId,
         request.headers,
         abortController.signal,
+        tracker,
       ),
       makeDeliveryStream(wsConnection, tracker, peerAwareLogger),
       duplex(createWebSocketStream(wsConnection)),
@@ -189,28 +193,38 @@ async function doHandshake(
   });
 }
 
-function streamActiveParcels(
+async function* streamActiveParcels(
   parcelStore: ParcelStore,
   peerGatewayAddress: string,
   logger: Logger,
   requestId: string,
   requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
+  tracker: CollectionTracker,
 ): AsyncIterable<ParcelStreamMessage> {
   // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
   const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
 
-  if (!keepAlive) {
-    return parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
+  if (keepAlive) {
+    const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
+    try {
+      yield* await parcelStore.liveStreamActiveParcelsForGateway(
+        peerGatewayAddress,
+        natsStreamingClient,
+        abortSignal,
+        logger,
+      );
+    } catch (err) {
+      if (err instanceof NatsStreamingSubscriptionError) {
+        logger.warn({ err }, 'Failed to subscribe to NATS queue to live stream active parcels');
+      } else {
+        logger.error({ err }, 'Failed to live stream parcels');
+      }
+      tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
+    }
+  } else {
+    yield* await parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
   }
-
-  const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
-  return parcelStore.liveStreamActiveParcelsForGateway(
-    peerGatewayAddress,
-    natsStreamingClient,
-    abortSignal,
-    logger,
-  );
 }
 
 function makeDeliveryStream(
@@ -239,7 +253,7 @@ function makeDeliveryStream(
 
     if (tracker.isCollectionComplete) {
       logger.info('All parcels were acknowledged shortly after the last one was sent');
-      wsConnection.close(WebSocketCode.NORMAL);
+      wsConnection.close(tracker.closeFrameCode);
     }
   };
 }
@@ -265,7 +279,7 @@ function makeACKProcessor(
 
       if (tracker.isCollectionComplete) {
         logger.info('Closing connection after all parcels have been acknowledged');
-        wsConnection.close(WebSocketCode.NORMAL);
+        wsConnection.close(tracker.closeFrameCode);
         break;
       }
     }
@@ -277,6 +291,8 @@ class CollectionTracker {
   private wereAllParcelsDelivered = false;
   // tslint:disable-next-line:readonly-keyword
   private pendingACKs: { [key: string]: PendingACK } = {};
+  // tslint:disable-next-line:readonly-keyword
+  private _closeFrameCode: WebSocketCode | null = null;
 
   get isCollectionComplete(): boolean {
     return this.wereAllParcelsDelivered && Object.keys(this.pendingACKs).length === 0;
@@ -299,5 +315,14 @@ class CollectionTracker {
       delete this.pendingACKs[deliveryId];
     }
     return pendingACK;
+  }
+
+  public setCloseFrameCode(code: WebSocketCode): void {
+    // tslint:disable-next-line:no-object-mutation
+    this._closeFrameCode = code;
+  }
+
+  get closeFrameCode(): WebSocketCode {
+    return this._closeFrameCode ?? WebSocketCode.NORMAL;
   }
 }

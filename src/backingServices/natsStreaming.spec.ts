@@ -5,7 +5,12 @@ import { EventEmitter } from 'events';
 import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
 
-import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../_test_utils';
+import {
+  arrayToAsyncIterable,
+  asyncIterableToArray,
+  getPromiseRejection,
+  iterableTake,
+} from '../_test_utils';
 import { configureMockEnvVars } from '../services/_test_utils';
 
 class MockNatsSubscription extends EventEmitter {
@@ -42,7 +47,11 @@ jest.mock('node-nats-streaming', () => {
     connect: mockNatsConnect,
   };
 });
-import { NatsStreamingClient, PublisherMessage } from './natsStreaming';
+import {
+  NatsStreamingClient,
+  NatsStreamingSubscriptionError,
+  PublisherMessage,
+} from './natsStreaming';
 
 const STUB_SERVER_URL = 'nats://example.com';
 const STUB_CLUSTER_ID = 'cluster-id';
@@ -474,15 +483,20 @@ describe('NatsStreamingClient', () => {
 
     test('Subscription and connection should be closed after a subscription error', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
-      const error = new Error('Whoops, my bad');
+      const stanError = new Error('cannot subscribe');
       setImmediate(() => {
         mockConnection.emit('connect');
       });
       setImmediate(() => {
-        mockSubscription.emit('error', error);
+        mockSubscription.emit('error', stanError);
       });
 
-      await expect(asyncIterableToArray(consumer)).rejects.toEqual(error);
+      const error = await getPromiseRejection(
+        asyncIterableToArray(consumer),
+        NatsStreamingSubscriptionError,
+      );
+      expect(error.message).toMatch(/^Subscription for queue consumer failed:/);
+      expect(error.cause()).toBe(stanError);
 
       expect(mockSubscription.close).toBeCalled();
       expect(mockConnection.close).toBeCalled();

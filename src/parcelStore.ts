@@ -58,6 +58,7 @@ export class ParcelStore {
    * @param natsStreamingClient
    * @param abortSignal
    * @param logger
+   * @throws NatsStreamingSubscriptionError
    */
   public async *liveStreamActiveParcelsForGateway(
     peerGatewayAddress: string,

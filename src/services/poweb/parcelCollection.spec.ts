@@ -378,6 +378,29 @@ describe('Keep alive', () => {
     expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalled();
     expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
   });
+
+  test('Connection should be closed if streaming of active parcels failed', async () => {
+    const error = new Error('whoops!');
+    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockImplementation(
+      async function* (): AsyncIterable<string> {
+        yield* await arrayToAsyncIterable([]);
+        throw error;
+      },
+    );
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
+    await completeHandshake(client);
+
+    await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
+      code: WebSocketCode.SERVER_ERROR,
+    });
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('error', 'Failed to live stream parcels', {
+        err: expect.objectContaining({ message: error.message }),
+        peerGatewayAddress,
+        reqId: UUID4_REGEX,
+      }),
+    );
+  });
 });
 
 test('Server should send parcel to client', async () => {

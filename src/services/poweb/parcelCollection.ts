@@ -189,13 +189,14 @@ async function doHandshake(
   });
 }
 
-function streamActiveParcels(
+async function* streamActiveParcels(
   parcelStore: ParcelStore,
   peerGatewayAddress: string,
   logger: Logger,
   requestId: string,
   requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
+  tracker: CollectionTracker,
 ): AsyncIterable<ParcelStreamMessage> {
   // "keep-alive" or any value other than "close-upon-completion" should keep the connection alive
   const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
@@ -205,12 +206,18 @@ function streamActiveParcels(
   }
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
-  return parcelStore.liveStreamActiveParcelsForGateway(
-    peerGatewayAddress,
-    natsStreamingClient,
-    abortSignal,
-    logger,
-  );
+
+  try {
+    yield* await parcelStore.liveStreamActiveParcelsForGateway(
+      peerGatewayAddress,
+      natsStreamingClient,
+      abortSignal,
+      logger,
+    );
+  } catch (err) {
+    tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
+    logger.error({ err }, 'Failed to live stream parcels');
+  }
 }
 
 function makeDeliveryStream(
@@ -239,7 +246,7 @@ function makeDeliveryStream(
 
     if (tracker.isCollectionComplete) {
       logger.info('All parcels were acknowledged shortly after the last one was sent');
-      wsConnection.close(WebSocketCode.NORMAL);
+      wsConnection.close(tracker.closeFrameCode);
     }
   };
 }
@@ -265,7 +272,7 @@ function makeACKProcessor(
 
       if (tracker.isCollectionComplete) {
         logger.info('Closing connection after all parcels have been acknowledged');
-        wsConnection.close(WebSocketCode.NORMAL);
+        wsConnection.close(tracker.closeFrameCode);
         break;
       }
     }
@@ -277,6 +284,8 @@ class CollectionTracker {
   private wereAllParcelsDelivered = false;
   // tslint:disable-next-line:readonly-keyword
   private pendingACKs: { [key: string]: PendingACK } = {};
+  // tslint:disable-next-line:readonly-keyword
+  private _closeFrameCode: WebSocketCode | null = null;
 
   get isCollectionComplete(): boolean {
     return this.wereAllParcelsDelivered && Object.keys(this.pendingACKs).length === 0;
@@ -299,5 +308,14 @@ class CollectionTracker {
       delete this.pendingACKs[deliveryId];
     }
     return pendingACK;
+  }
+
+  public setCloseFrameCode(code: WebSocketCode): void {
+    // tslint:disable-next-line:no-object-mutation
+    this._closeFrameCode = code;
+  }
+
+  get closeFrameCode(): WebSocketCode {
+    return this._closeFrameCode ?? WebSocketCode.NORMAL;
   }
 }

@@ -1,3 +1,5 @@
+// tslint:disable:max-classes-per-file
+
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
 import pipe from 'it-pipe';
@@ -6,10 +8,14 @@ import { PassThrough } from 'stream';
 import * as streamToIt from 'stream-to-it';
 import { promisify } from 'util';
 
+import { PublicGatewayError } from '../errors';
+
 export interface PublisherMessage {
   readonly id: string;
   readonly data: Buffer | string;
 }
+
+export class NatsStreamingSubscriptionError extends PublicGatewayError {}
 
 export class NatsStreamingClient {
   public static initFromEnv(clientId: string): NatsStreamingClient {
@@ -55,6 +61,16 @@ export class NatsStreamingClient {
     await pipe([{ data: messageData }], this.makePublisher(channel, clientIdSuffix), drainIterable);
   }
 
+  /**
+   * Make a queue consumer.
+   *
+   * @param channel
+   * @param queue
+   * @param durableName
+   * @param abortSignal
+   * @param clientIdSuffix
+   * @throws NatsStreamingSubscriptionError
+   */
   public async *makeQueueConsumer(
     channel: string,
     queue: string,
@@ -73,7 +89,11 @@ export class NatsStreamingClient {
     const messagesStream = new PassThrough({ objectMode: true });
 
     const subscription = connection.subscribe(channel, queue, subscriptionOptions);
-    subscription.on('error', (error) => messagesStream.destroy(error));
+    subscription.on('error', (error) =>
+      messagesStream.destroy(
+        new NatsStreamingSubscriptionError(error, 'Subscription for queue consumer failed'),
+      ),
+    );
     subscription.on('message', (msg) => messagesStream.write(msg));
 
     const messagesIterable = streamToIt.source(messagesStream);

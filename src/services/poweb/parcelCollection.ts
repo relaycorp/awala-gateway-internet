@@ -31,6 +31,8 @@ import { WebSocketCode } from './websockets';
 // The largest payload the client could send is the handshake response, which should be < 1.9 kib
 const MAX_PAYLOAD = 2 * 1024;
 
+const WEBSOCKET_PING_INTERVAL_MS = 10_000;
+
 interface PendingACK {
   readonly ack: () => Promise<void>;
   readonly parcelObjectKey: string;
@@ -92,6 +94,15 @@ function makeConnectionHandler(
       );
       return;
     }
+
+    const pingIntervalId = setInterval(() => {
+      requestAwareLogger.debug('Sending ping to client');
+      wsConnection.ping();
+    }, WEBSOCKET_PING_INTERVAL_MS);
+    wsConnection.once('close', () => {
+      clearInterval(pingIntervalId);
+    });
+
     const abortController = makeAbortController(wsConnection, requestAwareLogger);
 
     const peerGatewayAddress = await doHandshake(

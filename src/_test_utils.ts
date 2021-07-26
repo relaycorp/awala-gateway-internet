@@ -202,3 +202,13 @@ export async function generateCCA(
   );
   return Buffer.from(await cca.serialize(privateGatewayPrivateKey));
 }
+
+export function useFakeTimers(): void {
+  beforeEach(() => {
+    jest.useFakeTimers('modern');
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+}

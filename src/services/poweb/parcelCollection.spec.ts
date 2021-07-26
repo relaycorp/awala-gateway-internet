@@ -652,13 +652,14 @@ test('Client-initiated WebSocket connection closure should be handled gracefully
 test('Abrupt TCP connection closure should be handled gracefully', async () => {
   const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
   const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
-  await client.connect();
-
-  expect(abortSpy).not.toBeCalled();
   const error = new Error('Sorry, I have to go');
-  client.abort(error);
 
-  expect(abortSpy).toBeCalled();
+  await client.use(async () => {
+    expect(abortSpy).not.toBeCalled();
+    client.abort(error);
+    expect(abortSpy).toBeCalled();
+  });
+
   expect(mockLogging.logs).toContainEqual(
     partialPinoLog('info', 'Closing connection due to error', {
       err: expect.objectContaining({ message: error.message }),

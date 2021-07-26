@@ -773,7 +773,7 @@ class MockPoWebClient extends MockClient {
     });
   }
 
-  public async completeHandshake(): Promise<void> {
+  protected async completeHandshake(): Promise<void> {
     const challenge = HandshakeChallenge.deserialize((await this.receive()) as ArrayBuffer);
     const response = new HandshakeResponse([
       await nonceSigner.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE),

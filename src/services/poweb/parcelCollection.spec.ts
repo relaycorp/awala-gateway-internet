@@ -176,6 +176,7 @@ describe('Handshake', () => {
     await client.connect();
 
     const challengeSerialized = await client.receive();
+    client.close();
     expect(challengeSerialized).toBeInstanceOf(ArrayBuffer);
     const challenge = HandshakeChallenge.deserialize(challengeSerialized as ArrayBuffer);
     expect(uuidBinSpy).toBeCalledTimes(1);
@@ -434,6 +435,7 @@ test('Server should send parcel to client', async () => {
   await completeHandshake(client);
 
   const parcelDeliverySerialized = await client.receive();
+  client.close();
   expect(parcelDeliverySerialized).toBeTruthy();
   const parcelDelivery = ParcelDelivery.deserialize(
     bufferToArray(parcelDeliverySerialized as Buffer),
@@ -466,6 +468,8 @@ describe('Acknowledgements', () => {
       bufferToArray(parcelDelivery2Serialized as Buffer),
     );
     expect(parcelDelivery1.deliveryId).not.toEqual(parcelDelivery2.deliveryId);
+
+    client.close();
   });
 
   test('Parcel should be acknowledged in store when client acknowledges it', async () => {
@@ -487,6 +491,8 @@ describe('Acknowledgements', () => {
         reqId: UUID4_REGEX,
       }),
     );
+
+    client.close();
   });
 
   test('Parcel should not be deleted if client never acknowledges it', async () => {
@@ -502,6 +508,8 @@ describe('Acknowledgements', () => {
 
     await sleep(500);
     expect(parcelStreamMessage.ack).not.toBeCalled();
+
+    client.close();
   });
 
   test('Connection should be closed with an error if client sends unknown ACK', async () => {
@@ -645,6 +653,8 @@ describe('Pings', () => {
     const [, ping2] = client.incomingPings;
     expect(ping2.date).toBeAfter(addSeconds(connectionDate, 19));
     expect(ping2.date).toBeBefore(addSeconds(connectionDate, 21));
+
+    client.close();
   });
 
   test('Ping should be logged', async () => {
@@ -657,7 +667,8 @@ describe('Pings', () => {
         reqId: UUID4_REGEX,
       }),
     );
-    await client.close();
+
+    client.close();
   });
 
   test('Pings should stop when connection is closed', async () => {

@@ -12,6 +12,7 @@ import {
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
 import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addSeconds } from 'date-fns';
 import { EventEmitter } from 'events';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
@@ -25,6 +26,7 @@ import {
   mockSpy,
   partialPinoLog,
   partialPinoLogger,
+  useFakeTimers,
   UUID4_REGEX,
 } from '../../_test_utils';
 import {
@@ -624,6 +626,48 @@ test('Abrupt TCP connection closure should be handled gracefully', async () => {
       reqId: UUID4_REGEX,
     }),
   );
+});
+
+describe('Pings', () => {
+  useFakeTimers();
+
+  test('Server should send ping every 10 seconds', async () => {
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
+    await client.connect();
+    const connectionDate = new Date();
+
+    jest.advanceTimersByTime(10_100);
+    const [ping1] = client.incomingPings;
+    expect(ping1.date).toBeAfter(addSeconds(connectionDate, 9));
+    expect(ping1.date).toBeBefore(addSeconds(connectionDate, 11));
+
+    jest.advanceTimersByTime(10_000);
+    const [, ping2] = client.incomingPings;
+    expect(ping2.date).toBeAfter(addSeconds(connectionDate, 19));
+    expect(ping2.date).toBeBefore(addSeconds(connectionDate, 21));
+  });
+
+  test('Ping should be logged', async () => {
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
+    await client.connect();
+
+    jest.advanceTimersByTime(10_100);
+    expect(mockLogging.logs).toContainEqual(
+      partialPinoLog('debug', 'Sending ping to client', {
+        reqId: UUID4_REGEX,
+      }),
+    );
+    await client.close();
+  });
+
+  test('Pings should stop when connection is closed', async () => {
+    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
+    await client.connect();
+    await client.close();
+
+    jest.advanceTimersByTime(10_100);
+    expect(client.incomingPings).toHaveLength(0);
+  });
 });
 
 function mockParcelStreamMessage(

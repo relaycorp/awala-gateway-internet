@@ -38,7 +38,7 @@
     "jest-extended": "^0.11.5",
     "light-my-request": "^4.4.1",
     "npm-run-all": "^4.1.5",
-    "pkijs": "^2.1.95",
+    "pkijs": "^2.1.96",
     "prettier": "^2.3.2",
     "split2": "^3.2.2",
     "trash-cli": "^4.0.0",

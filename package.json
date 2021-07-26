@@ -81,7 +81,7 @@
     "env-var": "^7.0.1",
     "fastify": "^3.19.2",
     "fastify-mongoose": "^0.3.0",
-    "grpc": "^1.24.10",
+    "grpc": "^1.24.11",
     "grpc-health-check": "^1.8.0",
     "it-pipe": "^1.1.0",
     "mongoose": "^5.10.18",

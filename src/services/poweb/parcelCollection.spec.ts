@@ -756,15 +756,6 @@ class MockPoWebClient extends MockClient {
     });
   }
 
-  public async use(callback: () => Promise<void>): Promise<void> {
-    await this.connect();
-    try {
-      await callback();
-    } finally {
-      this.close();
-    }
-  }
-
   public async useWithHandshake(callback: () => Promise<void>): Promise<void> {
     await this.use(async () => {
       await this.completeHandshake();

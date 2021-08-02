@@ -25,7 +25,7 @@
   "devDependencies": {
     "@relaycorp/relaynet-poweb": "^1.6.3",
     "@relaycorp/shared-config": "^1.5.3",
-    "@relaycorp/ws-mock": "^2.2.0",
+    "@relaycorp/ws-mock": "^2.4.1",
     "@semantic-release/exec": "^5.0.0",
     "@types/jest": "^26.0.24",
     "@types/mongoose": "^5.10.5",

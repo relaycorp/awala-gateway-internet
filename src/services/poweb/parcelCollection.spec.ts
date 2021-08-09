@@ -671,7 +671,7 @@ test('Abrupt TCP connection closure should be handled gracefully', async () => {
 describe('Pings', () => {
   useFakeTimers();
 
-  test('Server should send ping every 10 seconds', async () => {
+  test('Server should send ping every 5 seconds', async () => {
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
     await client.connect();
     const connectionDate = new Date();
@@ -681,7 +681,7 @@ describe('Pings', () => {
     expect(ping1.date).toBeAfter(addSeconds(connectionDate, 9));
     expect(ping1.date).toBeBefore(addSeconds(connectionDate, 11));
 
-    jest.advanceTimersByTime(10_000);
+    jest.advanceTimersByTime(5_000);
     const [, ping2] = client.incomingPings;
     expect(ping2.date).toBeAfter(addSeconds(connectionDate, 19));
     expect(ping2.date).toBeBefore(addSeconds(connectionDate, 21));

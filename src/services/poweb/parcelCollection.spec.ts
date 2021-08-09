@@ -671,20 +671,23 @@ test('Abrupt TCP connection closure should be handled gracefully', async () => {
 describe('Pings', () => {
   useFakeTimers();
 
+  const PING_INTERVAL_SEC = 5;
+  const PING_INTERVAL_MS = PING_INTERVAL_SEC * 1_000;
+
   test('Server should send ping every 5 seconds', async () => {
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
     await client.connect();
     const connectionDate = new Date();
 
-    jest.advanceTimersByTime(10_100);
+    jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
     const [ping1] = client.incomingPings;
-    expect(ping1.date).toBeAfter(addSeconds(connectionDate, 9));
-    expect(ping1.date).toBeBefore(addSeconds(connectionDate, 11));
+    expect(ping1.date).toBeAfter(addSeconds(connectionDate, PING_INTERVAL_SEC - 1));
+    expect(ping1.date).toBeBefore(addSeconds(connectionDate, PING_INTERVAL_SEC + 1));
 
-    jest.advanceTimersByTime(5_000);
+    jest.advanceTimersByTime(PING_INTERVAL_MS);
     const [, ping2] = client.incomingPings;
-    expect(ping2.date).toBeAfter(addSeconds(connectionDate, 19));
-    expect(ping2.date).toBeBefore(addSeconds(connectionDate, 21));
+    expect(ping2.date).toBeAfter(addSeconds(ping1.date, PING_INTERVAL_SEC - 1));
+    expect(ping2.date).toBeBefore(addSeconds(ping1.date, PING_INTERVAL_SEC + 1));
 
     client.close();
   });
@@ -693,7 +696,7 @@ describe('Pings', () => {
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
     await client.connect();
 
-    jest.advanceTimersByTime(10_100);
+    jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Sending ping to client', {
         reqId: UUID4_REGEX,
@@ -708,7 +711,7 @@ describe('Pings', () => {
     await client.connect();
     await client.close();
 
-    jest.advanceTimersByTime(10_100);
+    jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
     expect(client.incomingPings).toHaveLength(0);
   });
 });

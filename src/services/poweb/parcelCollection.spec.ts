@@ -385,7 +385,7 @@ describe('Keep alive', () => {
     await client.useWithHandshake(async () => {
       await sleep(500);
 
-      expect(client.wasConnectionClosed).toBeFalse();
+      expect(client.didPeerCloseConnection).toBeFalse();
     });
 
     expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalledWith(
@@ -508,9 +508,9 @@ describe('Acknowledgements', () => {
 
     await client.useWithHandshake(async () => {
       await receiveAndACKDelivery(client);
+      await client.waitForPeerClosure();
     });
 
-    await waitForSetImmediate();
     expect(parcelStreamMessage.ack).toBeCalled();
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Acknowledgement received', {
@@ -615,7 +615,7 @@ describe('Acknowledgements', () => {
       ackAlert.emit('ackSent');
 
       const parcel2DeliverySerialized = (await client.receive()) as Buffer;
-      expect(client.wasConnectionClosed).toBeFalse();
+      expect(client.didPeerCloseConnection).toBeFalse();
       const parcel2Delivery = ParcelDelivery.deserialize(bufferToArray(parcel2DeliverySerialized));
       await client.send(parcel2Delivery.deliveryId);
       await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
@@ -735,10 +735,6 @@ async function receiveAndACKDelivery(client: MockPoWebClient): Promise<void> {
 
 async function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function waitForSetImmediate(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
 }
 
 async function waitForEvent<T>(eventName: string, eventEmitter: EventEmitter): Promise<T> {

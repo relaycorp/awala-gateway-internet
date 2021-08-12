@@ -1,5 +1,5 @@
 declare module 'grpc-health-check' {
-  import { ServiceDefinition } from 'grpc';
+  import { ServiceDefinition } from '@grpc/grpc-js';
 
   export const service: ServiceDefinition<any>;
   export class Implementation {

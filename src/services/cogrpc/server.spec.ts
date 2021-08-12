@@ -1,5 +1,5 @@
+import * as grpc from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
-import * as grpc from 'grpc';
 import * as grpcHealthCheck from 'grpc-health-check';
 import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
@@ -17,11 +17,11 @@ const makeServiceImplementationSpy = mockSpy(
 );
 const mockServer = {
   addService: mockSpy(jest.fn()),
-  bind: mockSpy(jest.fn(), () => 1),
+  bindAsync: mockSpy(jest.fn(), () => Promise.resolve()),
   start: mockSpy(jest.fn()),
 };
-jest.mock('grpc', () => {
-  const grpcOriginal = jest.requireActual('grpc');
+jest.mock('@grpc/grpc-js', () => {
+  const grpcOriginal = jest.requireActual('@grpc/grpc-js');
   return {
     ...grpcOriginal,
     Server: jest.fn().mockImplementation(() => mockServer),
@@ -172,16 +172,15 @@ describe('runServer', () => {
   test('Server should listen on 0.0.0.0:8080', async () => {
     await runServer();
 
-    expect(mockServer.bind).toBeCalledTimes(1);
-    expect(mockServer.bind).toBeCalledWith('0.0.0.0:8080', expect.anything());
+    expect(mockServer.bindAsync).toBeCalledTimes(1);
+    expect(mockServer.bindAsync).toBeCalledWith('0.0.0.0:8080', expect.anything());
   });
 
   test('Failing to listen on specified port should result in error', async () => {
-    mockServer.bind.mockReturnValueOnce(-1);
+    const bindError = new Error('Port is apparently taken')
+    mockServer.bindAsync.mockRejectedValue(bindError);
 
-    await expect(() => runServer()).rejects.toMatchObject({
-      message: 'Failed to listen on 0.0.0.0:8080',
-    });
+    await expect(() => runServer()).rejects.toEqual(bindError)
   });
 
   test('Server should use TLS with a self-issued certificate', async () => {
@@ -189,7 +188,7 @@ describe('runServer', () => {
 
     await runServer();
 
-    expect(mockServer.bind).toBeCalledTimes(1);
+    expect(mockServer.bindAsync).toBeCalledTimes(1);
     expect(spiedCreateSsl).toBeCalledWith(null, [
       {
         cert_chain: Buffer.from(mockSelfSignedOutput.cert),
@@ -215,7 +214,7 @@ describe('runServer', () => {
 
     expect(mockServer.start).toBeCalledTimes(1);
     expect(mockServer.start).toBeCalledWith();
-    expect(mockServer.start).toHaveBeenCalledAfter(mockServer.bind as jest.Mock);
+    expect(mockServer.start).toHaveBeenCalledAfter(mockServer.bindAsync as jest.Mock);
   });
 
   test('A log should be produced when the server is ready', async () => {

@@ -1,3 +1,4 @@
+import grpc from '@grpc/grpc-js';
 import { CogRPCClient, CogRPCError } from '@relaycorp/cogrpc';
 import {
   Cargo,
@@ -9,7 +10,6 @@ import {
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
-import grpc from 'grpc';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 
 import {

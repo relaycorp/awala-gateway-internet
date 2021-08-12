@@ -69,7 +69,8 @@
   },
   "homepage": "https://docs.relaycorp.tech/relaynet-internet-gateway/",
   "dependencies": {
-    "@relaycorp/cogrpc": "^1.3.19",
+    "@grpc/grpc-js": "^1.3.7",
+    "@relaycorp/cogrpc": "^1.3.22",
     "@relaycorp/keystore-vault": "^1.2.6",
     "@relaycorp/object-storage": "^1.4.5",
     "@relaycorp/pino-cloud": "^1.0.4",
@@ -82,7 +83,6 @@
     "env-var": "^7.0.1",
     "fastify": "^3.20.1",
     "fastify-mongoose": "^0.3.0",
-    "grpc": "^1.24.11",
     "grpc-health-check": "^1.8.0",
     "it-pipe": "^1.1.0",
     "mongoose": "^5.13.5",

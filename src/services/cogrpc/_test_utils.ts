@@ -1,4 +1,4 @@
-import grpc from 'grpc';
+import grpc from '@grpc/grpc-js';
 import { Duplex } from 'stream';
 
 export class MockGrpcBidiCall<Input, Output> extends Duplex {

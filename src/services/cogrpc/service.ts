@@ -1,3 +1,4 @@
+import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
@@ -8,7 +9,6 @@ import {
   Gateway,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import * as grpc from 'grpc';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';

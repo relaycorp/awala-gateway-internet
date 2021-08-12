@@ -1,6 +1,6 @@
+import { KeyCertPair, Server, ServerCredentials } from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
-import { KeyCertPair, Server, ServerCredentials } from 'grpc';
 import grpcHealthCheck from 'grpc-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
@@ -56,13 +56,16 @@ export async function runServer(logger?: Logger): Promise<void> {
   });
   server.addService(grpcHealthCheck.service, healthCheckService);
 
-  const bindResult = server.bind(
-    NETLOC,
-    ServerCredentials.createSsl(null, [await selfIssueCertificate()]),
-  );
-  if (bindResult < 0) {
-    throw new Error(`Failed to listen on ${NETLOC}`);
-  }
+  const certificate = await selfIssueCertificate();
+  await new Promise((resolve, reject) => {
+    server.bindAsync(NETLOC, ServerCredentials.createSsl(null, [certificate]), (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
   server.start();
 
   baseLogger.info('Ready to receive requests');

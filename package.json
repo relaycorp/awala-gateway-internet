@@ -85,7 +85,7 @@
     "grpc": "^1.24.11",
     "grpc-health-check": "^1.8.0",
     "it-pipe": "^1.1.0",
-    "mongoose": "^5.13.5",
+    "mongoose": "^5.13.7",
     "node-nats-streaming": "^0.3.2",
     "pino": "^6.13.0",
     "selfsigned": "^1.10.11",

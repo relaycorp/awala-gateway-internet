@@ -1,4 +1,4 @@
-declare module 'grpc-health-check' {
+declare module 'grpc-js-health-check' {
   import { ServiceDefinition } from '@grpc/grpc-js';
 
   export const service: ServiceDefinition<any>;

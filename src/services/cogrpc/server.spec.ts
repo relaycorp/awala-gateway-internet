@@ -1,6 +1,6 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
-import * as grpcHealthCheck from 'grpc-health-check';
+import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 

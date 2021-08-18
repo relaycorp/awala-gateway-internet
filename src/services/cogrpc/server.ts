@@ -1,7 +1,7 @@
 import { KeyCertPair, Server, ServerCredentials } from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
-import grpcHealthCheck from 'grpc-health-check';
+import grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
 import { configureExitHandling } from '../../utilities/exitHandling';

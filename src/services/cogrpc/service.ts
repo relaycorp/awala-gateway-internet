@@ -12,7 +12,6 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
-import * as streamToIt from 'stream-to-it';
 import uuid from 'uuid-random';
 
 import { createMongooseConnectionFromEnv, initMongoDBKeyStore } from '../../backingServices/mongo';
@@ -135,7 +134,7 @@ async function deliverCargo(
   }
 
   try {
-    await pipe(streamToIt.source(call), validateDelivery, natsPublisher, ackDelivery);
+    await pipe(call, validateDelivery, natsPublisher, ackDelivery);
   } catch (err) {
     logger.error({ err }, 'Failed to store cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call

@@ -69,7 +69,7 @@ jobs:
       - run: npm run test:functional
         env:
           IS_GITHUB: 'true'
-        timeout-minutes: 2
+        timeout-minutes: 3
       - name: Output diagnostic information upon failure
         if: failure()
         run: .github/scripts/output-diagnostics.sh

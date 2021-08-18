@@ -17,7 +17,7 @@ const makeServiceImplementationSpy = mockSpy(
 );
 const mockServer = {
   addService: mockSpy(jest.fn()),
-  bindAsync: mockSpy(jest.fn(), () => Promise.resolve()),
+  bindAsync: mockSpy(jest.fn(), (_netloc, _credentials, cb) => cb()),
   start: mockSpy(jest.fn()),
 };
 jest.mock('@grpc/grpc-js', () => {
@@ -161,9 +161,8 @@ describe('runServer', () => {
       expect.anything(),
       expect.objectContaining({
         statusMap: {
-          '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
-          'relaynet.cogrpc.CargoRelay':
-            grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+          '': grpcHealthCheck.servingStatus.SERVING,
+          'relaynet.cogrpc.CargoRelay': grpcHealthCheck.servingStatus.SERVING,
         },
       }),
     );
@@ -173,14 +172,18 @@ describe('runServer', () => {
     await runServer();
 
     expect(mockServer.bindAsync).toBeCalledTimes(1);
-    expect(mockServer.bindAsync).toBeCalledWith('0.0.0.0:8080', expect.anything());
+    expect(mockServer.bindAsync).toBeCalledWith(
+      '0.0.0.0:8080',
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   test('Failing to listen on specified port should result in error', async () => {
-    const bindError = new Error('Port is apparently taken')
-    mockServer.bindAsync.mockRejectedValue(bindError);
+    const bindError = new Error('Port is apparently taken');
+    mockServer.bindAsync.mockImplementation((_netloc, _credentials, cb) => cb(bindError));
 
-    await expect(() => runServer()).rejects.toEqual(bindError)
+    await expect(() => runServer()).rejects.toBe(bindError);
   });
 
   test('Server should use TLS with a self-issued certificate', async () => {

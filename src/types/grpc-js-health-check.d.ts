@@ -6,12 +6,8 @@ declare module 'grpc-js-health-check' {
     constructor(map: { readonly [key: string]: string });
   }
 
-  export const messages: {
-    readonly HealthCheckResponse: {
-      readonly ServingStatus: {
-        readonly NOT_SERVING: any;
-        readonly SERVING: any;
-      };
-    };
+  export const servingStatus: {
+    readonly NOT_SERVING: any;
+    readonly SERVING: any;
   };
 }

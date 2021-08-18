@@ -1,7 +1,7 @@
 import { KeyCertPair, Server, ServerCredentials } from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import { get as getEnvVar } from 'env-var';
-import grpcHealthCheck from 'grpc-js-health-check';
+import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
 import { configureExitHandling } from '../../utilities/exitHandling';
@@ -46,15 +46,14 @@ export async function runServer(logger?: Logger): Promise<void> {
     parcelStoreBucket,
     publicAddress,
   });
-  server.addService(CargoRelayService, serviceImplementation);
+  server.addService(CargoRelayService, serviceImplementation as any);
 
   // TODO: Health checks should be probing backing services
   const healthCheckService = new grpcHealthCheck.Implementation({
-    '': grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
-    'relaynet.cogrpc.CargoRelay':
-      grpcHealthCheck.messages.HealthCheckResponse.ServingStatus.SERVING,
+    '': grpcHealthCheck.servingStatus.SERVING,
+    'relaynet.cogrpc.CargoRelay': grpcHealthCheck.servingStatus.SERVING,
   });
-  server.addService(grpcHealthCheck.service, healthCheckService);
+  server.addService(grpcHealthCheck.service, healthCheckService as any);
 
   const certificate = await selfIssueCertificate();
   await new Promise((resolve, reject) => {

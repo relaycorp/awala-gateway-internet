@@ -1,3 +1,4 @@
+import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import {
   Cargo,
@@ -23,7 +24,6 @@ import {
 import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { EventEmitter } from 'events';
-import * as grpc from 'grpc';
 import mongoose from 'mongoose';
 
 import {

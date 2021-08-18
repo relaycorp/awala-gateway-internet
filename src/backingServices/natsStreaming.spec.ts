@@ -122,18 +122,17 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Publishing should only be done once the connection has been established', async (done) => {
+    test('Publishing should only be done once the connection has been established', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
-      setImmediate(() => {
-        // "connect" event was never emitted, so no message should've been published
-        expect(mockConnection.on).toBeCalledWith('connect', expect.any(Function));
-
-        expect(mockConnection.publish).not.toBeCalled();
-
-        done();
-      });
 
       await publisher([STUB_MESSAGE_1]);
+
+      await new Promise(setImmediate);
+
+      // "connect" event was never emitted, so no message should've been published
+      expect(mockConnection.on).toBeCalledWith('connect', expect.any(Function));
+
+      expect(mockConnection.publish).not.toBeCalled();
     });
 
     test('Messages should be published to the specified channel', async () => {

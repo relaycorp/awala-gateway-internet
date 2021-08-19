@@ -122,7 +122,7 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Publishing should only be done once the connection has been established', async (done) => {
+    test('Publishing should only be done once the connection has been established', (done) => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => {
         // "connect" event was never emitted, so no message should've been published
@@ -133,7 +133,7 @@ describe('NatsStreamingClient', () => {
         done();
       });
 
-      await publisher([STUB_MESSAGE_1]);
+      publisher([STUB_MESSAGE_1]);
     });
 
     test('Messages should be published to the specified channel', async () => {

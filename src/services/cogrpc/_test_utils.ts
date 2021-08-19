@@ -1,4 +1,5 @@
 import * as grpc from '@grpc/grpc-js';
+import { EventEmitter } from 'events';
 import { Duplex } from 'stream';
 
 export class MockGrpcBidiCall<Input, Output> extends Duplex {
@@ -53,4 +54,24 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     // ugly hack
     return this as unknown as grpc.ServerDuplexStream<Input, Output>;
   }
+}
+
+export async function onError(
+  emitter: EventEmitter,
+  trigger: () => any,
+  handler: (error: Error) => Promise<void> | void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    emitter.on('error', async (error) => {
+      try {
+        await handler(error);
+      } catch (handlingError) {
+        reject(handlingError);
+        return;
+      }
+      resolve();
+    });
+
+    trigger();
+  });
 }

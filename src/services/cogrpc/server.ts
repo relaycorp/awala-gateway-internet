@@ -61,7 +61,7 @@ export async function runServer(logger?: Logger): Promise<void> {
       if (error) {
         reject(error);
       } else {
-        resolve();
+        resolve(undefined);
       }
     });
   });

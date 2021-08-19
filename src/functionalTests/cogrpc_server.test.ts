@@ -199,7 +199,7 @@ async function getLastQueueMessage(): Promise<Buffer | undefined> {
     const timeout = setTimeout(() => {
       subscription.close();
       stanConnection.close();
-      resolve();
+      reject(new Error('Could not get NATS Streaming message on time'));
     }, 3_000);
     subscription.on('error', (error) => {
       clearTimeout(timeout);

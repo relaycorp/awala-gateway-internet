@@ -29,7 +29,7 @@ npm test
 
 First, run `skaffold delete` to ensure you have a clean fixture and then `skaffold run` to deploy the chart against which you'll run the tests.
 
-Again, you can run the tests selectively from your IDE (using `jest.config.functional.js` as the Jest configuration), or run the whole suite with:
+Again, you can run the tests selectively from your IDE, or run the whole suite with:
 
 ```bash
 npm run test:functional

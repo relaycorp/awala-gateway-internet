@@ -81,7 +81,7 @@
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "env-var": "^7.0.1",
-    "fastify": "^3.20.2",
+    "fastify": "^3.21.3",
     "fastify-mongoose": "^0.3.0",
     "grpc-js-health-check": "^1.0.2",
     "it-pipe": "^1.1.0",

@@ -40,13 +40,10 @@ jobs:
         with:
           cluster_name: default
       - name: Run Skaffold pipeline
-        uses: hiberbee/github-action-skaffold@1.4.0
+        uses: hiberbee/github-action-skaffold@1.8.0
         with:
           command: run
           skaffold-version: 1.19.0
-        env:
-          # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
         timeout-minutes: 7
       - name: Start port-forwarding
         run: |

@@ -1,7 +1,6 @@
 # Relaynet-Internet Gateway
 
 This is the reference implementation of a Relaynet-Internet Gateway, a type of _public gateway_ whose responsibility is to connect private gateways to the Internet. Please refer to the [online documentation](https://docs.relaycorp.tech/relaynet-internet-gateway/) to learn how to operate this app.
-
 # Development
 
 To use this app locally and be able to update the source code, you need the following system dependencies:

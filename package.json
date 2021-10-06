@@ -85,7 +85,7 @@
     "fastify-mongoose": "^0.3.0",
     "grpc-js-health-check": "^1.0.2",
     "it-pipe": "^1.1.0",
-    "mongoose": "^5.13.7",
+    "mongoose": "^5.13.10",
     "node-nats-streaming": "^0.3.2",
     "pino": "^6.13.0",
     "selfsigned": "^1.10.11",

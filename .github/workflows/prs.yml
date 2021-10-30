@@ -8,3 +8,5 @@ on:
 jobs:
   dependabot-automerge:
     uses: relaycorp/shared-workflows/.github/workflows/prs.yml@main
+    secrets:
+      githubToken: ${{ secrets.IRELAYBOT_PR_AUTOMATION_GITHUB_PAT }}

@@ -74,7 +74,7 @@
     "@relaycorp/keystore-vault": "^1.2.6",
     "@relaycorp/object-storage": "^1.4.5",
     "@relaycorp/pino-cloud": "^1.0.4",
-    "@relaycorp/relaynet-core": "^1.49.1",
+    "@relaycorp/relaynet-core": "^1.49.3",
     "@relaycorp/relaynet-pohttp": "^1.7.6",
     "@typegoose/typegoose": "^8.1.1",
     "abort-controller": "^3.0.0",

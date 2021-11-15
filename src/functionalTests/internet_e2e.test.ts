@@ -33,6 +33,7 @@ import {
   GW_POWEB_LOCAL_PORT,
   GW_PUBLIC_ADDRESS_URL,
   PONG_ENDPOINT_ADDRESS,
+  PONG_ENDPOINT_LOCAL_URL,
 } from './services';
 import { generatePdaChain, IS_GITHUB, sleep } from './utils';
 
@@ -130,9 +131,10 @@ async function getPongEndpointKeyPairs(): Promise<{
   readonly identityPublicKey: CryptoKey;
   readonly sessionKey: SessionKey;
 }> {
-  const connectionParamsResponse = await httpGet(`${PONG_ENDPOINT_ADDRESS}/connection-params.der`, {
-    timeout: 2_000,
-  });
+  const connectionParamsResponse = await httpGet(
+    `${PONG_ENDPOINT_LOCAL_URL}/connection-params.der`,
+    { timeout: 2_000 },
+  );
   const connectionParamsSerialization = await readHTTPResponse(connectionParamsResponse);
   const connectionParams = await PublicNodeConnectionParams.deserialize(
     bufferToArray(connectionParamsSerialization),

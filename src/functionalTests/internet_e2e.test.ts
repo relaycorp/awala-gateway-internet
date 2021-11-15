@@ -1,5 +1,4 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   Cargo,
   CargoMessageSet,
@@ -7,15 +6,17 @@ import {
   issueDeliveryAuthorization,
   Parcel,
   ParcelCollectionAck,
+  PublicNodeConnectionParams,
   ServiceMessage,
   SessionEnvelopedData,
+  SessionKey,
   SessionlessEnvelopedData,
   Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
+import { ClientRequest, get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
@@ -47,8 +48,8 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
-    pongEndpointSessionCertificate.identityCert,
-    pongEndpointSessionCertificate.sessionCert,
+    pongEndpointSessionCertificate.identityPublicKey,
+    pongEndpointSessionCertificate.sessionKey,
     gwPDAChain,
   );
 
@@ -81,8 +82,8 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
-    pongEndpointSessionCertificate.identityCert,
-    pongEndpointSessionCertificate.sessionCert,
+    pongEndpointSessionCertificate.identityPublicKey,
+    pongEndpointSessionCertificate.sessionKey,
     pdaChain,
   );
 
@@ -126,29 +127,36 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
 });
 
 async function getPongEndpointKeyPairs(): Promise<{
-  readonly sessionCert: Certificate;
-  readonly identityCert: Certificate;
+  readonly identityPublicKey: CryptoKey;
+  readonly sessionKey: SessionKey;
 }> {
-  const VAULT_URL = getEnvVar('VAULT_URL').required().asString();
-  const VAULT_TOKEN = getEnvVar('VAULT_TOKEN').required().asString();
-  const pongKeyStore = new VaultPrivateKeyStore(VAULT_URL, VAULT_TOKEN, 'pong-keys');
-
-  const pongKeyId = base64DecodeEnvVar('PONG_ENDPOINT_KEY_ID');
-  const identityCert = (await pongKeyStore.fetchNodeKey(pongKeyId)).certificate;
-  const pongSessionKeyId = base64DecodeEnvVar('PONG_SESSION_ENDPOINT_KEY_ID');
-  const sessionCert = (await pongKeyStore.fetchInitialSessionKey(pongSessionKeyId)).certificate;
-  return { sessionCert, identityCert };
+  const connectionParamsResponse = await httpGet(`${PONG_ENDPOINT_ADDRESS}/connection-params.der`, {
+    timeout: 2_000,
+  });
+  const connectionParamsSerialization = await readHTTPResponse(connectionParamsResponse);
+  const connectionParams = await PublicNodeConnectionParams.deserialize(
+    bufferToArray(connectionParamsSerialization),
+  );
+  return {
+    identityPublicKey: connectionParams.identityKey,
+    sessionKey: connectionParams.sessionKey,
+  };
 }
 
-function base64DecodeEnvVar(envVarName: string): Buffer {
-  const pongKeyIdBase64 = getEnvVar(envVarName).required().asString();
-  return Buffer.from(pongKeyIdBase64, 'base64');
+async function readHTTPResponse(stream: ClientRequest): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    // tslint:disable-next-line:readonly-array
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', (err) => reject(`error converting stream - ${err}`));
+  });
 }
 
 async function makePingParcel(
   pingId: string,
-  recipientIdentityCert: Certificate,
-  recipientSessionCert: Certificate,
+  recipientIdentityPublicKey: CryptoKey,
+  recipientSessionKey: SessionKey,
   gwPDAChain: ExternalPdaChain,
 ): Promise<{
   readonly parcelId: string;
@@ -158,7 +166,7 @@ async function makePingParcel(
   const pongEndpointPda = await issueDeliveryAuthorization({
     issuerCertificate: gwPDAChain.peerEndpointCert,
     issuerPrivateKey: gwPDAChain.peerEndpointPrivateKey,
-    subjectPublicKey: await recipientIdentityCert.getPublicKey(),
+    subjectPublicKey: await recipientIdentityPublicKey,
     validityEndDate: gwPDAChain.peerEndpointCert.expiryDate,
   });
   const pingSerialized = serializePing(pingId, pongEndpointPda, [
@@ -169,7 +177,7 @@ async function makePingParcel(
   const serviceMessage = new ServiceMessage('application/vnd.awala.ping-v1.ping', pingSerialized);
   const pingEncryption = await SessionEnvelopedData.encrypt(
     serviceMessage.serialize(),
-    recipientSessionCert,
+    recipientSessionKey,
   );
   const parcel = new Parcel(
     PONG_ENDPOINT_ADDRESS,

@@ -52,7 +52,7 @@ async function main(): Promise<void> {
       gatewayCertificate: base64Encode(gatewayCertificate.serialize()),
       keyPairId: KEY_ID_BASE64,
     },
-    'Key pairs were successfully generated',
+    'Identity key pair was successfully generated',
   );
 }
 

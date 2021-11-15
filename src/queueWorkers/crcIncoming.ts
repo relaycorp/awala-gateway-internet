@@ -1,7 +1,7 @@
 import {
   Cargo,
   CargoMessageSet,
-  Gateway,
+  GatewayManager,
   InvalidMessageError,
   Parcel,
   ParcelCollectionAck,
@@ -46,7 +46,10 @@ function makeCargoProcessor(
 ): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
     const mongooseConnection = await createMongooseConnectionFromEnv();
-    const gateway = new Gateway(initVaultKeyStore(), new MongoPublicKeyStore(mongooseConnection));
+    const gateway = new GatewayManager(
+      initVaultKeyStore(),
+      new MongoPublicKeyStore(mongooseConnection),
+    );
 
     const objectStoreClient = initObjectStoreFromEnv();
     const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
@@ -71,7 +74,7 @@ function makeCargoProcessor(
 
 async function processCargo(
   message: Message,
-  gateway: Gateway,
+  gatewayManager: GatewayManager,
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
@@ -84,7 +87,7 @@ async function processCargo(
 
   let cargoMessageSet: CargoMessageSet;
   try {
-    cargoMessageSet = await gateway.unwrapMessagePayload(cargo);
+    cargoMessageSet = await gatewayManager.unwrapMessagePayload(cargo);
   } catch (err) {
     if (err instanceof PrivateKeyStoreError) {
       // Vault is down or returned an unexpected response

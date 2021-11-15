@@ -6,11 +6,9 @@ import {
   CargoCollectionRequest,
   CargoMessageSet,
   CargoMessageStream,
-  generateECDHKeyPair,
   generateRSAKeyPair,
   InvalidMessageError,
   issueEndpointCertificate,
-  issueInitialDHKeyCertificate,
   MockPrivateKeyStore,
   MockPublicKeyStore,
   Parcel,
@@ -18,6 +16,7 @@ import {
   RAMFSyntaxError,
   RecipientAddressType,
   SessionEnvelopedData,
+  SessionKey,
   SessionlessEnvelopedData,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
@@ -46,12 +45,7 @@ import * as ccaFulfillments from '../../ccaFulfilments';
 import * as certs from '../../certs';
 import * as parcelCollectionAck from '../../parcelCollection';
 import { ParcelStore } from '../../parcelStore';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  reSerializeCertificate,
-} from '../_test_utils';
+import { configureMockEnvVars, generatePdaChain, getMockInstance } from '../_test_utils';
 import { MockGrpcBidiCall } from './_test_utils';
 import { makeServiceImplementation, ServiceImplementationOptions } from './service';
 
@@ -161,6 +155,7 @@ describe('deliverCargo', () => {
   let PUBLISHED_MESSAGES: Buffer[];
   beforeEach(() => {
     PUBLISHED_MESSAGES = [];
+
     async function* mockNatsPublisher(
       messages: IterableIterator<natsStreaming.PublisherMessage>,
     ): AsyncIterable<string> {
@@ -169,6 +164,7 @@ describe('deliverCargo', () => {
         yield message.id;
       }
     }
+
     NATS_CLIENT = {
       makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
     } as unknown as natsStreaming.NatsStreamingClient;
@@ -315,11 +311,13 @@ describe('deliverCargo', () => {
 
     test('Errors while processing cargo should be logged and end the call', async (cb) => {
       const error = new Error('Denied');
+
       async function* failToPublishMessage(
         _: IterableIterator<natsStreaming.PublisherMessage>,
       ): AsyncIterable<string> {
         throw error;
       }
+
       getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(failToPublishMessage);
       CALL.output.push({
         cargo: CARGO_SERIALIZATION,
@@ -364,6 +362,7 @@ describe('deliverCargo', () => {
           throw new Error('Denied');
         }
       }
+
       getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(publishFirstMessageThenFail);
       const undeliveredMessageId = 'undelivered';
       CALL.output.push(
@@ -898,24 +897,16 @@ describe('collectCargo', () => {
     expect(CALL.end).toBeCalledWith();
   });
 
-  test('CCA payload encryption key should be stored if using channel session', async () => {
+  test('CCA payload encryption key should be stored', async () => {
     const ccr = new CargoCollectionRequest(cdaChain.publicGatewayCert);
-    const publicGatewaySessionKey = await generateECDHKeyPair();
-    const publicGatewaySessionCertificate = reSerializeCertificate(
-      await issueInitialDHKeyCertificate({
-        issuerCertificate: pdaChain.publicGatewayCert,
-        issuerPrivateKey: pdaChain.publicGatewayPrivateKey,
-        subjectPublicKey: publicGatewaySessionKey.publicKey,
-        validityEndDate: pdaChain.publicGatewayCert.expiryDate,
-      }),
-    );
-    await PRIVATE_KEY_STORE.registerInitialSessionKey(
-      publicGatewaySessionKey.privateKey,
-      publicGatewaySessionCertificate,
+    const publicGatewaySessionKeyPair = await SessionKey.generate();
+    await PRIVATE_KEY_STORE.saveInitialSessionKey(
+      publicGatewaySessionKeyPair.privateKey,
+      publicGatewaySessionKeyPair.sessionKey.keyId,
     );
     const ccaPayloadEncryptionResult = await SessionEnvelopedData.encrypt(
       ccr.serialize(),
-      publicGatewaySessionCertificate,
+      publicGatewaySessionKeyPair.sessionKey,
     );
     CALL.metadata.add(
       'Authorization',

@@ -6,7 +6,7 @@ import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
   CargoMessageStream,
-  Gateway,
+  GatewayManager,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
@@ -198,7 +198,7 @@ async function collectCargo(
   }
 
   const publicKeyStore = initMongoDBKeyStore(mongooseConnection);
-  const gateway = new Gateway(vaultKeyStore, publicKeyStore);
+  const gateway = new GatewayManager(vaultKeyStore, publicKeyStore);
 
   let ccr: CargoCollectionRequest;
   try {

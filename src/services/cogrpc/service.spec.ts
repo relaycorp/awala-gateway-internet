@@ -16,7 +16,7 @@ import {
   RAMFSyntaxError,
   RecipientAddressType,
   SessionEnvelopedData,
-  SessionKey,
+  SessionKeyPair,
   SessionlessEnvelopedData,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
@@ -899,7 +899,7 @@ describe('collectCargo', () => {
 
   test('CCA payload encryption key should be stored', async () => {
     const ccr = new CargoCollectionRequest(cdaChain.publicGatewayCert);
-    const publicGatewaySessionKeyPair = await SessionKey.generate();
+    const publicGatewaySessionKeyPair = await SessionKeyPair.generate();
     await PRIVATE_KEY_STORE.saveInitialSessionKey(
       publicGatewaySessionKeyPair.privateKey,
       publicGatewaySessionKeyPair.sessionKey.keyId,

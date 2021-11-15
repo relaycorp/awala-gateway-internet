@@ -94,7 +94,7 @@ export default async function registerRoutes(
       return reply
         .code(200)
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION)
-        .send(Buffer.from(registration.serialize()));
+        .send(Buffer.from(await registration.serialize()));
     },
   });
 }

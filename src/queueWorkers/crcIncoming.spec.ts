@@ -10,6 +10,7 @@ import {
   PrivateKeyStoreError,
   SessionEnvelopedData,
   SessionKey,
+  SessionKeyPair,
   SessionlessEnvelopedData,
   SessionPublicKeyData,
 } from '@relaycorp/relaynet-core';
@@ -109,7 +110,7 @@ beforeAll(async () => {
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const sessionKeyPair = await SessionKey.generate();
+  const sessionKeyPair = await SessionKeyPair.generate();
   publicGatewaySessionKey = sessionKeyPair.sessionKey;
   publicGatewaySessionPrivateKey = sessionKeyPair.privateKey;
 });

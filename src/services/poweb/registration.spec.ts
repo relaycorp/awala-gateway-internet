@@ -129,7 +129,9 @@ describe('Successful registration', () => {
       CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION,
     );
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
   });
 
@@ -138,7 +140,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
     await expect(
       registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
@@ -150,7 +154,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     const threeHoursInThePast = new Date();
     threeHoursInThePast.setHours(threeHoursInThePast.getHours() - 3);
     expect(registration.privateNodeCertificate.startDate.getTime()).toBeWithin(
@@ -164,7 +170,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     const expectedExpiryDate = new Date();
     expectedExpiryDate.setFullYear(expectedExpiryDate.getFullYear() + 1);
     expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
@@ -178,7 +186,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
 
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();

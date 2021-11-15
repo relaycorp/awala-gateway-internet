@@ -20,7 +20,7 @@ import { asyncIterableToArray, ExternalPdaChain, iterableTake } from '../_test_u
 import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_POWEB_LOCAL_PORT } from './services';
 import {
-  generatePdaChain,
+  createAndRegisterPrivateGateway,
   getPublicGatewayCertificate,
   registerPrivateGateway,
   sleep,
@@ -67,8 +67,8 @@ describe('PoWeb server', () => {
   describe('Parcel delivery and collection', () => {
     test('Delivering and collecting a given parcel (closing upon completion)', async () => {
       const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-      const senderChain = await generatePdaChain();
-      const recipientChain = await generatePdaChain();
+      const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+      const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
       const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
 
@@ -99,8 +99,8 @@ describe('PoWeb server', () => {
 
     test('Delivering and collecting a given parcel (keep alive)', async () => {
       const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-      const senderChain = await generatePdaChain();
-      const recipientChain = await generatePdaChain();
+      const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+      const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
       const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
 

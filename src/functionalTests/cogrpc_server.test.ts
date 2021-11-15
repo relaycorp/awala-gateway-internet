@@ -22,14 +22,14 @@ import {
 } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
-import { connectToNatsStreaming, generatePdaChain, sleep } from './utils';
+import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';
 
 const TOMORROW = new Date();
 TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
-    const pdaChain = await generatePdaChain();
+    const { pdaChain } = await createAndRegisterPrivateGateway();
     const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from([]));
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
@@ -76,16 +76,16 @@ describe('Cargo delivery', () => {
 
 describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
-    const pdaChain = await generatePdaChain();
+    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const parcelSerialized = await generateDummyParcel(pdaChain);
     await deliverParcel(GW_POHTTP_URL, parcelSerialized);
 
     await sleep(1);
 
-    const ccaSerialized = await generateCCA(
+    const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
       await generateCDAChain(pdaChain),
-      pdaChain.publicGatewayCert,
+      publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
     const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
@@ -102,24 +102,22 @@ describe('Cargo collection', () => {
     expect(cargo.recipientAddress).toEqual(
       await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
     );
-    const { payload: cargoMessageSet } = await cargo.unwrapPayload(
-      pdaChain.privateGatewayPrivateKey,
-    );
+    const { payload: cargoMessageSet } = await cargo.unwrapPayload(sessionPrivateKey);
     expect(cargoMessageSet.messages).toHaveLength(1);
     expectBuffersToEqual(cargoMessageSet.messages[0], parcelSerialized);
   });
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
-    const pdaChain = await generatePdaChain();
+    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     await deliverParcel(GW_POHTTP_URL, await generateDummyParcel(pdaChain));
 
     await sleep(1);
 
     const cdaChain = await generateCDAChain(pdaChain);
-    const ccaSerialized = await generateCCA(
+    const { ccaSerialized } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
       cdaChain,
-      pdaChain.publicGatewayCert,
+      publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
     const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
@@ -160,12 +158,12 @@ describe('Cargo collection', () => {
   });
 
   test('CCAs should not be reusable', async () => {
-    const pdaChain = await generatePdaChain();
+    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const cdaChain = await generateCDAChain(pdaChain);
-    const ccaSerialized = await generateCCA(
+    const { ccaSerialized } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
       cdaChain,
-      pdaChain.publicGatewayCert,
+      publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
 

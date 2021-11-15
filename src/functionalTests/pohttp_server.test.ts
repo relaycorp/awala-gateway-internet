@@ -5,7 +5,7 @@ import { Message, Stan } from 'node-nats-streaming';
 import { GW_POHTTP_URL } from './services';
 import {
   connectToNatsStreaming,
-  generatePdaChain,
+  createAndRegisterPrivateGateway,
   OBJECT_STORAGE_BUCKET,
   OBJECT_STORAGE_CLIENT,
 } from './utils';
@@ -19,7 +19,7 @@ describe('PoHTTP server', () => {
   });
 
   test('Valid parcel should be accepted', async (cb) => {
-    const pdaChain = await generatePdaChain();
+    const { pdaChain } = await createAndRegisterPrivateGateway();
     const parcel = new Parcel(
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       pdaChain.pdaCert,

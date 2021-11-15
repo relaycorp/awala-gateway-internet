@@ -11,7 +11,6 @@ import {
   SessionEnvelopedData,
   SessionKey,
   SessionKeyPair,
-  SessionlessEnvelopedData,
   SessionPublicKeyData,
 } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
@@ -478,14 +477,14 @@ test('Mongoose connection should be closed when the queue ends', async () => {
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {
   const cargoMessageSet = new CargoMessageSet(items);
-  const payload = await SessionlessEnvelopedData.encrypt(
+  const { envelopedData } = await SessionEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
-    certificateChain.publicGatewayCert,
+    publicGatewaySessionKey,
   );
   return new Cargo(
-    await certificateChain.publicGatewayCert.getCommonName(),
+    certificateChain.publicGatewayCert.getCommonName(),
     certificateChain.privateGatewayCert,
-    Buffer.from(payload.serialize()),
+    Buffer.from(envelopedData.serialize()),
   );
 }
 

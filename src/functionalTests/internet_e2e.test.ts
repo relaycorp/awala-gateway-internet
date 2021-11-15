@@ -16,7 +16,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { ClientRequest, get as httpGet } from 'http';
+import { get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
@@ -131,11 +131,9 @@ async function getPongEndpointKeyPairs(): Promise<{
   readonly identityPublicKey: CryptoKey;
   readonly sessionKey: SessionKey;
 }> {
-  const connectionParamsResponse = await httpGet(
+  const connectionParamsSerialization = await downloadFileFromURL(
     `${PONG_ENDPOINT_LOCAL_URL}/connection-params.der`,
-    { timeout: 2_000 },
   );
-  const connectionParamsSerialization = await readHTTPResponse(connectionParamsResponse);
   const connectionParams = await PublicNodeConnectionParams.deserialize(
     bufferToArray(connectionParamsSerialization),
   );
@@ -145,13 +143,21 @@ async function getPongEndpointKeyPairs(): Promise<{
   };
 }
 
-async function readHTTPResponse(stream: ClientRequest): Promise<Buffer> {
+async function downloadFileFromURL(url: string): Promise<Buffer> {
+  // tslint:disable-next-line:readonly-array
+  const chunks: Buffer[] = [];
   return new Promise((resolve, reject) => {
-    // tslint:disable-next-line:readonly-array
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', (err) => reject(`error converting stream - ${err}`));
+    httpGet(url, { timeout: 2_000 }, (response) => {
+      if (response.statusCode !== 200) {
+        return reject(new Error(`Failed to download ${url} (HTTP ${response.statusCode})`));
+      }
+
+      response.on('error', reject);
+
+      response.on('data', (chunk) => chunks.push(chunk));
+
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    });
   });
 }
 

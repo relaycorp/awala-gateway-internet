@@ -4,7 +4,8 @@ import {
   Certificate,
   issueDeliveryAuthorization,
   issueGatewayCertificate,
-  SessionlessEnvelopedData,
+  SessionEnvelopedData,
+  SessionKey,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
@@ -184,23 +185,29 @@ export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAC
   return { privateGatewayCert, publicGatewayCert };
 }
 
+export interface GeneratedCCA {
+  readonly ccaSerialized: Buffer;
+  readonly sessionPrivateKey: CryptoKey;
+}
+
 export async function generateCCA(
   recipientAddress: string,
   chain: CDAChain,
-  publicGatewaySelfIssuedCertificate: Certificate,
+  publicGatewaySessionKey: SessionKey,
   privateGatewayPrivateKey: CryptoKey,
-): Promise<Buffer> {
+): Promise<GeneratedCCA> {
   const ccr = new CargoCollectionRequest(chain.publicGatewayCert);
-  const ccaPayload = await SessionlessEnvelopedData.encrypt(
+  const { envelopedData, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     ccr.serialize(),
-    publicGatewaySelfIssuedCertificate,
+    publicGatewaySessionKey,
   );
   const cca = new CargoCollectionAuthorization(
     recipientAddress,
     chain.privateGatewayCert,
-    Buffer.from(await ccaPayload.serialize()),
+    Buffer.from(envelopedData.serialize()),
   );
-  return Buffer.from(await cca.serialize(privateGatewayPrivateKey));
+  const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);
+  return { ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
 }
 
 export function useFakeTimers(): void {

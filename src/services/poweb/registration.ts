@@ -5,9 +5,11 @@ import {
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
+  SessionKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
+import { initVaultKeyStore } from '../../backingServices/vault';
 import { sha256 } from '../../utilities/crypto';
 
 import { registerDisallowedMethods } from '../fastify';
@@ -36,6 +38,8 @@ export default async function registerRoutes(
     { parseAs: 'buffer' },
     async (_req: any, rawBody: Buffer) => rawBody,
   );
+
+  const privateKeyStore = initVaultKeyStore();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -87,14 +91,21 @@ export default async function registerRoutes(
         publicGatewayKeyPair.privateKey,
         publicGatewayKeyPair.certificate,
       );
+      const sessionKeyPair = await SessionKeyPair.generate();
+      await privateKeyStore.saveSubsequentSessionKey(
+        sessionKeyPair.privateKey,
+        sessionKeyPair.sessionKey.keyId,
+        await privateGatewayCertificate.calculateSubjectPrivateAddress(),
+      );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
         publicGatewayKeyPair.certificate,
+        sessionKeyPair.sessionKey,
       );
       return reply
         .code(200)
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION)
-        .send(Buffer.from(registration.serialize()));
+        .send(Buffer.from(await registration.serialize()));
     },
   });
 }

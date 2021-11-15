@@ -6,6 +6,7 @@ import {
   issueEndpointCertificate,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
+  SessionKey,
   UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
@@ -60,11 +61,17 @@ export async function getPublicGatewayCertificate(): Promise<Certificate> {
   return keyPair.certificate;
 }
 
-export async function generatePdaChain(): Promise<ExternalPdaChain> {
+export interface PrivateGatewayRegistration {
+  readonly pdaChain: ExternalPdaChain;
+  readonly publicGatewaySessionKey: SessionKey;
+}
+
+export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayRegistration> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const {
     privateNodeCertificate: privateGatewayCertificate,
     gatewayCertificate: publicGatewayCert,
+    sessionKey: publicGatewaySessionKey,
   } = await registerPrivateGateway(
     privateGatewayKeyPair,
     PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
@@ -86,7 +93,7 @@ export async function generatePdaChain(): Promise<ExternalPdaChain> {
     validityEndDate: peerEndpointCertificate.expiryDate,
   });
 
-  return {
+  const pdaChain = {
     pdaCert: pda,
     pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
     peerEndpointCert: peerEndpointCertificate,
@@ -95,6 +102,7 @@ export async function generatePdaChain(): Promise<ExternalPdaChain> {
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     publicGatewayCert,
   };
+  return { pdaChain, publicGatewaySessionKey: publicGatewaySessionKey!! };
 }
 
 export async function registerPrivateGateway(

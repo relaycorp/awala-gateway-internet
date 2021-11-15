@@ -4,6 +4,7 @@ import {
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
+  SubsequentSessionPrivateKeyData,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
@@ -129,7 +130,9 @@ describe('Successful registration', () => {
       CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION,
     );
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
   });
 
@@ -138,7 +141,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
     await expect(
       registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
@@ -150,7 +155,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     const threeHoursInThePast = new Date();
     threeHoursInThePast.setHours(threeHoursInThePast.getHours() - 3);
     expect(registration.privateNodeCertificate.startDate.getTime()).toBeWithin(
@@ -164,7 +171,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     const expectedExpiryDate = new Date();
     expectedExpiryDate.setFullYear(expectedExpiryDate.getFullYear() + 1);
     expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
@@ -178,7 +187,9 @@ describe('Successful registration', () => {
 
     const response = await completeRegistration(fixtures);
 
-    const registration = PrivateNodeRegistration.deserialize(bufferToArray(response.rawPayload));
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
     expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
 
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
@@ -186,6 +197,33 @@ describe('Successful registration', () => {
     await expect(
       derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
     ).resolves.toEqual(privateGatewayPublicKeySerialized);
+  });
+
+  test('Session key should be included in registration', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
+    expect(registration.sessionKey).toBeTruthy();
+  });
+
+  test('Session key should be bound to private gateway', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
+    const keyData = fixtures.privateKeyStore.keys[registration.sessionKey!!.keyId.toString('hex')];
+    expect(keyData).toBeTruthy();
+    expect(keyData.type).toEqual('session-subsequent');
+    expect((keyData as SubsequentSessionPrivateKeyData).peerPrivateAddress).toEqual(
+      await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+    );
   });
 
   async function completeRegistration(fixtures: FixtureSet): Promise<LightMyRequest.Response> {

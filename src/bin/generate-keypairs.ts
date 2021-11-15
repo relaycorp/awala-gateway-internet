@@ -1,10 +1,4 @@
-import {
-  Certificate,
-  generateECDHKeyPair,
-  generateRSAKeyPair,
-  issueGatewayCertificate,
-  issueInitialDHKeyCertificate,
-} from '@relaycorp/relaynet-core';
+import { Certificate, generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
 import { getModelForClass } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -19,16 +13,15 @@ const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
 
 const NODE_CERTIFICATE_TTL_DAYS = 360;
-const SESSION_CERTIFICATE_TTL_DAYS = 60;
 
 const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
 
-const sessionStore = initVaultKeyStore();
+const privateKeyStore = initVaultKeyStore();
 
 async function main(): Promise<void> {
   const keyId = Buffer.from(KEY_ID_BASE64, 'base64');
   try {
-    await sessionStore.fetchNodeKey(keyId);
+    await privateKeyStore.fetchNodeKey(keyId);
     LOGGER.warn(`Gateway key ${KEY_ID_BASE64} already exists`);
     return;
   } catch (error) {
@@ -51,27 +44,15 @@ async function main(): Promise<void> {
   (gatewayCertificate as any).pkijsCertificate.serialNumber.valueBlock.valueHex =
     bufferToArray(keyId);
 
-  await sessionStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+  await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
   await saveOwnCertificate(gatewayCertificate);
-
-  const initialSessionKeyPair = await generateECDHKeyPair();
-  const sessionCertEndDate = new Date();
-  sessionCertEndDate.setDate(sessionCertEndDate.getDate() + SESSION_CERTIFICATE_TTL_DAYS);
-  const initialKeyCertificate = await issueInitialDHKeyCertificate({
-    issuerCertificate: gatewayCertificate,
-    issuerPrivateKey: gatewayKeyPair.privateKey,
-    subjectPublicKey: initialSessionKeyPair.publicKey,
-    validityEndDate: sessionCertEndDate,
-  });
-  await sessionStore.saveInitialSessionKey(initialSessionKeyPair.privateKey, initialKeyCertificate);
 
   LOGGER.info(
     {
       gatewayCertificate: base64Encode(gatewayCertificate.serialize()),
-      initialSessionCertificate: base64Encode(initialKeyCertificate.serialize()),
       keyPairId: KEY_ID_BASE64,
     },
-    'Key pairs were successfully generated',
+    'Identity key pair was successfully generated',
   );
 }
 

@@ -42,3 +42,7 @@ portForward:
   resourceName: public-gateway-cogrpc
   port: 8081
   localPort: 8082
+- resourceType: service
+  resourceName: relaynet-pong-pohttp
+  port: 80
+  localPort: 8083

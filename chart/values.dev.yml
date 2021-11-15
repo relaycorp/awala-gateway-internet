@@ -88,6 +88,7 @@ relaynet-pong:
   fullnameOverride: relaynet-pong
   pohttp_tls_required: false
   public_endpoint_address: relaynet-pong-pohttp
+  current_endpoint_key_id: "aGVsbG8K"
   vault:
     host: public-gateway-vault
     token: root

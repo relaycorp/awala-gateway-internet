@@ -10,7 +10,6 @@ import {
   ServiceMessage,
   SessionEnvelopedData,
   SessionKey,
-  SessionlessEnvelopedData,
   Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
@@ -94,6 +93,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     const cargoSerialized = await encapsulateParcelsInCargo(
       [pingParcelData.parcelSerialized],
       pdaChain,
+      publicGatewaySessionKey,
     );
     await asyncIterableToArray(
       cogRPCClient.deliverCargo(
@@ -227,16 +227,17 @@ function serializeCertificate(certificate: Certificate): string {
 async function encapsulateParcelsInCargo(
   parcels: readonly ArrayBuffer[],
   gwPDAChain: ExternalPdaChain,
+  publicGatewaySessionKey: SessionKey,
 ): Promise<Buffer> {
   const messageSet = new CargoMessageSet(parcels);
-  const messageSetCiphertext = await SessionlessEnvelopedData.encrypt(
+  const { envelopedData } = await SessionEnvelopedData.encrypt(
     messageSet.serialize(),
-    gwPDAChain.publicGatewayCert,
+    publicGatewaySessionKey,
   );
   const cargo = new Cargo(
     GW_PUBLIC_ADDRESS_URL,
     gwPDAChain.privateGatewayCert,
-    Buffer.from(messageSetCiphertext.serialize()),
+    Buffer.from(envelopedData.serialize()),
   );
   return Buffer.from(await cargo.serialize(gwPDAChain.privateGatewayPrivateKey));
 }

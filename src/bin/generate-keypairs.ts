@@ -1,9 +1,8 @@
 import {
   Certificate,
-  generateECDHKeyPair,
   generateRSAKeyPair,
   issueGatewayCertificate,
-  issueInitialDHKeyCertificate,
+  SessionKey,
 } from '@relaycorp/relaynet-core';
 import { getModelForClass } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -19,7 +18,6 @@ const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
 
 const NODE_CERTIFICATE_TTL_DAYS = 360;
-const SESSION_CERTIFICATE_TTL_DAYS = 60;
 
 const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
 
@@ -54,21 +52,16 @@ async function main(): Promise<void> {
   await sessionStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
   await saveOwnCertificate(gatewayCertificate);
 
-  const initialSessionKeyPair = await generateECDHKeyPair();
-  const sessionCertEndDate = new Date();
-  sessionCertEndDate.setDate(sessionCertEndDate.getDate() + SESSION_CERTIFICATE_TTL_DAYS);
-  const initialKeyCertificate = await issueInitialDHKeyCertificate({
-    issuerCertificate: gatewayCertificate,
-    issuerPrivateKey: gatewayKeyPair.privateKey,
-    subjectPublicKey: initialSessionKeyPair.publicKey,
-    validityEndDate: sessionCertEndDate,
-  });
-  await sessionStore.saveInitialSessionKey(initialSessionKeyPair.privateKey, initialKeyCertificate);
+  const initialSessionKeyPair = await SessionKey.generate();
+  await sessionStore.saveInitialSessionKey(
+    initialSessionKeyPair.privateKey,
+    initialSessionKeyPair.sessionKey.keyId,
+  );
 
   LOGGER.info(
     {
       gatewayCertificate: base64Encode(gatewayCertificate.serialize()),
-      initialSessionCertificate: base64Encode(initialKeyCertificate.serialize()),
+      initialSessionKeyId: base64Encode(initialSessionKeyPair.sessionKey.keyId),
       keyPairId: KEY_ID_BASE64,
     },
     'Key pairs were successfully generated',

@@ -1,9 +1,4 @@
-import {
-  Certificate,
-  generateRSAKeyPair,
-  issueGatewayCertificate,
-  SessionKey,
-} from '@relaycorp/relaynet-core';
+import { Certificate, generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
 import { getModelForClass } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -21,12 +16,12 @@ const NODE_CERTIFICATE_TTL_DAYS = 360;
 
 const KEY_ID_BASE64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
 
-const sessionStore = initVaultKeyStore();
+const privateKeyStore = initVaultKeyStore();
 
 async function main(): Promise<void> {
   const keyId = Buffer.from(KEY_ID_BASE64, 'base64');
   try {
-    await sessionStore.fetchNodeKey(keyId);
+    await privateKeyStore.fetchNodeKey(keyId);
     LOGGER.warn(`Gateway key ${KEY_ID_BASE64} already exists`);
     return;
   } catch (error) {
@@ -49,19 +44,12 @@ async function main(): Promise<void> {
   (gatewayCertificate as any).pkijsCertificate.serialNumber.valueBlock.valueHex =
     bufferToArray(keyId);
 
-  await sessionStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
+  await privateKeyStore.saveNodeKey(gatewayKeyPair.privateKey, gatewayCertificate);
   await saveOwnCertificate(gatewayCertificate);
-
-  const initialSessionKeyPair = await SessionKey.generate();
-  await sessionStore.saveInitialSessionKey(
-    initialSessionKeyPair.privateKey,
-    initialSessionKeyPair.sessionKey.keyId,
-  );
 
   LOGGER.info(
     {
       gatewayCertificate: base64Encode(gatewayCertificate.serialize()),
-      initialSessionKeyId: base64Encode(initialSessionKeyPair.sessionKey.keyId),
       keyPairId: KEY_ID_BASE64,
     },
     'Key pairs were successfully generated',

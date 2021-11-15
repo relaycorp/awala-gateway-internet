@@ -9,6 +9,7 @@ import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../
 export interface FixtureSet extends PdaChain {
   readonly mongooseConnection: Connection;
   readonly parcelStore: ParcelStore;
+  readonly privateKeyStore: MockPrivateKeyStore;
 }
 
 export function setUpCommonFixtures(): () => FixtureSet {
@@ -64,6 +65,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
   return () => ({
     mongooseConnection: mockMongooseConnection,
     parcelStore: mockParcelStore,
+    privateKeyStore: mockPrivateKeyStore,
     ...certificatePath,
   });
 }

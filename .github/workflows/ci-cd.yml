@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - run: npm run static-checks
-      - run: npm run test:ci:unit
+      - run: npm test
 
       - uses: azure/setup-helm@v1
         with:

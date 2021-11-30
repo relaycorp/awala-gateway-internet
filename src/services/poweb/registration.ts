@@ -66,12 +66,13 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
       const publicGatewayCertificate = await certificateStore.retrieveLatest(privateAddress!!);
+      const gatewayPublicKey = await publicGatewayCertificate!!.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
         registrationAuthorization = await PrivateNodeRegistrationAuthorization.deserialize(
           registrationRequest.pnraSerialized,
-          await publicGatewayCertificate!!.getPublicKey(),
+          gatewayPublicKey,
         );
       } catch (err) {
         request.log.info({ err }, 'PNRR contains invalid authorization');

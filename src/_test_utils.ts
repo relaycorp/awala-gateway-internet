@@ -227,6 +227,7 @@ export function setUpTestDBConnection(): () => Connection {
 
   const connect = () =>
     createConnection((global as any).__MONGO_URI__, {
+      useCreateIndex: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

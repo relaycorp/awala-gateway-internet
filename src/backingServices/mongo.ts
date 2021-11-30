@@ -16,6 +16,7 @@ export function getMongooseConnectionArgsFromEnv(): {
     options: {
       dbName: mongoDb,
       pass: mongoPassword,
+      useCreateIndex: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
       user: mongoUser,

@@ -2,7 +2,6 @@ jest.setTimeout(10_000);
 
 const TEST_ENV_VARS = {
   COGRPC_REQUIRE_TLS: 'false',
-  GATEWAY_KEY_ID: 'MTM1NzkK',
   NATS_CLUSTER_ID: 'stan',
   NATS_SERVER_URL: 'nats://127.0.0.1:4222',
   OBJECT_STORE_ACCESS_KEY_ID: 'test-key',

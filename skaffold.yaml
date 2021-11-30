@@ -16,7 +16,6 @@ deploy:
       artifactOverrides:
         image.repository: public-gateway
       setValues:
-        gatewayKeyId: MTM1NzkK
         relaynet-pong.current_endpoint_key_id: aGVsbG8K
         relaynet-pong.current_endpoint_session_key_id: OTc1MzEK
       wait: true

@@ -4,6 +4,7 @@ import { get as getEnvVar } from 'env-var';
 import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
+import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { configureExitHandling } from '../../utilities/exitHandling';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
@@ -23,7 +24,6 @@ export async function runServer(logger?: Logger): Promise<void> {
   const baseLogger = logger ?? makeLogger();
   configureExitHandling(baseLogger);
 
-  const gatewayKeyIdBase64 = getEnvVar('GATEWAY_KEY_ID').required().asString();
   const publicAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
   const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
@@ -40,7 +40,7 @@ export async function runServer(logger?: Logger): Promise<void> {
 
   const serviceImplementation = await makeServiceImplementation({
     baseLogger,
-    gatewayKeyIdBase64,
+    getMongooseConnection: createMongooseConnectionFromEnv,
     natsClusterId,
     natsServerUrl,
     parcelStoreBucket,

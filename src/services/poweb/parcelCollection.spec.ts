@@ -51,7 +51,7 @@ let mockLogging: MockLogging;
 beforeEach(() => {
   mockLogging = makeMockLogging();
   mockWSServer = makeWebSocketServer(
-    getFixtures().mongooseConnection,
+    getFixtures().getMongooseConnection(),
     REQUEST_ID_HEADER,
     mockLogging.logger,
   );
@@ -68,7 +68,7 @@ beforeAll(async () => {
 const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
   async (connection) => {
-    expect(connection).toBe(getFixtures().mongooseConnection);
+    expect(connection).toBe(getFixtures().getMongooseConnection());
     const fixtures = getFixtures();
     return [fixtures.publicGatewayCert];
   },
@@ -90,7 +90,7 @@ mockSpy(jest.spyOn(WS, 'createWebSocketStream'), createMockWebSocketStream);
 describe('WebSocket server configuration', () => {
   test('Path should be /v1/parcel-collection', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().mongooseConnection,
+      getFixtures().getMongooseConnection(),
       REQUEST_ID_HEADER,
       mockLogging.logger,
     );
@@ -100,7 +100,7 @@ describe('WebSocket server configuration', () => {
 
   test('Maximum incoming payload size should be 2 kib', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().mongooseConnection,
+      getFixtures().getMongooseConnection(),
       REQUEST_ID_HEADER,
       mockLogging.logger,
     );
@@ -110,7 +110,7 @@ describe('WebSocket server configuration', () => {
 
   test('Clients should not be tracked', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().mongooseConnection,
+      getFixtures().getMongooseConnection(),
       REQUEST_ID_HEADER,
       mockLogging.logger,
     );

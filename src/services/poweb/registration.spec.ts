@@ -4,7 +4,7 @@ import {
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
-  SubsequentSessionPrivateKeyData,
+  SessionPrivateKeyData,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
@@ -218,12 +218,11 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    const keyData = fixtures.privateKeyStore.keys[registration.sessionKey!!.keyId.toString('hex')];
-    expect(keyData).toBeTruthy();
-    expect(keyData.type).toEqual('session-subsequent');
-    expect((keyData as SubsequentSessionPrivateKeyData).peerPrivateAddress).toEqual(
-      await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
-    );
+    const keyData =
+      fixtures.privateKeyStore.sessionKeys[registration.sessionKey!!.keyId.toString('hex')];
+    expect(keyData).toMatchObject<Partial<SessionPrivateKeyData>>({
+      peerPrivateAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+    });
   });
 
   async function completeRegistration(fixtures: FixtureSet): Promise<LightMyRequest.Response> {

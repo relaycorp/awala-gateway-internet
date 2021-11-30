@@ -9,6 +9,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
+import { Connection, createConnection } from 'mongoose';
 import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
 
@@ -186,6 +187,7 @@ export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAC
 }
 
 export interface GeneratedCCA {
+  readonly cca: CargoCollectionAuthorization;
   readonly ccaSerialized: Buffer;
   readonly sessionPrivateKey: CryptoKey;
 }
@@ -207,7 +209,7 @@ export async function generateCCA(
     Buffer.from(envelopedData.serialize()),
   );
   const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);
-  return { ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
+  return { cca, ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
 }
 
 export function useFakeTimers(): void {
@@ -218,4 +220,35 @@ export function useFakeTimers(): void {
   afterEach(() => {
     jest.useRealTimers();
   });
+}
+
+export function setUpTestDBConnection(): () => Connection {
+  let connection: Connection;
+
+  const connect = () =>
+    createConnection((global as any).__MONGO_URI__, {
+      useCreateIndex: true,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+  beforeAll(async () => {
+    connection = await connect();
+  });
+
+  beforeEach(async () => {
+    if (connection.readyState === 0) {
+      connection = await connect();
+    }
+  });
+
+  afterEach(async () => {
+    Object.values(connection.collections).map((c) => c.deleteMany({}));
+  });
+
+  afterAll(async () => {
+    await connection.close(true);
+  });
+
+  return () => connection;
 }

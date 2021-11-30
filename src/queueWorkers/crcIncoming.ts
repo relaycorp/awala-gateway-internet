@@ -18,7 +18,7 @@ import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { initVaultKeyStore } from '../backingServices/vault';
-import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';

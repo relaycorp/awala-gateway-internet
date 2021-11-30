@@ -19,12 +19,7 @@ import pipe from 'it-pipe';
 import { asyncIterableToArray, ExternalPdaChain, iterableTake } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_POWEB_LOCAL_PORT } from './services';
-import {
-  createAndRegisterPrivateGateway,
-  getPublicGatewayCertificate,
-  registerPrivateGateway,
-  sleep,
-} from './utils';
+import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';
 
 describe('PoWeb server', () => {
   describe('Node registration', () => {
@@ -37,9 +32,6 @@ describe('PoWeb server', () => {
       await expect(
         derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
       ).resolves.toEqual(await derSerializePublicKey(privateGatewayKeyPair.publicKey));
-
-      const actualPublicGatewayCertificate = await getPublicGatewayCertificate();
-      expect(actualPublicGatewayCertificate.isEqual(registration.gatewayCertificate)).toBeTrue();
 
       await expect(
         registration.privateNodeCertificate.getCertificationPath(

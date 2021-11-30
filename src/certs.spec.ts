@@ -1,81 +1,66 @@
-/* tslint:disable:no-object-mutation */
+import { Certificate, generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
+import { addMinutes } from 'date-fns';
 
-import { generateRSAKeyPair } from '@relaycorp/relaynet-core';
-import * as typegoose from '@typegoose/typegoose';
-import bufferToArray from 'buffer-to-arraybuffer';
-import { Connection } from 'mongoose';
-
-import { mockSpy } from './_test_utils';
+import { setUpTestDBConnection } from './_test_utils';
 import { retrieveOwnCertificates } from './certs';
-import { OwnCertificate } from './models';
-import { expectBuffersToEqual, generateStubEndpointCertificate } from './services/_test_utils';
+import { MongoCertificateStore } from './keystores/MongoCertificateStore';
+import { Config, ConfigKey } from './utilities/config';
 
-const stubConnection: Connection = { whoAreYou: 'the-stub-connection' } as any;
+const getMongooseConnection = setUpTestDBConnection();
 
-const stubFind = mockSpy(jest.fn(), () => []);
-const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'), () => ({
-  find: stubFind,
-}));
-
-let stubOwnCerts: readonly OwnCertificate[];
+let certificate1: Certificate;
+let certificate2: Certificate;
 beforeAll(async () => {
-  const keyPair1 = await generateRSAKeyPair();
-  const ownCert1 = new OwnCertificate();
-  ownCert1.serializationDer = Buffer.from(
-    (await generateStubEndpointCertificate(keyPair1)).serialize(),
-  );
+  const identityKeyPair = await generateRSAKeyPair();
+  certificate1 = await issueGatewayCertificate({
+    issuerPrivateKey: identityKeyPair.privateKey,
+    subjectPublicKey: identityKeyPair.publicKey,
+    validityEndDate: addMinutes(new Date(), 1),
+  });
+  certificate2 = await issueGatewayCertificate({
+    issuerPrivateKey: identityKeyPair.privateKey,
+    subjectPublicKey: identityKeyPair.publicKey,
+    validityEndDate: addMinutes(new Date(), 3),
+  });
+});
 
-  const keyPair2 = await generateRSAKeyPair();
-  const ownCert2 = new OwnCertificate();
-  ownCert2.serializationDer = Buffer.from(
-    (await generateStubEndpointCertificate(keyPair2)).serialize(),
-  );
+let certificateStore: MongoCertificateStore;
+beforeEach(async () => {
+  const connection = getMongooseConnection();
 
-  stubOwnCerts = [ownCert1, ownCert2];
+  certificateStore = new MongoCertificateStore(connection);
+
+  const config = new Config(connection);
+  await config.set(
+    ConfigKey.CURRENT_PRIVATE_ADDRESS,
+    await certificate1.calculateSubjectPrivateAddress(),
+  );
 });
 
 describe('retrieveOwnCertificates', () => {
-  test('The specified connection should be used', async () => {
-    await retrieveOwnCertificates(stubConnection);
-
-    expect(stubGetModelForClass).toBeCalledTimes(1);
-    expect(stubGetModelForClass).toBeCalledWith(OwnCertificate, {
-      existingConnection: stubConnection,
-    });
-  });
-
-  test('All records should be queried', async () => {
-    await retrieveOwnCertificates(stubConnection);
-
-    expect(stubFind).toBeCalledTimes(1);
-    expect(stubFind).toBeCalledWith({});
-  });
-
   test('An empty array should be returned when there are no certificates', async () => {
-    const certs = await retrieveOwnCertificates(stubConnection);
+    const certs = await retrieveOwnCertificates(getMongooseConnection());
 
     expect(certs).toEqual([]);
   });
 
   test('A single certificate should be returned when there is one certificate', async () => {
-    stubFind.mockReset();
-    stubFind.mockResolvedValueOnce([stubOwnCerts[0]]);
+    await certificateStore.save(certificate1);
 
-    const certs = await retrieveOwnCertificates(stubConnection);
+    const certs = await retrieveOwnCertificates(getMongooseConnection());
 
     expect(certs).toHaveLength(1);
-    expectBuffersToEqual(certs[0].serialize(), bufferToArray(stubOwnCerts[0].serializationDer));
+    expect(certificate1.isEqual(certs[0])).toBeTrue();
   });
 
   test('Multiple certificates should be retuned when there are multiple certificates', async () => {
-    stubFind.mockReset();
-    stubFind.mockResolvedValueOnce(stubOwnCerts);
+    await certificateStore.save(certificate1);
+    await certificateStore.save(certificate2);
 
-    const certs = await retrieveOwnCertificates(stubConnection);
+    const certs = await retrieveOwnCertificates(getMongooseConnection());
 
-    expect(certs).toHaveLength(stubOwnCerts.length);
-    for (let i = 0; i < stubOwnCerts.length; i++) {
-      expectBuffersToEqual(certs[i].serialize(), bufferToArray(stubOwnCerts[i].serializationDer));
-    }
+    expect(certs).toHaveLength(2);
+    expect(certs.filter((c) => certificate1.isEqual(c))).toHaveLength(1);
+    expect(certs.filter((c) => certificate2.isEqual(c))).toHaveLength(1);
   });
 });

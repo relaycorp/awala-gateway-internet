@@ -1,13 +1,11 @@
 import { initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
 import {
-  Certificate,
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
   SessionKey,
-  UnboundKeyPair,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { get as getEnvVar } from 'env-var';
@@ -15,7 +13,6 @@ import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../_test_utils';
-import { initVaultKeyStore } from '../backingServices/vault';
 import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
@@ -45,20 +42,6 @@ export function connectToNatsStreaming(): Promise<Stan> {
     );
     stanConnection.on('connect', resolve);
   });
-}
-
-async function getPublicGatewayKeyPair(): Promise<UnboundKeyPair> {
-  const privateKeyStore = initVaultKeyStore();
-  const publicGatewayKeyId = Buffer.from(
-    getEnvVar('GATEWAY_KEY_ID').required().asString(),
-    'base64',
-  );
-  return privateKeyStore.fetchNodeKey(publicGatewayKeyId);
-}
-
-export async function getPublicGatewayCertificate(): Promise<Certificate> {
-  const keyPair = await getPublicGatewayKeyPair();
-  return keyPair.certificate;
 }
 
 export interface PrivateGatewayRegistration {

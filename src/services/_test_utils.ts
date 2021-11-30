@@ -194,11 +194,11 @@ export function testDisallowedMethods(
   });
 }
 
-export function mockFastifyMongoose(mockMongoProperty: { readonly db: Connection }): void {
+export function mockFastifyMongoose(mockMongoProperty: () => { readonly db: Connection }): void {
   const mockFastifyPlugin = fastifyPlugin;
   jest.mock('fastify-mongoose', () => {
     function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
-      fastify.decorate('mongo', mockMongoProperty);
+      fastify.decorate('mongo', mockMongoProperty());
       next();
     }
 

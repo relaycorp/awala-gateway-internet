@@ -27,6 +27,7 @@
     "@relaycorp/shared-config": "^1.6.0",
     "@relaycorp/ws-mock": "^4.2.0",
     "@semantic-release/exec": "^5.0.0",
+    "@shelf/jest-mongodb": "^2.1.0",
     "@types/jest": "^26.0.24",
     "@types/mongoose": "^5.10.5",
     "@types/pino": "^6.3.11",

@@ -4,9 +4,24 @@ import { index, prop } from '@typegoose/typegoose';
 
 const SECONDS_IN_A_DAY = 86400;
 
+/**
+ * @deprecated Use [Certificate] instead
+ */
 export class OwnCertificate {
   @prop({ required: true })
   public serializationDer!: Buffer;
+}
+
+@index({ subjectPrivateAddress: 1 })
+export class Certificate {
+  @prop({ required: true })
+  public subjectPrivateAddress!: string;
+
+  @prop({ required: true })
+  public certificateSerialized!: Buffer;
+
+  @prop({ required: true, expires: 0 })
+  public expiryDate!: Date;
 }
 
 export class PeerPublicKeyData {

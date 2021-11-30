@@ -21,10 +21,14 @@ const privateKeyStore = initVaultKeyStore();
 
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();
-  const certificateStore = new MongoCertificateStore(connection);
+  try {
+    const certificateStore = new MongoCertificateStore(connection);
 
-  await generateKeyPair(connection, certificateStore);
-  await migrateDeprecatedCertificates(connection, certificateStore);
+    await generateKeyPair(connection, certificateStore);
+    await migrateDeprecatedCertificates(connection, certificateStore);
+  } finally {
+    await connection.close();
+  }
 }
 
 async function generateKeyPair(

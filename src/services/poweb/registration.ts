@@ -59,7 +59,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
           .send({ message: 'Payload is not a valid Private Node Registration Request' });
       }
 
-      const mongooseConnection = (fastify as any).mongo;
+      const mongooseConnection = (fastify as any).mongo.db;
       const config = new Config(mongooseConnection);
       const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);

@@ -224,15 +224,26 @@ export function useFakeTimers(): void {
 export function setUpTestDBConnection(): () => Connection {
   let connection: Connection;
 
-  beforeAll(async () => {
-    connection = await createConnection((global as any).__MONGO_URI__, {
+  const connect = () =>
+    createConnection((global as any).__MONGO_URI__, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
+
+  beforeAll(async () => {
+    connection = await connect();
+  });
+
+  beforeEach(async () => {
+    if (connection.readyState === 0) {
+      connection = await connect();
+    }
   });
 
   afterAll(async () => {
-    await connection.close();
+    if (connection.readyState !== 0) {
+      await connection.close();
+    }
   });
 
   return () => connection;

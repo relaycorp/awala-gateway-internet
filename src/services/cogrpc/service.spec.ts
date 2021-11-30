@@ -9,7 +9,6 @@ import {
   InvalidMessageError,
   issueEndpointCertificate,
   MockPrivateKeyStore,
-  MockPublicKeyStore,
   Parcel,
   ParcelCollectionAck,
   RAMFSyntaxError,
@@ -18,10 +17,9 @@ import {
   SessionKeyPair,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
-import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import { EventEmitter } from 'events';
-import mongoose from 'mongoose';
 
 import {
   arrayBufferFrom,
@@ -34,15 +32,17 @@ import {
   partialPinoLog,
   partialPinoLogger,
   PdaChain,
+  setUpTestDBConnection,
   UUID4_REGEX,
 } from '../../_test_utils';
-import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import * as vault from '../../backingServices/vault';
 import * as ccaFulfillments from '../../ccaFulfilments';
 import * as certs from '../../certs';
+import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../parcelCollection';
 import { ParcelStore } from '../../parcelStore';
+import { Config, ConfigKey } from '../../utilities/config';
 import { configureMockEnvVars, generatePdaChain, getMockInstance } from '../_test_utils';
 import { MockGrpcBidiCall } from './_test_utils';
 import { makeServiceImplementation, ServiceImplementationOptions } from './service';
@@ -55,8 +55,7 @@ const OBJECT_STORE_BUCKET = 'parcels-bucket';
 const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
 
-const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+const TOMORROW = addDays(new Date(), 1);
 
 let pdaChain: PdaChain;
 let cdaChain: CDAChain;
@@ -67,12 +66,7 @@ beforeAll(async () => {
   privateGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
-const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = new EventEmitter() as any;
-const MOCK_CREATE_MONGOOSE_CONNECTION = mockSpy(
-  jest.spyOn(mongo, 'createMongooseConnectionFromEnv'),
-  jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
-);
-beforeEach(() => MOCK_MONGOOSE_CONNECTION.removeAllListeners());
+const getMongooseConnection = setUpTestDBConnection();
 
 configureMockEnvVars({
   OBJECT_STORE_ACCESS_KEY_ID: 'id',
@@ -91,7 +85,7 @@ beforeEach(() => {
   MOCK_LOGS = mockLogging.logs;
   SERVICE_IMPLEMENTATION_OPTIONS = {
     baseLogger: mockLogging.logger,
-    gatewayKeyIdBase64: pdaChain.publicGatewayCert.getSerialNumber().toString('base64'),
+    getMongooseConnection: jest.fn().mockImplementation(getMongooseConnection),
     natsClusterId: NATS_CLUSTER_ID,
     natsServerUrl: NATS_SERVER_URL,
     parcelStoreBucket: OBJECT_STORE_BUCKET,
@@ -104,16 +98,18 @@ beforeEach(() => {
 describe('makeServiceImplementation', () => {
   describe('Mongoose connection', () => {
     test('Connection should be created preemptively before any RPC', async () => {
-      expect(MOCK_CREATE_MONGOOSE_CONNECTION).not.toBeCalled();
+      expect(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).not.toBeCalled();
 
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
-      expect(MOCK_CREATE_MONGOOSE_CONNECTION).toBeCalledTimes(1);
+      expect(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).toBeCalled();
     });
 
     test('Errors while establishing connection should be propagated', async () => {
       const error = new Error('Database credentials are wrong');
-      MOCK_CREATE_MONGOOSE_CONNECTION.mockRejectedValue(error);
+      getMockInstance(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).mockRejectedValue(
+        error,
+      );
 
       await expect(makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS)).rejects.toEqual(
         error,
@@ -121,11 +117,15 @@ describe('makeServiceImplementation', () => {
     });
 
     test('Errors after establishing connection should be logged', async (cb) => {
+      const mockConnection = new EventEmitter();
+      getMockInstance(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).mockResolvedValue(
+        mockConnection,
+      );
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
       const error = new Error('Database credentials are wrong');
 
-      MOCK_MONGOOSE_CONNECTION.on('error', (err) => {
+      mockConnection.on('error', (err) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('error', 'Mongoose connection error', {
             err: expect.objectContaining({ message: err.message }),
@@ -133,7 +133,7 @@ describe('makeServiceImplementation', () => {
         );
         cb();
       });
-      MOCK_MONGOOSE_CONNECTION.emit('error', error);
+      mockConnection.emit('error', error);
     });
   });
 });
@@ -405,28 +405,37 @@ describe('deliverCargo', () => {
 
 describe('collectCargo', () => {
   const PRIVATE_KEY_STORE = new MockPrivateKeyStore();
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
   let publicGatewaySessionKeyPair: SessionKeyPair;
   beforeAll(async () => {
     publicGatewaySessionKeyPair = await SessionKeyPair.generate();
   });
   beforeEach(async () => {
     PRIVATE_KEY_STORE.clear();
-    await PRIVATE_KEY_STORE.registerNodeKey(
-      pdaChain.publicGatewayPrivateKey,
-      pdaChain.publicGatewayCert,
-    );
-    await PRIVATE_KEY_STORE.saveSubsequentSessionKey(
+    await PRIVATE_KEY_STORE.saveIdentityKey(pdaChain.publicGatewayPrivateKey);
+    await PRIVATE_KEY_STORE.saveBoundSessionKey(
       publicGatewaySessionKeyPair.privateKey,
       publicGatewaySessionKeyPair.sessionKey.keyId,
       privateGatewayAddress,
     );
   });
+  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
 
-  const PUBLIC_KEYS_STORE = new MockPublicKeyStore();
-  mockSpy(jest.spyOn(mongo, 'initMongoDBKeyStore'), (connection) => {
-    expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
-    return PUBLIC_KEYS_STORE;
+  beforeEach(async () => {
+    const connection = getMongooseConnection();
+
+    const certificateStore = new MongoCertificateStore(connection);
+    await certificateStore.save(pdaChain.publicGatewayCert);
+
+    const config = new Config(connection);
+    await config.set(
+      ConfigKey.CURRENT_PRIVATE_ADDRESS,
+      await pdaChain.publicGatewayCert.calculateSubjectPrivateAddress(),
+    );
+  });
+  afterEach(async () => {
+    const connection = getMongooseConnection();
+
+    Object.values(connection.collections).map((c) => c.deleteMany({}));
   });
 
   let SERVICE: CargoRelayServerMethodSet;
@@ -449,8 +458,6 @@ describe('collectCargo', () => {
       yield* arrayToAsyncIterable([]);
     },
   );
-
-  mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 
   const MOCK_WAS_CCA_FULFILLED = mockSpy(
     jest.spyOn(ccaFulfillments, 'wasCCAFulfilled'),
@@ -830,7 +837,7 @@ describe('collectCargo', () => {
     expect(MOCK_GENERATE_PCAS).toBeCalledTimes(1);
     expect(MOCK_GENERATE_PCAS).toBeCalledWith(
       await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-      MOCK_MONGOOSE_CONNECTION,
+      getMongooseConnection(),
     );
   });
 
@@ -888,7 +895,7 @@ describe('collectCargo', () => {
     const cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
     expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledWith(
       expect.objectContaining({ id: cca.id }),
-      MOCK_MONGOOSE_CONNECTION,
+      getMongooseConnection(),
     );
   });
 

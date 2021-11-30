@@ -30,7 +30,7 @@ export async function createMongooseConnectionFromEnv(): Promise<Connection> {
 }
 
 /**
- * Return the public key store used by the gateway.
+ * Return the public key store.
  *
  * @param connection
  *

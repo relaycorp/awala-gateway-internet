@@ -4,6 +4,14 @@ import { index, prop } from '@typegoose/typegoose';
 
 const SECONDS_IN_A_DAY = 86400;
 
+export class ConfigItem {
+  @prop({ required: true, unique: true })
+  public key!: string;
+
+  @prop({ required: true })
+  public value!: string;
+}
+
 /**
  * @deprecated Use [Certificate] instead
  */

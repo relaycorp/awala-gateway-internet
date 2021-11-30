@@ -9,6 +9,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
+import { Connection, createConnection } from 'mongoose';
 import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
 
@@ -218,4 +219,21 @@ export function useFakeTimers(): void {
   afterEach(() => {
     jest.useRealTimers();
   });
+}
+
+export function setUpTestDBConnection(): () => Connection {
+  let connection: Connection;
+
+  beforeAll(async () => {
+    connection = await createConnection((global as any).__MONGO_URI__, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+  });
+
+  afterAll(async () => {
+    await connection.close();
+  });
+
+  return () => connection;
 }

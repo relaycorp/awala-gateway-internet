@@ -6,7 +6,7 @@ import { Connection } from 'mongoose';
 import { Certificate } from '../models';
 
 export class MongoCertificateStore extends CertificateStore {
-  protected readonly certificateModel: ReturnModelType<typeof Certificate>;
+  private readonly certificateModel: ReturnModelType<typeof Certificate>;
 
   constructor(connection: Connection) {
     super();

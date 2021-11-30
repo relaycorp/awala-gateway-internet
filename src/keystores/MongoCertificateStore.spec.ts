@@ -6,27 +6,22 @@ import {
 } from '@relaycorp/relaynet-core';
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
-import { Connection, createConnection } from 'mongoose';
 
+import { setUpTestDBConnection } from '../_test_utils';
 import { Certificate as CertificateModel } from '../models';
 import { MongoCertificateStore } from './MongoCertificateStore';
 
-let connection: Connection;
+const getConnection = setUpTestDBConnection();
 let certificateModel: ReturnModelType<typeof CertificateModel>;
+let store: MongoCertificateStore;
 beforeAll(async () => {
-  connection = await createConnection((global as any).__MONGO_URI__, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  const connection = getConnection();
   certificateModel = getModelForClass(CertificateModel, { existingConnection: connection });
+  store = new MongoCertificateStore(connection);
 });
 
 beforeEach(async () => {
   await certificateModel.deleteMany();
-});
-
-afterAll(async () => {
-  await connection.close();
 });
 
 let identityKeyPair: CryptoKeyPair;
@@ -52,8 +47,6 @@ beforeAll(async () => {
 
 describe('saveData', () => {
   test('All attributes should be saved', async () => {
-    const store = new MongoCertificateStore(connection);
-
     await store.save(validCertificate);
 
     const certificateStored = await certificateModel.findOne({ subjectPrivateAddress }).exec();
@@ -64,7 +57,6 @@ describe('saveData', () => {
   });
 
   test('The same subject should be allowed to have multiple certificates', async () => {
-    const store = new MongoCertificateStore(connection);
     const certificate2 = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
@@ -87,7 +79,6 @@ describe('saveData', () => {
   });
 
   test('Certificates with the same subject and expiry date should be deduped', async () => {
-    const store = new MongoCertificateStore(connection);
     const certificate2 = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
@@ -108,21 +99,16 @@ describe('saveData', () => {
 
 describe('retrieveLatestSerialization', () => {
   test('Nothing should be returned if subject has no certificates', async () => {
-    const store = new MongoCertificateStore(connection);
-
     await expect(store.retrieveLatest(subjectPrivateAddress)).resolves.toBeNull();
   });
 
   test('Expired certificates should not be returned', async () => {
-    const store = new MongoCertificateStore(connection);
-
     await store.save(expiredCertificate);
 
     await expect(store.retrieveLatest(subjectPrivateAddress)).resolves.toBeNull();
   });
 
   test('The latest valid certificate should be returned', async () => {
-    const store = new MongoCertificateStore(connection);
     await store.save(validCertificate);
     const newestCertificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
@@ -139,20 +125,16 @@ describe('retrieveLatestSerialization', () => {
 
 describe('retrieveAllSerializations', () => {
   test('Nothing should be returned if there are no certificates', async () => {
-    const store = new MongoCertificateStore(connection);
-
     await expect(store.retrieveAll(subjectPrivateAddress)).resolves.toBeEmpty();
   });
 
   test('Expired certificates should not be returned', async () => {
-    const store = new MongoCertificateStore(connection);
     await store.save(expiredCertificate);
 
     await expect(store.retrieveAll(subjectPrivateAddress)).resolves.toBeEmpty();
   });
 
   test('All valid certificates should be returned', async () => {
-    const store = new MongoCertificateStore(connection);
     await store.save(expiredCertificate);
     await store.save(validCertificate);
     const newestCertificate = await issueGatewayCertificate({
@@ -172,7 +154,6 @@ describe('retrieveAllSerializations', () => {
 
 describe('deleteExpired', () => {
   test('Valid certificates should not be deleted', async () => {
-    const store = new MongoCertificateStore(connection);
     await store.save(validCertificate);
 
     await store.deleteExpired();

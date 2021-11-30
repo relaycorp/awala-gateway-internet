@@ -2,7 +2,6 @@ import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
 import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
-import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { configureMockEnvVars } from '../services/_test_utils';
 import {
@@ -130,13 +129,5 @@ describe('initMongoDBKeyStore', () => {
     const keyStore = initMongoDBKeyStore(MOCK_MONGOOSE_CONNECTION);
 
     expect(keyStore).toBeInstanceOf(MongoPublicKeyStore);
-  });
-});
-
-describe('initMongoDBCertificateStore', () => {
-  test('MongoCertificateStore instance should be returned', () => {
-    const certStore = initMongoDBKeyStore(MOCK_MONGOOSE_CONNECTION);
-
-    expect(certStore).toBeInstanceOf(MongoCertificateStore);
   });
 });

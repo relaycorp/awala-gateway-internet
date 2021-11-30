@@ -10,11 +10,12 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { initVaultKeyStore } from '../../backingServices/vault';
+import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
+import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';
 
 import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
-import RouteOptions from './RouteOptions';
 
 const ENDPOINT_URL = '/v1/nodes';
 
@@ -27,10 +28,7 @@ const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
 
 const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 1;
 
-export default async function registerRoutes(
-  fastify: FastifyInstance,
-  options: RouteOptions,
-): Promise<void> {
+export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
   fastify.addContentTypeParser(
@@ -61,13 +59,19 @@ export default async function registerRoutes(
           .send({ message: 'Payload is not a valid Private Node Registration Request' });
       }
 
-      const publicGatewayKeyPair = await options.keyPairRetriever();
+      const mongooseConnection = (fastify as any).mongo;
+      const config = new Config(mongooseConnection);
+      const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+      const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
+
+      const certificateStore = new MongoCertificateStore(mongooseConnection);
+      const publicGatewayCertificate = await certificateStore.retrieveLatest(privateAddress!!);
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
         registrationAuthorization = await PrivateNodeRegistrationAuthorization.deserialize(
           registrationRequest.pnraSerialized,
-          await publicGatewayKeyPair.certificate.getPublicKey(),
+          await publicGatewayCertificate!!.getPublicKey(),
         );
       } catch (err) {
         request.log.info({ err }, 'PNRR contains invalid authorization');
@@ -88,18 +92,18 @@ export default async function registerRoutes(
 
       const privateGatewayCertificate = await issuePrivateGatewayCertificate(
         registrationRequest.privateNodePublicKey,
-        publicGatewayKeyPair.privateKey,
-        publicGatewayKeyPair.certificate,
+        privateKey,
+        publicGatewayCertificate!!,
       );
       const sessionKeyPair = await SessionKeyPair.generate();
-      await privateKeyStore.saveSubsequentSessionKey(
+      await privateKeyStore.saveBoundSessionKey(
         sessionKeyPair.privateKey,
         sessionKeyPair.sessionKey.keyId,
         await privateGatewayCertificate.calculateSubjectPrivateAddress(),
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
-        publicGatewayKeyPair.certificate,
+        publicGatewayCertificate!!,
         sessionKeyPair.sessionKey,
       );
       return reply

@@ -192,7 +192,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     expect.objectContaining({ id: PARCEL.id }),
     Buffer.from(PARCEL_SERIALIZED),
     await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
-    fixtures.mongooseConnection,
+    fixtures.getMongooseConnection(),
     mockNatsStreamingConnection,
     expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
   );

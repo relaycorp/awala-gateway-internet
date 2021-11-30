@@ -1,7 +1,8 @@
 import { PublicKeyStore } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { Connection, ConnectionOptions, createConnection } from 'mongoose';
-import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+
+import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 
 export function getMongooseConnectionArgsFromEnv(): {
   readonly uri: string;

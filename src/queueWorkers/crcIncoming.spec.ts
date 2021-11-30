@@ -28,7 +28,7 @@ import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import * as vault from '../backingServices/vault';
-import * as mongoPublicKeyStore from '../MongoPublicKeyStore';
+import * as mongoPublicKeyStore from '../keystores/MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
 import {
   castMock,

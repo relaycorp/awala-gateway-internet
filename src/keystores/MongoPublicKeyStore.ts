@@ -2,7 +2,7 @@ import { PublicKeyStore, SessionPublicKeyData } from '@relaycorp/relaynet-core';
 import { getModelForClass } from '@typegoose/typegoose';
 import { Connection, Model } from 'mongoose';
 
-import { PeerPublicKeyData } from './models';
+import { PeerPublicKeyData } from '../models';
 
 export class MongoPublicKeyStore extends PublicKeyStore {
   protected readonly keyDataModel: Model<any>;

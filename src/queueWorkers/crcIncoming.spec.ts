@@ -115,11 +115,8 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await mockPrivateKeyStore.registerNodeKey(
-    certificateChain.publicGatewayPrivateKey,
-    certificateChain.publicGatewayCert,
-  );
-  await mockPrivateKeyStore.saveInitialSessionKey(
+  await mockPrivateKeyStore.saveIdentityKey(certificateChain.publicGatewayPrivateKey);
+  await mockPrivateKeyStore.saveUnboundSessionKey(
     publicGatewaySessionPrivateKey,
     publicGatewaySessionKey.keyId,
   );

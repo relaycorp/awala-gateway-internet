@@ -10,9 +10,6 @@ const TEST_ENV_VARS = {
   OBJECT_STORE_SECRET_KEY: 'test-secret',
   OBJECT_STORE_TLS_ENABLED: 'false',
   POHTTP_TLS_REQUIRED: 'false',
-  VAULT_KV_PREFIX: 'gw-keys',
-  VAULT_TOKEN: 'root',
-  VAULT_URL: 'http://127.0.0.1:8200',
 };
 // tslint:disable-next-line:no-object-mutation
 Object.assign(process.env, TEST_ENV_VARS);

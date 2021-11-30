@@ -10,10 +10,6 @@ beforeAll(async () => {
   configItemModel = getModelForClass(ConfigItem, { existingConnection: getConnection() });
 });
 
-beforeEach(async () => {
-  await configItemModel.deleteMany();
-});
-
 const PRIVATE_ADDRESS = '0deafbeef';
 
 describe('Config', () => {

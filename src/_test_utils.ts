@@ -187,6 +187,7 @@ export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAC
 }
 
 export interface GeneratedCCA {
+  readonly cca: CargoCollectionAuthorization;
   readonly ccaSerialized: Buffer;
   readonly sessionPrivateKey: CryptoKey;
 }
@@ -208,7 +209,7 @@ export async function generateCCA(
     Buffer.from(envelopedData.serialize()),
   );
   const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);
-  return { ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
+  return { cca, ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
 }
 
 export function useFakeTimers(): void {
@@ -240,10 +241,12 @@ export function setUpTestDBConnection(): () => Connection {
     }
   });
 
+  afterEach(async () => {
+    Object.values(connection.collections).map((c) => c.deleteMany({}));
+  });
+
   afterAll(async () => {
-    if (connection.readyState !== 0) {
-      await connection.close();
-    }
+    await connection.close(true);
   });
 
   return () => connection;

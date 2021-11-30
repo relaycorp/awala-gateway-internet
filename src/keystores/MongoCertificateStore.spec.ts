@@ -20,10 +20,6 @@ beforeAll(async () => {
   store = new MongoCertificateStore(connection);
 });
 
-beforeEach(async () => {
-  await certificateModel.deleteMany();
-});
-
 let identityKeyPair: CryptoKeyPair;
 let subjectPrivateAddress: string;
 let validCertificate: Certificate;

@@ -37,7 +37,7 @@ import {
 } from '../../_test_utils';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import * as vault from '../../backingServices/vault';
-import * as ccaFulfillments from '../../ccaFulfilments';
+import { recordCCAFulfillment, wasCCAFulfilled } from '../../ccaFulfilments';
 import * as certs from '../../certs';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../parcelCollection';
@@ -432,11 +432,6 @@ describe('collectCargo', () => {
       await pdaChain.publicGatewayCert.calculateSubjectPrivateAddress(),
     );
   });
-  afterEach(async () => {
-    const connection = getMongooseConnection();
-
-    Object.values(connection.collections).map((c) => c.deleteMany({}));
-  });
 
   let SERVICE: CargoRelayServerMethodSet;
   beforeEach(async () => {
@@ -459,15 +454,6 @@ describe('collectCargo', () => {
     },
   );
 
-  const MOCK_WAS_CCA_FULFILLED = mockSpy(
-    jest.spyOn(ccaFulfillments, 'wasCCAFulfilled'),
-    async () => false,
-  );
-  const MOCK_RECORD_CCA_FULFILLMENT = mockSpy(
-    jest.spyOn(ccaFulfillments, 'recordCCAFulfillment'),
-    async () => null,
-  );
-
   let DUMMY_PARCEL: Parcel;
   let DUMMY_PARCEL_SERIALIZED: Buffer;
   beforeAll(async () => {
@@ -485,6 +471,7 @@ describe('collectCargo', () => {
     DUMMY_PARCEL_SERIALIZED = Buffer.from(await DUMMY_PARCEL.serialize(keyPair.privateKey));
   });
 
+  let cca: CargoCollectionAuthorization;
   let ccaSerialized: Buffer;
   let privateGatewaySessionPrivateKey: CryptoKey;
   beforeAll(async () => {
@@ -494,6 +481,7 @@ describe('collectCargo', () => {
       publicGatewaySessionKeyPair.sessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
+    cca = generatedCCA.cca;
     ccaSerialized = generatedCCA.ccaSerialized;
     privateGatewaySessionPrivateKey = generatedCCA.sessionPrivateKey;
   });
@@ -653,7 +641,7 @@ describe('collectCargo', () => {
     });
 
     test('INVALID_ARGUMENT should be returned if CCA recipient is malformed', async (cb) => {
-      const cca = new CargoCollectionAuthorization(
+      const malformedCCA = new CargoCollectionAuthorization(
         '0deadbeef',
         pdaChain.privateGatewayCert,
         Buffer.from([]),
@@ -661,7 +649,7 @@ describe('collectCargo', () => {
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA with malformed recipient', {
-            ccaRecipientAddress: cca.recipientAddress,
+            ccaRecipientAddress: malformedCCA.recipientAddress,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
             peerGatewayAddress: privateGatewayAddress,
@@ -676,7 +664,7 @@ describe('collectCargo', () => {
       });
 
       const invalidCCASerialized = Buffer.from(
-        await cca.serialize(pdaChain.privateGatewayPrivateKey),
+        await malformedCCA.serialize(pdaChain.privateGatewayPrivateKey),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -684,7 +672,7 @@ describe('collectCargo', () => {
     });
 
     test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
-      const cca = new CargoCollectionAuthorization(
+      const invalidCCA = new CargoCollectionAuthorization(
         `https://different-${PUBLIC_ADDRESS}`,
         pdaChain.privateGatewayCert,
         Buffer.from([]),
@@ -692,7 +680,7 @@ describe('collectCargo', () => {
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA bound for another gateway', {
-            ccaRecipientAddress: cca.recipientAddress,
+            ccaRecipientAddress: invalidCCA.recipientAddress,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
             peerGatewayAddress: privateGatewayAddress,
@@ -707,7 +695,7 @@ describe('collectCargo', () => {
       });
 
       const invalidCCASerialized = Buffer.from(
-        await cca.serialize(pdaChain.privateGatewayPrivateKey),
+        await invalidCCA.serialize(pdaChain.privateGatewayPrivateKey),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -715,6 +703,8 @@ describe('collectCargo', () => {
     });
 
     test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async (cb) => {
+      await recordCCAFulfillment(cca, getMongooseConnection());
+
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
@@ -731,7 +721,6 @@ describe('collectCargo', () => {
         cb();
       });
 
-      MOCK_WAS_CCA_FULFILLED.mockResolvedValue(true);
       CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -891,12 +880,7 @@ describe('collectCargo', () => {
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
-    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledTimes(1);
-    const cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
-    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledWith(
-      expect.objectContaining({ id: cca.id }),
-      getMongooseConnection(),
-    );
+    await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeTrue();
   });
 
   test('CCA fulfillment should be logged and end the call', async () => {
@@ -958,7 +942,7 @@ describe('collectCargo', () => {
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
     test('Call should end with an error for the client', async (cb) => {
@@ -971,16 +955,16 @@ describe('collectCargo', () => {
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
     test('CCA should not be marked as fulfilled', async (cb) => {
-      CALL.on('error', () => {
-        expect(MOCK_RECORD_CCA_FULFILLMENT).not.toBeCalled();
+      CALL.on('error', async () => {
+        await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeFalse();
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
   });
 
@@ -992,12 +976,12 @@ describe('collectCargo', () => {
     recipientAddress: string,
     payload: ArrayBuffer,
   ): Promise<Buffer> {
-    const cca = new CargoCollectionAuthorization(
+    const auth = new CargoCollectionAuthorization(
       recipientAddress,
       pdaChain.privateGatewayCert,
       Buffer.from(payload),
     );
-    return Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey));
+    return Buffer.from(await auth.serialize(pdaChain.privateGatewayPrivateKey));
   }
 
   async function validateCargoDelivery(

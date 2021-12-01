@@ -243,7 +243,7 @@ export function setUpTestDBConnection(): () => Connection {
   });
 
   afterEach(async () => {
-    Object.values(connection.collections).map((c) => c.deleteMany({}));
+    await Promise.all(Object.values(connection.collections).map((c) => c.deleteMany({})));
   });
 
   afterAll(async () => {

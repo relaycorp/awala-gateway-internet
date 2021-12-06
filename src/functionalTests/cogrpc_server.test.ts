@@ -109,12 +109,14 @@ describe('Cargo collection', () => {
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
     // tslint:disable:no-console
-    console.log('BADGER, start');
+    console.log('BADGER, start', new Date());
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     await deliverParcel(GW_POHTTP_URL, await generateDummyParcel(pdaChain));
 
+    console.log('BADGER, before sleep', new Date());
     await sleep(1);
 
+    console.log('BADGER, after sleep', new Date());
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
@@ -129,7 +131,7 @@ describe('Cargo collection', () => {
     } finally {
       cogrpcClient.close();
     }
-    console.log('BADGER, after collect');
+    console.log('BADGER, after collect', new Date());
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
     await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);

@@ -10,6 +10,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 
 import {
@@ -24,8 +25,15 @@ import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';
 
-const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+const TOMORROW = addDays(new Date(), 1);
+
+let cogRPCClient: CogRPCClient;
+beforeEach(async () => {
+  cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
+});
+afterEach(() => {
+  cogRPCClient.close();
+});
 
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
@@ -34,17 +42,12 @@ describe('Cargo delivery', () => {
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
     const deliveryId = 'random-delivery-id';
-    const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
-    try {
-      const ackDeliveryIds = await cogRPCClient.deliverCargo(
-        arrayToAsyncIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
-      );
+    const ackDeliveryIds = await cogRPCClient.deliverCargo(
+      arrayToAsyncIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
+    );
 
-      await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
-      await expect(getLastQueueMessage()).resolves.toEqual(cargoSerialized);
-    } finally {
-      cogRPCClient.close();
-    }
+    await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
+    await expect(getLastQueueMessage()).resolves.toEqual(cargoSerialized);
   });
 
   test('Unauthorized cargo should be acknowledged but not processed', async () => {
@@ -60,16 +63,12 @@ describe('Cargo delivery', () => {
       await cargo.serialize(unauthorizedSenderKeyPair.privateKey),
     );
 
-    const cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
-    try {
-      await asyncIterableToArray(
-        await cogRPCClient.deliverCargo(
-          arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
-        ),
-      );
-    } finally {
-      cogRPCClient.close();
-    }
+    await asyncIterableToArray(
+      await cogRPCClient.deliverCargo(
+        arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+      ),
+    );
+
     await expect(getLastQueueMessage()).resolves.not.toEqual(cargoSerialized);
   });
 });
@@ -88,13 +87,7 @@ describe('Cargo collection', () => {
       publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
-    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
-    let collectedCargoes: readonly Buffer[];
-    try {
-      collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
-    } finally {
-      cogrpcClient.close();
-    }
+    const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
 
     await expect(collectedCargoes).toHaveLength(1);
 
@@ -120,13 +113,7 @@ describe('Cargo collection', () => {
       publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
-    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
-    let collectedCargoes: readonly Buffer[];
-    try {
-      collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
-    } finally {
-      cogrpcClient.close();
-    }
+    const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
     await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
@@ -146,15 +133,10 @@ describe('Cargo collection', () => {
       Buffer.from([]),
     );
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
-    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
-    try {
-      const error = await getPromiseRejection<CogRPCError>(
-        asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-      );
-      expect(error.cause()).toHaveProperty('code', grpc.status.UNAUTHENTICATED);
-    } finally {
-      cogrpcClient.close();
-    }
+    const error = await getPromiseRejection<CogRPCError>(
+      asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+    );
+    expect(error.cause()).toHaveProperty('code', grpc.status.UNAUTHENTICATED);
   });
 
   test('CCAs should not be reusable', async () => {
@@ -167,16 +149,11 @@ describe('Cargo collection', () => {
       pdaChain.privateGatewayPrivateKey,
     );
 
-    const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
-    try {
-      await expect(asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized))).toResolve();
-      const error = await getPromiseRejection<CogRPCError>(
-        asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized)),
-      );
-      expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
-    } finally {
-      cogrpcClient.close();
-    }
+    await expect(asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized))).toResolve();
+    const error = await getPromiseRejection<CogRPCError>(
+      asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+    );
+    expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
   });
 });
 

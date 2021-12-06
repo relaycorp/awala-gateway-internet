@@ -107,7 +107,7 @@ describe('Cargo collection', () => {
     expectBuffersToEqual(cargoMessageSet.messages[0], parcelSerialized);
   });
 
-  test('Cargo should be signed with Cargo Delivery Authorization', async () => {
+  test.only('Cargo should be signed with Cargo Delivery Authorization', async () => {
     // tslint:disable:no-console
     console.log('BADGER, start', new Date());
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();

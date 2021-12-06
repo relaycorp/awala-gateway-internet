@@ -126,9 +126,11 @@ describe('Cargo collection', () => {
     );
     const cogrpcClient = await CogRPCClient.init(GW_COGRPC_URL);
     let collectedCargoes: readonly Buffer[];
+    console.log('BADGER, before collect', new Date());
     try {
       collectedCargoes = await asyncIterableToArray(cogrpcClient.collectCargo(ccaSerialized));
     } finally {
+      console.log('BADGER, closing collect', new Date());
       cogrpcClient.close();
     }
     console.log('BADGER, after collect', new Date());

@@ -126,16 +126,17 @@ describe('Cargo collection', () => {
       subjectPublicKey: unauthorizedSenderKeyPair.publicKey,
       validityEndDate: TOMORROW,
     });
-
     const cca = new CargoCollectionAuthorization(
       GW_PUBLIC_ADDRESS_URL,
       unauthorizedCertificate,
       Buffer.from([]),
     );
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
+
     const error = await getPromiseRejection<CogRPCError>(
       asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
     );
+
     expect(error.cause()).toHaveProperty('code', grpc.status.UNAUTHENTICATED);
   });
 

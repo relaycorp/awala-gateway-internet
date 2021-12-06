@@ -148,11 +148,12 @@ describe('Cargo collection', () => {
       publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
-
     await expect(asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized))).toResolve();
+
     const error = await getPromiseRejection<CogRPCError>(
       asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
     );
+
     expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
   });
 });

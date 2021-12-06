@@ -135,6 +135,7 @@ describe('Cargo collection', () => {
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
     await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
+    console.log('BADGER, end', new Date());
   });
 
   test('Unauthorized CCA should be refused', async () => {

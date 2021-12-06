@@ -39,7 +39,7 @@
     "light-my-request": "^4.7.0",
     "npm-run-all": "^4.1.5",
     "pkijs": "^2.1.96",
-    "prettier": "^2.5.0",
+    "prettier": "^2.5.1",
     "split2": "^4.1.0",
     "trash-cli": "^4.0.0",
     "ts-jest": "^26.5.6",

@@ -40,7 +40,7 @@ jobs:
         with:
           cluster_name: default
       - name: Run Skaffold pipeline
-        uses: hiberbee/github-action-skaffold@1.4.0
+        uses: hiberbee/github-action-skaffold@1.14.0
         with:
           command: run
           skaffold-version: 1.19.0

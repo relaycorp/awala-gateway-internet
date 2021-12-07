@@ -4,9 +4,6 @@ updates:
   directory: "/"
   schedule:
     interval: weekly
-    time: "08:00"
-    timezone: Etc/UCT
-  open-pull-requests-limit: 99
   versioning-strategy: increase
   commit-message:
     prefix: fix
@@ -15,6 +12,3 @@ updates:
   directory: "/docs"
   schedule:
     interval: weekly
-    time: "08:00"
-    timezone: Etc/UCT
-  open-pull-requests-limit: 99

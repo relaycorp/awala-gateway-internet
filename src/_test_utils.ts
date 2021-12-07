@@ -4,10 +4,12 @@ import {
   Certificate,
   issueDeliveryAuthorization,
   issueGatewayCertificate,
-  SessionlessEnvelopedData,
+  SessionEnvelopedData,
+  SessionKey,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
+import { Connection, createConnection } from 'mongoose';
 import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
 
@@ -184,23 +186,30 @@ export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAC
   return { privateGatewayCert, publicGatewayCert };
 }
 
+export interface GeneratedCCA {
+  readonly cca: CargoCollectionAuthorization;
+  readonly ccaSerialized: Buffer;
+  readonly sessionPrivateKey: CryptoKey;
+}
+
 export async function generateCCA(
   recipientAddress: string,
   chain: CDAChain,
-  publicGatewaySelfIssuedCertificate: Certificate,
+  publicGatewaySessionKey: SessionKey,
   privateGatewayPrivateKey: CryptoKey,
-): Promise<Buffer> {
+): Promise<GeneratedCCA> {
   const ccr = new CargoCollectionRequest(chain.publicGatewayCert);
-  const ccaPayload = await SessionlessEnvelopedData.encrypt(
+  const { envelopedData, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     ccr.serialize(),
-    publicGatewaySelfIssuedCertificate,
+    publicGatewaySessionKey,
   );
   const cca = new CargoCollectionAuthorization(
     recipientAddress,
     chain.privateGatewayCert,
-    Buffer.from(await ccaPayload.serialize()),
+    Buffer.from(envelopedData.serialize()),
   );
-  return Buffer.from(await cca.serialize(privateGatewayPrivateKey));
+  const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);
+  return { cca, ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
 }
 
 export function useFakeTimers(): void {
@@ -211,4 +220,35 @@ export function useFakeTimers(): void {
   afterEach(() => {
     jest.useRealTimers();
   });
+}
+
+export function setUpTestDBConnection(): () => Connection {
+  let connection: Connection;
+
+  const connect = () =>
+    createConnection((global as any).__MONGO_URI__, {
+      useCreateIndex: true,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+  beforeAll(async () => {
+    connection = await connect();
+  });
+
+  beforeEach(async () => {
+    if (connection.readyState === 0) {
+      connection = await connect();
+    }
+  });
+
+  afterEach(async () => {
+    await Promise.all(Object.values(connection.collections).map((c) => c.deleteMany({})));
+  });
+
+  afterAll(async () => {
+    await connection.close(true);
+  });
+
+  return () => connection;
 }

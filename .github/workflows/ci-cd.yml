@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - run: npm run static-checks
-      - run: npm run test:ci:unit
+      - run: npm run test:unit
 
       - uses: azure/setup-helm@v1
         with:
@@ -47,7 +47,7 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
-        timeout-minutes: 7
+        timeout-minutes: 8
       - name: Start port-forwarding
         run: |
           # Ugly workaround for https://github.com/GoogleContainerTools/skaffold/issues/4022
@@ -60,7 +60,7 @@ jobs:
           kubectl port-forward --address 127.0.0.1 svc/public-gateway-poweb 8080:8082 &
           kubectl port-forward --address 127.0.0.1 svc/public-gateway-pohttp 8081:8080 &
           kubectl port-forward --address 127.0.0.1 svc/public-gateway-cogrpc 8082:8081 &
-          kubectl port-forward --address 127.0.0.1 svc/public-gateway-vault 8200:8200 &
+          kubectl port-forward --address 127.0.0.1 svc/relaynet-pong-pohttp 8083:80 &
           kubectl port-forward --address 127.0.0.1 svc/nats 4222:4222 &
           kubectl port-forward --address 127.0.0.1 svc/minio 9000:9000 &
 

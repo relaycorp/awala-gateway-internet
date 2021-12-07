@@ -18,7 +18,7 @@ import { makeServer } from './server';
 jest.mock('../../utilities/exitHandling');
 
 const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' } as any, ObjectId: {} };
-mockFastifyMongoose(mockFastifyMongooseObject);
+mockFastifyMongoose(() => mockFastifyMongooseObject);
 
 const validRequestOptions: InjectOptions = {
   headers: {

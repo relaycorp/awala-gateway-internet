@@ -19,12 +19,7 @@ import pipe from 'it-pipe';
 import { asyncIterableToArray, ExternalPdaChain, iterableTake } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
 import { GW_POWEB_LOCAL_PORT } from './services';
-import {
-  generatePdaChain,
-  getPublicGatewayCertificate,
-  registerPrivateGateway,
-  sleep,
-} from './utils';
+import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';
 
 describe('PoWeb server', () => {
   describe('Node registration', () => {
@@ -37,9 +32,6 @@ describe('PoWeb server', () => {
       await expect(
         derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
       ).resolves.toEqual(await derSerializePublicKey(privateGatewayKeyPair.publicKey));
-
-      const actualPublicGatewayCertificate = await getPublicGatewayCertificate();
-      expect(actualPublicGatewayCertificate.isEqual(registration.gatewayCertificate)).toBeTrue();
 
       await expect(
         registration.privateNodeCertificate.getCertificationPath(
@@ -67,8 +59,8 @@ describe('PoWeb server', () => {
   describe('Parcel delivery and collection', () => {
     test('Delivering and collecting a given parcel (closing upon completion)', async () => {
       const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-      const senderChain = await generatePdaChain();
-      const recipientChain = await generatePdaChain();
+      const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+      const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
       const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
 
@@ -99,8 +91,8 @@ describe('PoWeb server', () => {
 
     test('Delivering and collecting a given parcel (keep alive)', async () => {
       const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-      const senderChain = await generatePdaChain();
-      const recipientChain = await generatePdaChain();
+      const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+      const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
       const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
 

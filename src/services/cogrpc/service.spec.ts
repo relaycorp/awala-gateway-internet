@@ -3,28 +3,23 @@ import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@rel
 import {
   Cargo,
   CargoCollectionAuthorization,
-  CargoCollectionRequest,
   CargoMessageSet,
   CargoMessageStream,
-  generateECDHKeyPair,
   generateRSAKeyPair,
   InvalidMessageError,
   issueEndpointCertificate,
-  issueInitialDHKeyCertificate,
   MockPrivateKeyStore,
-  MockPublicKeyStore,
   Parcel,
   ParcelCollectionAck,
   RAMFSyntaxError,
   RecipientAddressType,
   SessionEnvelopedData,
-  SessionlessEnvelopedData,
+  SessionKeyPair,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
-import * as typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import { EventEmitter } from 'events';
-import mongoose from 'mongoose';
 
 import {
   arrayBufferFrom,
@@ -37,21 +32,18 @@ import {
   partialPinoLog,
   partialPinoLogger,
   PdaChain,
+  setUpTestDBConnection,
   UUID4_REGEX,
 } from '../../_test_utils';
-import * as mongo from '../../backingServices/mongo';
 import * as natsStreaming from '../../backingServices/natsStreaming';
 import * as vault from '../../backingServices/vault';
-import * as ccaFulfillments from '../../ccaFulfilments';
+import { recordCCAFulfillment, wasCCAFulfilled } from '../../ccaFulfilments';
 import * as certs from '../../certs';
+import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../parcelCollection';
 import { ParcelStore } from '../../parcelStore';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  reSerializeCertificate,
-} from '../_test_utils';
+import { Config, ConfigKey } from '../../utilities/config';
+import { configureMockEnvVars, generatePdaChain, getMockInstance } from '../_test_utils';
 import { MockGrpcBidiCall } from './_test_utils';
 import { makeServiceImplementation, ServiceImplementationOptions } from './service';
 
@@ -63,24 +55,18 @@ const OBJECT_STORE_BUCKET = 'parcels-bucket';
 const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
 
-const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+const TOMORROW = addDays(new Date(), 1);
 
 let pdaChain: PdaChain;
 let cdaChain: CDAChain;
-let peerGatewayAddress: string;
+let privateGatewayAddress: string;
 beforeAll(async () => {
   pdaChain = await generatePdaChain();
   cdaChain = await generateCDAChain(pdaChain);
-  peerGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  privateGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
-const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = new EventEmitter() as any;
-const MOCK_CREATE_MONGOOSE_CONNECTION = mockSpy(
-  jest.spyOn(mongo, 'createMongooseConnectionFromEnv'),
-  jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
-);
-beforeEach(() => MOCK_MONGOOSE_CONNECTION.removeAllListeners());
+const getMongooseConnection = setUpTestDBConnection();
 
 configureMockEnvVars({
   OBJECT_STORE_ACCESS_KEY_ID: 'id',
@@ -99,7 +85,7 @@ beforeEach(() => {
   MOCK_LOGS = mockLogging.logs;
   SERVICE_IMPLEMENTATION_OPTIONS = {
     baseLogger: mockLogging.logger,
-    gatewayKeyIdBase64: pdaChain.publicGatewayCert.getSerialNumber().toString('base64'),
+    getMongooseConnection: jest.fn().mockImplementation(getMongooseConnection),
     natsClusterId: NATS_CLUSTER_ID,
     natsServerUrl: NATS_SERVER_URL,
     parcelStoreBucket: OBJECT_STORE_BUCKET,
@@ -112,16 +98,18 @@ beforeEach(() => {
 describe('makeServiceImplementation', () => {
   describe('Mongoose connection', () => {
     test('Connection should be created preemptively before any RPC', async () => {
-      expect(MOCK_CREATE_MONGOOSE_CONNECTION).not.toBeCalled();
+      expect(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).not.toBeCalled();
 
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
-      expect(MOCK_CREATE_MONGOOSE_CONNECTION).toBeCalledTimes(1);
+      expect(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).toBeCalled();
     });
 
     test('Errors while establishing connection should be propagated', async () => {
       const error = new Error('Database credentials are wrong');
-      MOCK_CREATE_MONGOOSE_CONNECTION.mockRejectedValue(error);
+      getMockInstance(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).mockRejectedValue(
+        error,
+      );
 
       await expect(makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS)).rejects.toEqual(
         error,
@@ -129,11 +117,15 @@ describe('makeServiceImplementation', () => {
     });
 
     test('Errors after establishing connection should be logged', async (cb) => {
+      const mockConnection = new EventEmitter();
+      getMockInstance(SERVICE_IMPLEMENTATION_OPTIONS.getMongooseConnection).mockResolvedValue(
+        mockConnection,
+      );
       await makeServiceImplementation(SERVICE_IMPLEMENTATION_OPTIONS);
 
       const error = new Error('Database credentials are wrong');
 
-      MOCK_MONGOOSE_CONNECTION.on('error', (err) => {
+      mockConnection.on('error', (err) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('error', 'Mongoose connection error', {
             err: expect.objectContaining({ message: err.message }),
@@ -141,7 +133,7 @@ describe('makeServiceImplementation', () => {
         );
         cb();
       });
-      MOCK_MONGOOSE_CONNECTION.emit('error', error);
+      mockConnection.emit('error', error);
     });
   });
 });
@@ -161,6 +153,7 @@ describe('deliverCargo', () => {
   let PUBLISHED_MESSAGES: Buffer[];
   beforeEach(() => {
     PUBLISHED_MESSAGES = [];
+
     async function* mockNatsPublisher(
       messages: IterableIterator<natsStreaming.PublisherMessage>,
     ): AsyncIterable<string> {
@@ -169,6 +162,7 @@ describe('deliverCargo', () => {
         yield message.id;
       }
     }
+
     NATS_CLIENT = {
       makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
     } as unknown as natsStreaming.NatsStreamingClient;
@@ -290,7 +284,7 @@ describe('deliverCargo', () => {
           cargoId: CARGO.id,
           grpcClient: CALL.getPeer(),
           grpcMethod: 'deliverCargo',
-          peerGatewayAddress,
+          peerGatewayAddress: privateGatewayAddress,
         }),
       );
     });
@@ -315,11 +309,13 @@ describe('deliverCargo', () => {
 
     test('Errors while processing cargo should be logged and end the call', async (cb) => {
       const error = new Error('Denied');
+
       async function* failToPublishMessage(
         _: IterableIterator<natsStreaming.PublisherMessage>,
       ): AsyncIterable<string> {
         throw error;
       }
+
       getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(failToPublishMessage);
       CALL.output.push({
         cargo: CARGO_SERIALIZATION,
@@ -364,6 +360,7 @@ describe('deliverCargo', () => {
           throw new Error('Denied');
         }
       }
+
       getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(publishFirstMessageThenFail);
       const undeliveredMessageId = 'undelivered';
       CALL.output.push(
@@ -408,19 +405,32 @@ describe('deliverCargo', () => {
 
 describe('collectCargo', () => {
   const PRIVATE_KEY_STORE = new MockPrivateKeyStore();
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
+  let publicGatewaySessionKeyPair: SessionKeyPair;
+  beforeAll(async () => {
+    publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+  });
   beforeEach(async () => {
     PRIVATE_KEY_STORE.clear();
-    await PRIVATE_KEY_STORE.registerNodeKey(
-      pdaChain.publicGatewayPrivateKey,
-      pdaChain.publicGatewayCert,
+    await PRIVATE_KEY_STORE.saveIdentityKey(pdaChain.publicGatewayPrivateKey);
+    await PRIVATE_KEY_STORE.saveBoundSessionKey(
+      publicGatewaySessionKeyPair.privateKey,
+      publicGatewaySessionKeyPair.sessionKey.keyId,
+      privateGatewayAddress,
     );
   });
+  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
 
-  const PUBLIC_KEYS_STORE = new MockPublicKeyStore();
-  mockSpy(jest.spyOn(mongo, 'initMongoDBKeyStore'), (connection) => {
-    expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
-    return PUBLIC_KEYS_STORE;
+  beforeEach(async () => {
+    const connection = getMongooseConnection();
+
+    const certificateStore = new MongoCertificateStore(connection);
+    await certificateStore.save(pdaChain.publicGatewayCert);
+
+    const config = new Config(connection);
+    await config.set(
+      ConfigKey.CURRENT_PRIVATE_ADDRESS,
+      await pdaChain.publicGatewayCert.calculateSubjectPrivateAddress(),
+    );
   });
 
   let SERVICE: CargoRelayServerMethodSet;
@@ -444,17 +454,6 @@ describe('collectCargo', () => {
     },
   );
 
-  mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
-
-  const MOCK_WAS_CCA_FULFILLED = mockSpy(
-    jest.spyOn(ccaFulfillments, 'wasCCAFulfilled'),
-    async () => false,
-  );
-  const MOCK_RECORD_CCA_FULFILLMENT = mockSpy(
-    jest.spyOn(ccaFulfillments, 'recordCCAFulfillment'),
-    async () => null,
-  );
-
   let DUMMY_PARCEL: Parcel;
   let DUMMY_PARCEL_SERIALIZED: Buffer;
   beforeAll(async () => {
@@ -472,14 +471,19 @@ describe('collectCargo', () => {
     DUMMY_PARCEL_SERIALIZED = Buffer.from(await DUMMY_PARCEL.serialize(keyPair.privateKey));
   });
 
+  let cca: CargoCollectionAuthorization;
   let ccaSerialized: Buffer;
+  let privateGatewaySessionPrivateKey: CryptoKey;
   beforeAll(async () => {
-    ccaSerialized = await generateCCA(
+    const generatedCCA = await generateCCA(
       PUBLIC_ADDRESS_URL,
       cdaChain,
-      pdaChain.publicGatewayCert,
+      publicGatewaySessionKeyPair.sessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
+    cca = generatedCCA.cca;
+    ccaSerialized = generatedCCA.ccaSerialized;
+    privateGatewaySessionPrivateKey = generatedCCA.sessionPrivateKey;
   });
 
   describe('CCA validation', () => {
@@ -598,13 +602,14 @@ describe('collectCargo', () => {
         cb();
       });
 
-      const payload = await SessionlessEnvelopedData.encrypt(
+      const unknownSessionKey = (await SessionKeyPair.generate()).sessionKey;
+      const { envelopedData } = await SessionEnvelopedData.encrypt(
         new ArrayBuffer(0),
-        pdaChain.pdaCert, // The public gateway doesn't have this key
+        unknownSessionKey, // The public gateway doesn't have this key
       );
       const invalidCCASerialized = await generateCCAForPayload(
         PUBLIC_ADDRESS_URL,
-        payload.serialize(),
+        envelopedData.serialize(),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -622,13 +627,13 @@ describe('collectCargo', () => {
         cb();
       });
 
-      const payload = await SessionlessEnvelopedData.encrypt(
+      const { envelopedData } = await SessionEnvelopedData.encrypt(
         arrayBufferFrom('not a valid CCR'),
-        pdaChain.publicGatewayCert,
+        publicGatewaySessionKeyPair.sessionKey,
       );
       const invalidCCASerialized = await generateCCAForPayload(
         PUBLIC_ADDRESS_URL,
-        payload.serialize(),
+        envelopedData.serialize(),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -636,7 +641,7 @@ describe('collectCargo', () => {
     });
 
     test('INVALID_ARGUMENT should be returned if CCA recipient is malformed', async (cb) => {
-      const cca = new CargoCollectionAuthorization(
+      const malformedCCA = new CargoCollectionAuthorization(
         '0deadbeef',
         pdaChain.privateGatewayCert,
         Buffer.from([]),
@@ -644,10 +649,10 @@ describe('collectCargo', () => {
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA with malformed recipient', {
-            ccaRecipientAddress: cca.recipientAddress,
+            ccaRecipientAddress: malformedCCA.recipientAddress,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
-            peerGatewayAddress,
+            peerGatewayAddress: privateGatewayAddress,
           }),
         );
         expect(error).toEqual({
@@ -659,7 +664,7 @@ describe('collectCargo', () => {
       });
 
       const invalidCCASerialized = Buffer.from(
-        await cca.serialize(pdaChain.privateGatewayPrivateKey),
+        await malformedCCA.serialize(pdaChain.privateGatewayPrivateKey),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -667,7 +672,7 @@ describe('collectCargo', () => {
     });
 
     test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
-      const cca = new CargoCollectionAuthorization(
+      const invalidCCA = new CargoCollectionAuthorization(
         `https://different-${PUBLIC_ADDRESS}`,
         pdaChain.privateGatewayCert,
         Buffer.from([]),
@@ -675,10 +680,10 @@ describe('collectCargo', () => {
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA bound for another gateway', {
-            ccaRecipientAddress: cca.recipientAddress,
+            ccaRecipientAddress: invalidCCA.recipientAddress,
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
-            peerGatewayAddress,
+            peerGatewayAddress: privateGatewayAddress,
           }),
         );
         expect(error).toEqual({
@@ -690,7 +695,7 @@ describe('collectCargo', () => {
       });
 
       const invalidCCASerialized = Buffer.from(
-        await cca.serialize(pdaChain.privateGatewayPrivateKey),
+        await invalidCCA.serialize(pdaChain.privateGatewayPrivateKey),
       );
       CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
 
@@ -698,12 +703,14 @@ describe('collectCargo', () => {
     });
 
     test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async (cb) => {
+      await recordCCAFulfillment(cca, getMongooseConnection());
+
       CALL.on('error', (error) => {
         expect(MOCK_LOGS).toContainEqual(
           partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
-            peerGatewayAddress,
+            peerGatewayAddress: privateGatewayAddress,
           }),
         );
         expect(error).toEqual({
@@ -714,7 +721,6 @@ describe('collectCargo', () => {
         cb();
       });
 
-      MOCK_WAS_CCA_FULFILLED.mockResolvedValue(true);
       CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
 
       await SERVICE.collectCargo(CALL.convertToGrpcStream());
@@ -754,8 +760,8 @@ describe('collectCargo', () => {
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
     expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-      peerGatewayAddress,
-      partialPinoLogger({ peerGatewayAddress }) as any,
+      privateGatewayAddress,
+      partialPinoLogger({ peerGatewayAddress: privateGatewayAddress }) as any,
     );
   });
 
@@ -820,7 +826,7 @@ describe('collectCargo', () => {
     expect(MOCK_GENERATE_PCAS).toBeCalledTimes(1);
     expect(MOCK_GENERATE_PCAS).toBeCalledWith(
       await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-      MOCK_MONGOOSE_CONNECTION,
+      getMongooseConnection(),
     );
   });
 
@@ -874,12 +880,7 @@ describe('collectCargo', () => {
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
-    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledTimes(1);
-    const cca = await CargoCollectionAuthorization.deserialize(bufferToArray(ccaSerialized));
-    expect(MOCK_RECORD_CCA_FULFILLMENT).toBeCalledWith(
-      expect.objectContaining({ id: cca.id }),
-      MOCK_MONGOOSE_CONNECTION,
-    );
+    await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeTrue();
   });
 
   test('CCA fulfillment should be logged and end the call', async () => {
@@ -892,40 +893,14 @@ describe('collectCargo', () => {
         cargoesCollected: 0,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress,
+        peerGatewayAddress: privateGatewayAddress,
       }),
     );
     expect(CALL.end).toBeCalledWith();
   });
 
-  test('CCA payload encryption key should be stored if using channel session', async () => {
-    const ccr = new CargoCollectionRequest(cdaChain.publicGatewayCert);
-    const publicGatewaySessionKey = await generateECDHKeyPair();
-    const publicGatewaySessionCertificate = reSerializeCertificate(
-      await issueInitialDHKeyCertificate({
-        issuerCertificate: pdaChain.publicGatewayCert,
-        issuerPrivateKey: pdaChain.publicGatewayPrivateKey,
-        subjectPublicKey: publicGatewaySessionKey.publicKey,
-        validityEndDate: pdaChain.publicGatewayCert.expiryDate,
-      }),
-    );
-    await PRIVATE_KEY_STORE.registerInitialSessionKey(
-      publicGatewaySessionKey.privateKey,
-      publicGatewaySessionCertificate,
-    );
-    const ccaPayloadEncryptionResult = await SessionEnvelopedData.encrypt(
-      ccr.serialize(),
-      publicGatewaySessionCertificate,
-    );
-    CALL.metadata.add(
-      'Authorization',
-      serializeAuthzMetadata(
-        await generateCCAForPayload(
-          PUBLIC_ADDRESS_URL,
-          ccaPayloadEncryptionResult.envelopedData.serialize(),
-        ),
-      ),
-    );
+  test('CCA payload encryption key should be stored', async () => {
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
     MOCK_RETRIEVE_ACTIVE_PARCELS.mockReturnValue(
       arrayToAsyncIterable([
         {
@@ -941,7 +916,7 @@ describe('collectCargo', () => {
 
     expect(CALL.input).toHaveLength(1);
     const cargo = await Cargo.deserialize(bufferToArray(CALL.input[0].cargo));
-    const cargoUnwrap = await cargo.unwrapPayload(ccaPayloadEncryptionResult.dhPrivateKey);
+    const cargoUnwrap = await cargo.unwrapPayload(privateGatewaySessionPrivateKey);
     expect(cargoUnwrap.payload.messages).toHaveLength(1);
   });
 
@@ -961,13 +936,13 @@ describe('collectCargo', () => {
             err: expect.objectContaining({ message: err.message }),
             grpcClient: CALL.getPeer(),
             grpcMethod: 'collectCargo',
-            peerGatewayAddress,
+            peerGatewayAddress: privateGatewayAddress,
           }),
         );
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
     test('Call should end with an error for the client', async (cb) => {
@@ -980,16 +955,16 @@ describe('collectCargo', () => {
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
 
     test('CCA should not be marked as fulfilled', async (cb) => {
-      CALL.on('error', () => {
-        expect(MOCK_RECORD_CCA_FULFILLMENT).not.toBeCalled();
+      CALL.on('error', async () => {
+        await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeFalse();
         cb();
       });
 
-      await SERVICE.collectCargo(CALL.convertToGrpcStream());
+      SERVICE.collectCargo(CALL.convertToGrpcStream());
     });
   });
 
@@ -1001,12 +976,12 @@ describe('collectCargo', () => {
     recipientAddress: string,
     payload: ArrayBuffer,
   ): Promise<Buffer> {
-    const cca = new CargoCollectionAuthorization(
+    const auth = new CargoCollectionAuthorization(
       recipientAddress,
       pdaChain.privateGatewayCert,
       Buffer.from(payload),
     );
-    return Buffer.from(await cca.serialize(pdaChain.privateGatewayPrivateKey));
+    return Buffer.from(await auth.serialize(pdaChain.privateGatewayPrivateKey));
   }
 
   async function validateCargoDelivery(
@@ -1027,7 +1002,7 @@ describe('collectCargo', () => {
 
   async function unwrapCargoMessages(cargoSerialized: Buffer): Promise<CargoMessageSet> {
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    const { payload } = await cargo.unwrapPayload(pdaChain.privateGatewayPrivateKey);
+    const { payload } = await cargo.unwrapPayload(privateGatewaySessionPrivateKey);
     return payload;
   }
 });

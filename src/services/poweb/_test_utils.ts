@@ -1,19 +1,28 @@
 import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import { arrayToAsyncIterable, mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
+import {
+  arrayToAsyncIterable,
+  mockSpy,
+  MONGO_ENV_VARS,
+  PdaChain,
+  setUpTestDBConnection,
+} from '../../_test_utils';
 import * as vault from '../../backingServices/vault';
+import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { Config, ConfigKey } from '../../utilities/config';
 import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
 
 export interface FixtureSet extends PdaChain {
-  readonly mongooseConnection: Connection;
+  readonly getMongooseConnection: () => Connection;
   readonly parcelStore: ParcelStore;
+  readonly privateKeyStore: MockPrivateKeyStore;
 }
 
 export function setUpCommonFixtures(): () => FixtureSet {
-  const mockMongooseConnection: Connection = { whatIsThis: 'The Mongoose connection' } as any;
-  mockFastifyMongoose({ db: mockMongooseConnection });
+  const getMongooseConnection = setUpTestDBConnection();
+  mockFastifyMongoose(() => ({ db: getMongooseConnection() }));
 
   const mockParcelStore: ParcelStore = {
     liveStreamActiveParcelsForGateway: mockSpy(
@@ -44,26 +53,35 @@ export function setUpCommonFixtures(): () => FixtureSet {
   let mockPrivateKeyStore: MockPrivateKeyStore;
   beforeEach(async () => {
     mockPrivateKeyStore = new MockPrivateKeyStore();
-    await mockPrivateKeyStore.registerNodeKey(
-      certificatePath.publicGatewayPrivateKey,
-      certificatePath.publicGatewayCert,
-    );
+    await mockPrivateKeyStore.saveIdentityKey(certificatePath.publicGatewayPrivateKey);
   });
   mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
+  beforeEach(async () => {
+    const connection = getMongooseConnection();
+
+    const certificateStore = new MongoCertificateStore(connection);
+    await certificateStore.save(certificatePath.publicGatewayCert);
+
+    const config = new Config(connection);
+    await config.set(
+      ConfigKey.CURRENT_PRIVATE_ADDRESS,
+      await certificatePath.publicGatewayCert.calculateSubjectPrivateAddress(),
+    );
+  });
+
   const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
   beforeEach(() => {
-    const gatewayCertificate = certificatePath.publicGatewayCert;
     mockEnvVars({
       ...MONGO_ENV_VARS,
-      GATEWAY_KEY_ID: gatewayCertificate.getSerialNumber().toString('base64'),
       GATEWAY_VERSION: '1.0.2',
     });
   });
 
   return () => ({
-    mongooseConnection: mockMongooseConnection,
+    getMongooseConnection,
     parcelStore: mockParcelStore,
+    privateKeyStore: mockPrivateKeyStore,
     ...certificatePath,
   });
 }

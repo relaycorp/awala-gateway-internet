@@ -1,5 +1,4 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   Cargo,
   CargoMessageSet,
@@ -7,15 +6,16 @@ import {
   issueDeliveryAuthorization,
   Parcel,
   ParcelCollectionAck,
+  PublicNodeConnectionParams,
   ServiceMessage,
   SessionEnvelopedData,
-  SessionlessEnvelopedData,
+  SessionKey,
   Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
+import { get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
@@ -32,24 +32,25 @@ import {
   GW_POWEB_LOCAL_PORT,
   GW_PUBLIC_ADDRESS_URL,
   PONG_ENDPOINT_ADDRESS,
+  PONG_ENDPOINT_LOCAL_URL,
 } from './services';
-import { generatePdaChain, IS_GITHUB, sleep } from './utils';
+import { createAndRegisterPrivateGateway, IS_GITHUB, sleep } from './utils';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
-  const gwPDAChain = await generatePdaChain();
+  const { pdaChain } = await createAndRegisterPrivateGateway();
   const privateGatewaySigner = new Signer(
-    gwPDAChain.privateGatewayCert,
-    gwPDAChain.privateGatewayPrivateKey,
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
   );
 
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
   const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
-    pongEndpointSessionCertificate.identityCert,
-    pongEndpointSessionCertificate.sessionCert,
-    gwPDAChain,
+    pongEndpointSessionCertificate.identityPublicKey,
+    pongEndpointSessionCertificate.sessionKey,
+    pdaChain,
   );
 
   // Deliver the ping message
@@ -76,13 +77,13 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
 
 test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
-  const pdaChain = await generatePdaChain();
+  const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
 
   const pingId = uuid();
   const pingParcelData = await makePingParcel(
     pingId,
-    pongEndpointSessionCertificate.identityCert,
-    pongEndpointSessionCertificate.sessionCert,
+    pongEndpointSessionCertificate.identityPublicKey,
+    pongEndpointSessionCertificate.sessionKey,
     pdaChain,
   );
 
@@ -92,6 +93,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     const cargoSerialized = await encapsulateParcelsInCargo(
       [pingParcelData.parcelSerialized],
       pdaChain,
+      publicGatewaySessionKey,
     );
     await asyncIterableToArray(
       cogRPCClient.deliverCargo(
@@ -103,15 +105,19 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
 
     // Collect the pong message encapsulated in a cargo
     const cdaChain = await generateCDAChain(pdaChain);
-    const ccaSerialized = await generateCCA(
+    const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
       cdaChain,
-      pdaChain.publicGatewayCert,
+      publicGatewaySessionKey,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
     expect(collectedCargoes).toHaveLength(1);
-    const collectedMessages = await extractMessagesFromCargo(collectedCargoes[0], pdaChain);
+    const collectedMessages = await extractMessagesFromCargo(
+      collectedCargoes[0],
+      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      sessionPrivateKey,
+    );
     expect(collectedMessages).toHaveLength(2);
     expect(ParcelCollectionAck.deserialize(collectedMessages[0])).toHaveProperty(
       'parcelId',
@@ -126,29 +132,43 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
 });
 
 async function getPongEndpointKeyPairs(): Promise<{
-  readonly sessionCert: Certificate;
-  readonly identityCert: Certificate;
+  readonly identityPublicKey: CryptoKey;
+  readonly sessionKey: SessionKey;
 }> {
-  const VAULT_URL = getEnvVar('VAULT_URL').required().asString();
-  const VAULT_TOKEN = getEnvVar('VAULT_TOKEN').required().asString();
-  const pongKeyStore = new VaultPrivateKeyStore(VAULT_URL, VAULT_TOKEN, 'pong-keys');
-
-  const pongKeyId = base64DecodeEnvVar('PONG_ENDPOINT_KEY_ID');
-  const identityCert = (await pongKeyStore.fetchNodeKey(pongKeyId)).certificate;
-  const pongSessionKeyId = base64DecodeEnvVar('PONG_SESSION_ENDPOINT_KEY_ID');
-  const sessionCert = (await pongKeyStore.fetchInitialSessionKey(pongSessionKeyId)).certificate;
-  return { sessionCert, identityCert };
+  const connectionParamsSerialization = await downloadFileFromURL(
+    `${PONG_ENDPOINT_LOCAL_URL}/connection-params.der`,
+  );
+  const connectionParams = await PublicNodeConnectionParams.deserialize(
+    bufferToArray(connectionParamsSerialization),
+  );
+  return {
+    identityPublicKey: connectionParams.identityKey,
+    sessionKey: connectionParams.sessionKey,
+  };
 }
 
-function base64DecodeEnvVar(envVarName: string): Buffer {
-  const pongKeyIdBase64 = getEnvVar(envVarName).required().asString();
-  return Buffer.from(pongKeyIdBase64, 'base64');
+async function downloadFileFromURL(url: string): Promise<Buffer> {
+  // tslint:disable-next-line:readonly-array
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    httpGet(url, { timeout: 2_000 }, (response) => {
+      if (response.statusCode !== 200) {
+        return reject(new Error(`Failed to download ${url} (HTTP ${response.statusCode})`));
+      }
+
+      response.on('error', reject);
+
+      response.on('data', (chunk) => chunks.push(chunk));
+
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+  });
 }
 
 async function makePingParcel(
   pingId: string,
-  recipientIdentityCert: Certificate,
-  recipientSessionCert: Certificate,
+  recipientIdentityPublicKey: CryptoKey,
+  recipientSessionKey: SessionKey,
   gwPDAChain: ExternalPdaChain,
 ): Promise<{
   readonly parcelId: string;
@@ -158,7 +178,7 @@ async function makePingParcel(
   const pongEndpointPda = await issueDeliveryAuthorization({
     issuerCertificate: gwPDAChain.peerEndpointCert,
     issuerPrivateKey: gwPDAChain.peerEndpointPrivateKey,
-    subjectPublicKey: await recipientIdentityCert.getPublicKey(),
+    subjectPublicKey: await recipientIdentityPublicKey,
     validityEndDate: gwPDAChain.peerEndpointCert.expiryDate,
   });
   const pingSerialized = serializePing(pingId, pongEndpointPda, [
@@ -169,7 +189,7 @@ async function makePingParcel(
   const serviceMessage = new ServiceMessage('application/vnd.awala.ping-v1.ping', pingSerialized);
   const pingEncryption = await SessionEnvelopedData.encrypt(
     serviceMessage.serialize(),
-    recipientSessionCert,
+    recipientSessionKey,
   );
   const parcel = new Parcel(
     PONG_ENDPOINT_ADDRESS,
@@ -207,30 +227,28 @@ function serializeCertificate(certificate: Certificate): string {
 async function encapsulateParcelsInCargo(
   parcels: readonly ArrayBuffer[],
   gwPDAChain: ExternalPdaChain,
+  publicGatewaySessionKey: SessionKey,
 ): Promise<Buffer> {
   const messageSet = new CargoMessageSet(parcels);
-  const messageSetCiphertext = await SessionlessEnvelopedData.encrypt(
+  const { envelopedData } = await SessionEnvelopedData.encrypt(
     messageSet.serialize(),
-    gwPDAChain.publicGatewayCert,
+    publicGatewaySessionKey,
   );
   const cargo = new Cargo(
     GW_PUBLIC_ADDRESS_URL,
     gwPDAChain.privateGatewayCert,
-    Buffer.from(messageSetCiphertext.serialize()),
+    Buffer.from(envelopedData.serialize()),
   );
   return Buffer.from(await cargo.serialize(gwPDAChain.privateGatewayPrivateKey));
 }
 
 async function extractMessagesFromCargo(
   cargoSerialized: Buffer,
-  gwPDAChain: ExternalPdaChain,
+  recipientPrivateAddress: string,
+  recipientSessionPrivateKey: CryptoKey,
 ): Promise<readonly ArrayBuffer[]> {
   const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-  expect(cargo.recipientAddress).toEqual(
-    await gwPDAChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-  );
-  const { payload: cargoMessageSet } = await cargo.unwrapPayload(
-    gwPDAChain.privateGatewayPrivateKey,
-  );
+  expect(cargo.recipientAddress).toEqual(recipientPrivateAddress);
+  const { payload: cargoMessageSet } = await cargo.unwrapPayload(recipientSessionPrivateKey);
   return Array.from(cargoMessageSet.messages);
 }

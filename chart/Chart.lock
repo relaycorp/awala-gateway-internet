@@ -16,9 +16,9 @@ dependencies:
   version: 0.7.2
 - name: relaynet-pong
   repository: https://h.cfcr.io/relaycorp/public
-  version: 2.7.3
+  version: 2.10.10
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 12.0.0
-digest: sha256:533233bda451a1f2961af128146b133faf65bd4ed7ecc2ea1fd697314f0c7e4d
-generated: "2021-03-21T22:16:46.455221611Z"
+digest: sha256:e073fde908e7cd81738fd5a3ee669ace853c2b4b9c93df82316e16fe13cf9aca
+generated: "2021-11-15T16:29:38.61066166Z"

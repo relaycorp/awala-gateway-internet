@@ -2,7 +2,7 @@ import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
 import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
-import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { configureMockEnvVars } from '../services/_test_utils';
 import {
   createMongooseConnectionFromEnv,
@@ -10,7 +10,7 @@ import {
   initMongoDBKeyStore,
 } from './mongo';
 
-const MOCK_MONGOOSE_CONNECTION = { what: 'The connection' };
+const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
 const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
   jest.spyOn(mongoose, 'createConnection'),
   jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
@@ -125,10 +125,8 @@ describe('createMongooseConnectionFromEnv', () => {
 });
 
 describe('initMongoDBKeyStore', () => {
-  const mongooseConnection = { model: { bind: jest.fn() } } as any as Connection;
-
   test('MongoPublicKeyStore instance should be returned', () => {
-    const keyStore = initMongoDBKeyStore(mongooseConnection);
+    const keyStore = initMongoDBKeyStore(MOCK_MONGOOSE_CONNECTION);
 
     expect(keyStore).toBeInstanceOf(MongoPublicKeyStore);
   });

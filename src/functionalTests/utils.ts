@@ -1,12 +1,11 @@
 import { initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
 import {
-  Certificate,
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   PrivateNodeRegistration,
   PrivateNodeRegistrationRequest,
-  UnboundKeyPair,
+  SessionKey,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { get as getEnvVar } from 'env-var';
@@ -14,7 +13,6 @@ import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../_test_utils';
-import { initVaultKeyStore } from '../backingServices/vault';
 import { GW_POWEB_LOCAL_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
@@ -46,25 +44,17 @@ export function connectToNatsStreaming(): Promise<Stan> {
   });
 }
 
-async function getPublicGatewayKeyPair(): Promise<UnboundKeyPair> {
-  const privateKeyStore = initVaultKeyStore();
-  const publicGatewayKeyId = Buffer.from(
-    getEnvVar('GATEWAY_KEY_ID').required().asString(),
-    'base64',
-  );
-  return privateKeyStore.fetchNodeKey(publicGatewayKeyId);
+export interface PrivateGatewayRegistration {
+  readonly pdaChain: ExternalPdaChain;
+  readonly publicGatewaySessionKey: SessionKey;
 }
 
-export async function getPublicGatewayCertificate(): Promise<Certificate> {
-  const keyPair = await getPublicGatewayKeyPair();
-  return keyPair.certificate;
-}
-
-export async function generatePdaChain(): Promise<ExternalPdaChain> {
+export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayRegistration> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const {
     privateNodeCertificate: privateGatewayCertificate,
     gatewayCertificate: publicGatewayCert,
+    sessionKey: publicGatewaySessionKey,
   } = await registerPrivateGateway(
     privateGatewayKeyPair,
     PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
@@ -86,7 +76,7 @@ export async function generatePdaChain(): Promise<ExternalPdaChain> {
     validityEndDate: peerEndpointCertificate.expiryDate,
   });
 
-  return {
+  const pdaChain = {
     pdaCert: pda,
     pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
     peerEndpointCert: peerEndpointCertificate,
@@ -95,6 +85,7 @@ export async function generatePdaChain(): Promise<ExternalPdaChain> {
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
     publicGatewayCert,
   };
+  return { pdaChain, publicGatewaySessionKey: publicGatewaySessionKey!! };
 }
 
 export async function registerPrivateGateway(

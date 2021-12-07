@@ -6,7 +6,7 @@ import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
   CargoMessageStream,
-  Gateway,
+  GatewayManager,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
@@ -14,7 +14,7 @@ import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
-import { createMongooseConnectionFromEnv, initMongoDBKeyStore } from '../../backingServices/mongo';
+import { initMongoDBKeyStore } from '../../backingServices/mongo';
 import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
 import { initVaultKeyStore } from '../../backingServices/vault';
@@ -22,6 +22,7 @@ import { recordCCAFulfillment, wasCCAFulfilled } from '../../ccaFulfilments';
 import { retrieveOwnCertificates } from '../../certs';
 import { generatePCAs } from '../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../parcelStore';
+import { Config, ConfigKey } from '../../utilities/config';
 
 const INTERNAL_SERVER_ERROR = {
   code: grpc.status.UNAVAILABLE,
@@ -30,7 +31,7 @@ const INTERNAL_SERVER_ERROR = {
 
 export interface ServiceImplementationOptions {
   readonly baseLogger: Logger;
-  readonly gatewayKeyIdBase64: string;
+  readonly getMongooseConnection: () => Promise<Connection>;
   readonly parcelStoreBucket: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
@@ -43,11 +44,9 @@ export async function makeServiceImplementation(
   const objectStoreClient = initObjectStoreFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
-  const currentKeyId = Buffer.from(options.gatewayKeyIdBase64, 'base64');
-
   const vaultKeyStore = initVaultKeyStore();
 
-  const mongooseConnection = await createMongooseConnectionFromEnv();
+  const mongooseConnection = await options.getMongooseConnection();
   mongooseConnection.on('error', (err) =>
     options.baseLogger.error({ err }, 'Mongoose connection error'),
   );
@@ -79,7 +78,6 @@ export async function makeServiceImplementation(
         call,
         mongooseConnection,
         options.publicAddress,
-        currentKeyId,
         parcelStore,
         vaultKeyStore,
         logger,
@@ -149,7 +147,6 @@ async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongooseConnection: Connection,
   ownPublicAddress: string,
-  currentKeyId: Buffer,
   parcelStore: ParcelStore,
   vaultKeyStore: VaultPrivateKeyStore,
   logger: Logger,
@@ -198,7 +195,7 @@ async function collectCargo(
   }
 
   const publicKeyStore = initMongoDBKeyStore(mongooseConnection);
-  const gateway = new Gateway(vaultKeyStore, publicKeyStore);
+  const gateway = new GatewayManager(vaultKeyStore, publicKeyStore);
 
   let ccr: CargoCollectionRequest;
   try {
@@ -224,10 +221,12 @@ async function collectCargo(
   let cargoesCollected = 0;
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    const { privateKey } = await vaultKeyStore.fetchNodeKey(currentKeyId);
+    const config = new Config(mongooseConnection);
+    const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+    const privateKey = await vaultKeyStore.retrieveIdentityKey(privateAddress!!);
     yield* await gateway.generateCargoes(
       messages,
-      cca.senderCertificate,
+      await cca.senderCertificate.calculateSubjectPrivateAddress(),
       privateKey,
       ccr.cargoDeliveryAuthorization,
     );

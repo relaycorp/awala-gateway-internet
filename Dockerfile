@@ -1,11 +1,11 @@
-FROM node:14.17.5 as build
+FROM node:14.18.2 as build
 WORKDIR /tmp/gw
 COPY package*.json ./
 RUN npm install
 COPY . ./
 RUN npm run build && npm prune --production && rm -r src
 
-FROM node:14.17.5-slim
+FROM node:14.18.2-slim
 WORKDIR /opt/gw
 COPY --from=build /tmp/gw ./
 USER node

@@ -47,7 +47,7 @@ jobs:
         env:
           # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
           ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
-        timeout-minutes: 7
+        timeout-minutes: 8
       - name: Start port-forwarding
         run: |
           # Ugly workaround for https://github.com/GoogleContainerTools/skaffold/issues/4022

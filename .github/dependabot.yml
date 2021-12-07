@@ -8,6 +8,9 @@ updates:
     timezone: Etc/UCT
   open-pull-requests-limit: 99
   versioning-strategy: increase
+  commit-message:
+    prefix: fix
+    prefix-development: chore
 - package-ecosystem: bundler
   directory: "/docs"
   schedule:

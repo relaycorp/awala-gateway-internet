@@ -18,7 +18,6 @@ spec:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
         {{- end }}
         global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
-        generated-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "generated-cm.yml") .) }}
         mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
         global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
       labels:
@@ -50,8 +49,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
-            - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-generated
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
             - secretRef:

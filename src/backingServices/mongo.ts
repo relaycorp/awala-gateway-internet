@@ -1,7 +1,8 @@
 import { PublicKeyStore } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { Connection, ConnectionOptions, createConnection } from 'mongoose';
-import { MongoPublicKeyStore } from '../MongoPublicKeyStore';
+
+import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 
 export function getMongooseConnectionArgsFromEnv(): {
   readonly uri: string;
@@ -15,6 +16,7 @@ export function getMongooseConnectionArgsFromEnv(): {
     options: {
       dbName: mongoDb,
       pass: mongoPassword,
+      useCreateIndex: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
       user: mongoUser,
@@ -29,7 +31,7 @@ export async function createMongooseConnectionFromEnv(): Promise<Connection> {
 }
 
 /**
- * Return the public key store used by the gateway.
+ * Return the public key store.
  *
  * @param connection
  *

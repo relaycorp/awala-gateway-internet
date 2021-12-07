@@ -5,6 +5,7 @@ import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
 import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
+import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
@@ -37,7 +38,6 @@ const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSel
 const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
 
 const BASE_ENV_VARS = {
-  GATEWAY_KEY_ID: 'base64-encoded key id',
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
   OBJECT_STORE_BUCKET: 'bucket-name',
@@ -58,7 +58,6 @@ describe('runServer', () => {
   });
 
   test.each([
-    'GATEWAY_KEY_ID',
     'NATS_SERVER_URL',
     'NATS_CLUSTER_ID',
     'OBJECT_STORE_BUCKET',
@@ -129,7 +128,7 @@ describe('runServer', () => {
         debug: expect.anything(),
         error: expect.anything(),
       }),
-      gatewayKeyIdBase64: BASE_ENV_VARS.GATEWAY_KEY_ID,
+      getMongooseConnection: createMongooseConnectionFromEnv,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
       parcelStoreBucket: BASE_ENV_VARS.OBJECT_STORE_BUCKET,

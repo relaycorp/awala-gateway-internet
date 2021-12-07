@@ -12,3 +12,6 @@ docs/vendor
 
 chart/charts
 chart/tmpcharts
+
+# Work around https://github.com/shelfio/jest-mongodb/issues/214
+/globalConfig.json

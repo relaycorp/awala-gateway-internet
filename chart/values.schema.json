@@ -73,9 +73,6 @@
         }
       }
     },
-    "gatewayKeyId": {
-      "type": "string"
-    },
     "proxyRequestIdHeader": {
       "type": "string"
     },

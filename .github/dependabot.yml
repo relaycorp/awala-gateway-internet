@@ -4,15 +4,14 @@ updates:
   directory: "/"
   schedule:
     interval: weekly
+    time: "08:00"
+    timezone: Etc/UCT
+  open-pull-requests-limit: 99
   versioning-strategy: increase
 - package-ecosystem: bundler
   directory: "/docs"
   schedule:
     interval: weekly
-- package-ecosystem: docker
-  directory: "/"
-  schedule:
-    interval: weekly
-  ignore:
-    - dependency-name: "*"
-      update-types: ["version-update:semver-major"]
+    time: "08:00"
+    timezone: Etc/UCT
+  open-pull-requests-limit: 99

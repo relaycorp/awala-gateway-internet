@@ -6,7 +6,5 @@ on:
       - synchronize
 
 jobs:
-  common:
-    uses: relaycorp/shared-workflows/.github/workflows/prs.yml@main
-    secrets:
-      dependabotPAT: ${{ secrets.IRELAYBOT_PAT_PR_AUTOMATION }}
+  pr-ci:
+    uses: relaycorp/shared-workflows/.github/workflows/pr-ci.yml@main

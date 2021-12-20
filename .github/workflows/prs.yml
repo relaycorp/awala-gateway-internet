@@ -1,6 +1,6 @@
- name: Process PRs
- 
- on:
+name: Process PRs
+
+on:
   pull_request:
     types:
       - opened

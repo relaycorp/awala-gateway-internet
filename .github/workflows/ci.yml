@@ -76,10 +76,8 @@ jobs:
 
       # Export Docker image so it can be published
       - name: Export Docker image
-        if: github.ref == 'refs/heads/master'
         run: docker save -o /tmp/docker-image public-gateway:latest
       - name: Upload Docker image
-        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v2
         with:
           name: docker-image

@@ -24,7 +24,6 @@
     "@relaycorp/relaynet-poweb": "^1.6.7",
     "@relaycorp/shared-config": "^1.6.0",
     "@relaycorp/ws-mock": "^4.2.0",
-    "@semantic-release/exec": "^5.0.0",
     "@shelf/jest-mongodb": "^2.1.1",
     "@types/jest": "^26.0.24",
     "@types/mongoose": "^5.10.5",

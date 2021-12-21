@@ -79,7 +79,7 @@
     "buffer-to-arraybuffer": "0.0.6",
     "date-fns": "^2.27.0",
     "env-var": "^7.1.1",
-    "fastify": "^3.24.1",
+    "fastify": "^3.25.1",
     "fastify-mongoose": "^0.3.0",
     "grpc-js-health-check": "^1.0.2",
     "it-pipe": "^1.1.0",

@@ -20,7 +20,7 @@ dependencies:
     tags: [gwDev]
     repository: https://helm.min.io
   - name: vault
-    version: 0.8.0
+    version: 0.9.1
     tags: [gwDev]
     repository: https://helm.releases.hashicorp.com
   - name: mongodb

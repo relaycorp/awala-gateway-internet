@@ -27,7 +27,7 @@
     "@shelf/jest-mongodb": "^2.2.0",
     "@types/jest": "^26.0.24",
     "@types/mongoose": "^5.10.5",
-    "@types/pino": "^6.3.11",
+    "@types/pino": "^7.0.5",
     "@types/pkijs": "^0.0.12",
     "@types/split2": "^3.2.1",
     "@types/verror": "^1.10.5",

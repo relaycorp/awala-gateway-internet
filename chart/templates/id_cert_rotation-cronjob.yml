@@ -6,6 +6,8 @@ metadata:
     {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
 spec:
   schedule: "*/1 * * * *"
+  startingDeadlineSeconds: 3600
+  concurrencyPolicy: Forbid
   jobTemplate:
     metadata:
       annotations:

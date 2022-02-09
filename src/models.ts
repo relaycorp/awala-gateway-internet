@@ -12,14 +12,6 @@ export class ConfigItem {
   public value!: string;
 }
 
-/**
- * @deprecated Use [Certificate] instead
- */
-export class OwnCertificate {
-  @prop({ required: true })
-  public serializationDer!: Buffer;
-}
-
 @index({ subjectPrivateAddress: 1 })
 export class Certificate {
   @prop({ required: true })

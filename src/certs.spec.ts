@@ -1,12 +1,15 @@
 import {
   Certificate,
+  derSerializePublicKey,
   generateRSAKeyPair,
   getPrivateAddressFromIdentityKey,
   issueGatewayCertificate,
+  MockPrivateKeyStore,
 } from '@relaycorp/relaynet-core';
-import { addDays, addMinutes, subSeconds } from 'date-fns';
+import { addDays, addMinutes, addSeconds, subSeconds } from 'date-fns';
 
-import { setUpTestDBConnection } from './_test_utils';
+import { mockSpy, setUpTestDBConnection } from './_test_utils';
+import * as vault from './backingServices/vault';
 import { retrieveOwnCertificates, rotateCertificate } from './certs';
 import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import { Config, ConfigKey } from './utilities/config';
@@ -74,33 +77,44 @@ describe('retrieveOwnCertificates', () => {
 });
 
 describe('rotateCertificate', () => {
+  const mockPrivateKeyStore = new MockPrivateKeyStore();
+  beforeEach(async () => {
+    await mockPrivateKeyStore.saveIdentityKey(identityKeyPair.privateKey);
+  });
+  afterEach(() => {
+    mockPrivateKeyStore.clear();
+  });
+  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+
   test('New certificate should be created if there are none', async () => {
-    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.toHaveLength(0);
+    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.toBeNull();
 
     await rotateCertificate(getMongooseConnection());
 
-    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.toHaveLength(1);
+    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.not.toBeNull();
   });
 
-  test('New certificate should be created if latest expires in 180 days', async () => {
+  test('New certificate should be created if latest expires in less than 180 days', async () => {
+    const cutoffDate = addDays(new Date(), 180);
     const certificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
-      validityEndDate: addDays(new Date(), 180),
+      validityEndDate: subSeconds(cutoffDate, 1),
     });
     await certificateStore.save(certificate);
 
     await rotateCertificate(getMongooseConnection());
 
     const newCertificate = await certificateStore.retrieveLatest(privateAddress);
-    expect(newCertificate!.expiryDate).toBeAfter(addDays(new Date(), 181));
+    expect(certificate.isEqual(newCertificate!!)).toBeFalse();
   });
 
   test('New certificate should not be created if latest expires in over 180 days', async () => {
+    const cutoffDate = addDays(new Date(), 180);
     const certificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
-      validityEndDate: addDays(new Date(), 181),
+      validityEndDate: addSeconds(cutoffDate, 1),
     });
     await certificateStore.save(certificate);
 
@@ -121,7 +135,9 @@ describe('rotateCertificate', () => {
     await rotateCertificate(getMongooseConnection());
 
     const certificate = await certificateStore.retrieveLatest(privateAddress);
-    await expect(certificate!.calculateSubjectPrivateAddress()).resolves.toEqual(privateAddress);
+    await expect(derSerializePublicKey(await certificate!.getPublicKey())).resolves.toEqual(
+      await derSerializePublicKey(identityKeyPair.publicKey),
+    );
   });
 
   test('New certificate should expire in 360 days', async () => {
@@ -130,6 +146,6 @@ describe('rotateCertificate', () => {
     const certificate = await certificateStore.retrieveLatest(privateAddress);
     const expectedExpiryDate = addDays(new Date(), 360);
     expect(certificate!.expiryDate).toBeBeforeOrEqualTo(expectedExpiryDate);
-    expect(certificate!.expiryDate).toBeAfter(subSeconds(expectedExpiryDate, 10));
+    expect(certificate!.expiryDate).toBeAfter(subSeconds(expectedExpiryDate, 5));
   });
 });

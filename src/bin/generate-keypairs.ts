@@ -4,6 +4,7 @@ import { Connection } from 'mongoose';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { initVaultKeyStore } from '../backingServices/vault';
+import { CERTIFICATE_TTL_DAYS } from '../certs';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { Config, ConfigKey } from '../utilities/config';
 import { configureExitHandling } from '../utilities/exitHandling';
@@ -11,8 +12,6 @@ import { makeLogger } from '../utilities/logging';
 
 const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
-
-const NODE_CERTIFICATE_TTL_DAYS = 360;
 
 const privateKeyStore = initVaultKeyStore();
 
@@ -45,7 +44,7 @@ async function generateKeyPair(
   const gatewayCertificate = await issueGatewayCertificate({
     issuerPrivateKey: gatewayKeyPair.privateKey,
     subjectPublicKey: gatewayKeyPair.publicKey,
-    validityEndDate: addDays(new Date(), NODE_CERTIFICATE_TTL_DAYS),
+    validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
   });
   await certificateStore.save(gatewayCertificate);
 

@@ -8,6 +8,7 @@ import {
   SessionKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { initVaultKeyStore } from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
@@ -26,7 +27,7 @@ const ENDPOINT_URL = '/v1/nodes';
  */
 const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
 
-const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 1;
+const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_DAYS = 180;
 
 export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
@@ -124,10 +125,7 @@ async function issuePrivateGatewayCertificate(
   validityStartDate.setHours(
     validityStartDate.getHours() - PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS,
   );
-  const validityEndDate = new Date();
-  validityEndDate.setFullYear(
-    validityEndDate.getFullYear() + PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS,
-  );
+  const validityEndDate = addDays(new Date(), PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_DAYS);
   return issueGatewayCertificate({
     issuerCertificate: publicGatewayCertificate,
     issuerPrivateKey: publicGatewayPrivateKey,

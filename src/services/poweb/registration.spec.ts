@@ -7,6 +7,7 @@ import {
   SessionPrivateKeyData,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest from 'light-my-request';
 
@@ -166,7 +167,7 @@ describe('Successful registration', () => {
     );
   });
 
-  test('Private gateway certificate should be valid for 1 year', async () => {
+  test('Private gateway certificate should be valid for 180 days', async () => {
     const fixtures = getFixtures();
 
     const response = await completeRegistration(fixtures);
@@ -174,8 +175,7 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    const expectedExpiryDate = new Date();
-    expectedExpiryDate.setFullYear(expectedExpiryDate.getFullYear() + 1);
+    const expectedExpiryDate = addDays(new Date(), 180);
     expect(registration.privateNodeCertificate.expiryDate.getTime()).toBeWithin(
       expectedExpiryDate.getTime() - 3_000,
       expectedExpiryDate.getTime(),

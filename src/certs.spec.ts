@@ -118,10 +118,18 @@ describe('rotateCertificate', () => {
     });
     await certificateStore.save(certificate);
 
-    await rotateCertificate(getMongooseConnection());
+    await expect(rotateCertificate(getMongooseConnection())).resolves.toBeNull();
 
     const newCertificate = await certificateStore.retrieveLatest(privateAddress);
     expect(certificate.isEqual(newCertificate!!)).toBeTrue();
+  });
+
+  test('New certificate should be output', async () => {
+    const newCertificate = await rotateCertificate(getMongooseConnection());
+
+    const latestCertificate = await certificateStore.retrieveLatest(privateAddress);
+
+    expect(newCertificate!.isEqual(latestCertificate!!)).toBeTrue();
   });
 
   test('New certificate should be self-issued', async () => {

@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
 spec:
-  schedule: "*/1 * * * *"
+  schedule: "0 8 * * *"
   startingDeadlineSeconds: 3600
   concurrencyPolicy: Forbid
   jobTemplate:
@@ -34,7 +34,7 @@ spec:
               image: {{ include "relaynet-internet-gateway.image" . }}
               imagePullPolicy: IfNotPresent
               args:
-                - build/main/bin/generate-keypairs.js
+                - build/main/bin/rotate-id-certificate.js
               envFrom:
                 - configMapRef:
                     name: {{ include "relaynet-internet-gateway.fullname" . }}

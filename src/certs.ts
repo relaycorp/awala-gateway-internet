@@ -23,7 +23,7 @@ export async function retrieveOwnCertificates(
   return store.retrieveAll(privateAddress!!);
 }
 
-export async function rotateCertificate(connection: Connection): Promise<void> {
+export async function rotateCertificate(connection: Connection): Promise<Certificate | null> {
   const store = new MongoCertificateStore(connection);
   const config = new Config(connection);
 
@@ -33,7 +33,7 @@ export async function rotateCertificate(connection: Connection): Promise<void> {
 
   const minExpiryDate = addDays(new Date(), MIN_CERTIFICATE_TTL_DAYS);
   if (latestCertificate && minExpiryDate < latestCertificate.expiryDate) {
-    return;
+    return null;
   }
 
   const privateKeyStore = initVaultKeyStore();
@@ -44,4 +44,6 @@ export async function rotateCertificate(connection: Connection): Promise<void> {
     validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
   });
   await store.save(newCertificate);
+
+  return newCertificate;
 }

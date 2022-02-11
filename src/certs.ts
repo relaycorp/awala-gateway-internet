@@ -1,4 +1,8 @@
-import { Certificate, issueGatewayCertificate } from '@relaycorp/relaynet-core';
+import {
+  Certificate,
+  getRSAPublicKeyFromPrivate,
+  issueGatewayCertificate,
+} from '@relaycorp/relaynet-core';
 import { addDays } from 'date-fns';
 import { Connection } from 'mongoose';
 import { initVaultKeyStore } from './backingServices/vault';
@@ -36,7 +40,7 @@ export async function rotateCertificate(connection: Connection): Promise<Certifi
   const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
   const newCertificate = await issueGatewayCertificate({
     issuerPrivateKey: privateKey,
-    subjectPublicKey: privateKey,
+    subjectPublicKey: await getRSAPublicKeyFromPrivate(privateKey),
     validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
   });
   await store.save(newCertificate);

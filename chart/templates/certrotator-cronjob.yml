@@ -1,0 +1,46 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-certrotator
+  labels:
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+spec:
+  schedule: "*/1 * * * *"
+  startingDeadlineSeconds: 3600
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      annotations:
+        {{- if .Values.podAnnotations }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- end }}
+        global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
+        mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
+        global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
+      labels:
+        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "certrotator") .) | nindent 8 }}
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          shareProcessNamespace: true
+          restartPolicy: OnFailure
+          containers:
+            - name: keygen
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: {{ include "relaynet-internet-gateway.image" . }}
+              imagePullPolicy: IfNotPresent
+              args:
+                - build/main/bin/generate-keypairs.js
+              envFrom:
+                - configMapRef:
+                    name: {{ include "relaynet-internet-gateway.fullname" . }}
+                - configMapRef:
+                    name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
+                - secretRef:
+                    name: {{ include "relaynet-internet-gateway.fullname" . }}
+              resources:
+                {{- toYaml .Values.crcQueue.resources | nindent 16 }}

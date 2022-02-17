@@ -6,12 +6,16 @@ const LOGGER = makeLogger();
 
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();
-  const newCertificate = await rotateCertificate(connection);
+  try {
+    const newCertificate = await rotateCertificate(connection);
 
-  if (newCertificate) {
-    LOGGER.info({ expiryDate: newCertificate.expiryDate }, 'Created new certificate');
-  } else {
-    LOGGER.debug('Existing certificate need not be rotated');
+    if (newCertificate) {
+      LOGGER.info({ expiryDate: newCertificate.expiryDate }, 'Created new certificate');
+    } else {
+      LOGGER.debug('Existing certificate need not be rotated');
+    }
+  } finally {
+    await connection.close();
   }
 }
 

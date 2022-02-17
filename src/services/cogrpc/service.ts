@@ -1,19 +1,13 @@
-import * as grpc from '@grpc/grpc-js';
+import { ServerDuplexStream } from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
-import { Cargo } from '@relaycorp/relaynet-core';
-import bufferToArray from 'buffer-to-arraybuffer';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
-import uuid from 'uuid-random';
 
-import { NatsStreamingClient, PublisherMessage } from '../../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
 import { initVaultKeyStore } from '../../backingServices/vault';
-import { retrieveOwnCertificates } from '../../certs';
 import { ParcelStore } from '../../parcelStore';
-import { INTERNAL_SERVER_ERROR } from './grpcUtils';
 import collectCargo from './methods/collectCargo';
+import deliverCargo from './methods/deliverCargo';
 
 export interface ServiceImplementationOptions {
   readonly baseLogger: Logger;
@@ -38,24 +32,16 @@ export async function makeServiceImplementation(
   );
 
   return {
-    async deliverCargo(
-      call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
-    ): Promise<void> {
-      const logger = options.baseLogger.child({
-        grpcClient: call.getPeer(),
-        grpcMethod: 'deliverCargo',
-      });
+    async deliverCargo(call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>): Promise<void> {
       await deliverCargo(
         call,
         mongooseConnection,
         options.natsServerUrl,
         options.natsClusterId,
-        logger,
+        options.baseLogger,
       );
     },
-    async collectCargo(
-      call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
-    ): Promise<void> {
+    async collectCargo(call: ServerDuplexStream<CargoDeliveryAck, CargoDelivery>): Promise<void> {
       await collectCargo(
         call,
         mongooseConnection,
@@ -66,61 +52,4 @@ export async function makeServiceImplementation(
       );
     },
   };
-}
-
-async function deliverCargo(
-  call: grpc.ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
-  mongooseConnection: Connection,
-  natsServerUrl: string,
-  natsClusterId: string,
-  logger: Logger,
-): Promise<void> {
-  const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
-
-  const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
-  const natsPublisher = natsClient.makePublisher('crc-cargo');
-
-  let cargoesDelivered = 0;
-
-  async function* validateDelivery(
-    source: AsyncIterable<CargoDelivery>,
-  ): AsyncIterable<PublisherMessage> {
-    for await (const delivery of source) {
-      let peerGatewayAddress: string | null = null;
-      let cargoId: string | null = null;
-      try {
-        const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
-        cargoId = cargo.id;
-        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
-        await cargo.validate(undefined, trustedCerts);
-      } catch (err) {
-        // Acknowledge that we got it, not that it was accepted and stored. See:
-        // https://github.com/relaynet/specs/issues/38
-        logger.info({ err, peerGatewayAddress }, 'Ignoring malformed/invalid cargo');
-        call.write({ id: delivery.id });
-        continue;
-      }
-
-      logger.info({ cargoId, peerGatewayAddress }, 'Processing valid cargo');
-      cargoesDelivered += 1;
-      yield { id: delivery.id, data: delivery.cargo };
-    }
-  }
-
-  async function ackDelivery(source: AsyncIterable<string>): Promise<void> {
-    for await (const deliveryId of source) {
-      call.write({ id: deliveryId });
-    }
-  }
-
-  try {
-    await pipe(call, validateDelivery, natsPublisher, ackDelivery);
-  } catch (err) {
-    logger.error({ err }, 'Failed to store cargo');
-    call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
-    return;
-  }
-
-  call.end();
-  logger.info({ cargoesDelivered }, 'Cargo delivery completed successfully');
 }

@@ -5,17 +5,23 @@ import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
   CargoMessageStream,
+  Certificate,
+  CertificateRotation,
   GatewayManager,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { addDays } from 'date-fns';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
+
 import { initMongoDBKeyStore } from '../../../backingServices/mongo';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
+import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import { generatePCAs } from '../../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../../parcelStore';
+import { issuePrivateGatewayCertificate } from '../../../pki';
 import { Config, ConfigKey } from '../../../utilities/config';
 import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 
@@ -100,14 +106,17 @@ export default async function collectCargo(
 
   let cargoesCollected = 0;
 
+  const config = new Config(mongooseConnection);
+  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
+  const publicGatewayPrivateKey = await vaultKeyStore.retrieveIdentityKey(
+    publicGatewayPrivateAddress,
+  );
+
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    const config = new Config(mongooseConnection);
-    const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-    const privateKey = await vaultKeyStore.retrieveIdentityKey(privateAddress!!);
     yield* await gateway.generateCargoes(
       messages,
       await cca.senderCertificate.calculateSubjectPrivateAddress(),
-      privateKey,
+      publicGatewayPrivateKey,
       ccr.cargoDeliveryAuthorization,
     );
   }
@@ -122,13 +131,15 @@ export default async function collectCargo(
     }
   }
 
-  const activeParcels = pipe(
-    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
-    convertParcelsToCargoMessageStream,
-  );
-  const cargoMessageStream = await concatMessageStreams(
-    generatePCAs(peerGatewayAddress, mongooseConnection),
-    activeParcels,
+  const certificateStore = new MongoCertificateStore(mongooseConnection);
+  const cargoMessageStream = await generateCargoMessageStream(
+    cca,
+    peerGatewayAddress,
+    parcelStore,
+    mongooseConnection,
+    publicGatewayPrivateKey,
+    (await certificateStore.retrieveLatest(publicGatewayPrivateAddress))!!,
+    ccaAwareLogger,
   );
   try {
     await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
@@ -172,6 +183,57 @@ async function parseAndValidateCCAFromMetadata(
   } catch (_) {
     return new Error('CCA is malformed');
   }
+}
+
+async function* generateCargoMessageStream(
+  cca: CargoCollectionAuthorization,
+  peerGatewayAddress: string,
+  parcelStore: ParcelStore,
+  mongooseConnection: Connection,
+  publicGatewayPrivateKey: CryptoKey,
+  publicGatewayCertificate: Certificate,
+  ccaAwareLogger: Logger,
+): CargoMessageStream {
+  const activeParcels = pipe(
+    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+    convertParcelsToCargoMessageStream,
+  );
+  yield* await concatMessageStreams(
+    generatePCAs(peerGatewayAddress, mongooseConnection),
+    activeParcels,
+  );
+
+  const minCertTTL = addDays(new Date(), 90);
+  if (cca.senderCertificate.expiryDate < minCertTTL) {
+    ccaAwareLogger.info('Sending certificate rotation');
+    const certificateRotation = await generateCertificateRotation(
+      await cca.senderCertificate.getPublicKey(),
+      publicGatewayPrivateKey,
+      publicGatewayCertificate,
+    );
+    yield {
+      expiryDate: certificateRotation.subjectCertificate.expiryDate,
+      message: Buffer.from(certificateRotation.serialize()),
+    };
+  } else {
+    ccaAwareLogger.debug(
+      { peerGatewayCertificateExpiry: cca.senderCertificate.expiryDate },
+      'Skipping certificate rotation',
+    );
+  }
+}
+
+async function generateCertificateRotation(
+  privateGatewayPublicKey: CryptoKey,
+  publicGatewayPrivateKey: CryptoKey,
+  publicGatewayCertificate: Certificate,
+): Promise<CertificateRotation> {
+  const privateGatewayCertificate = await issuePrivateGatewayCertificate(
+    privateGatewayPublicKey,
+    publicGatewayPrivateKey,
+    publicGatewayCertificate,
+  );
+  return new CertificateRotation(privateGatewayCertificate, [publicGatewayCertificate]);
 }
 
 async function* convertParcelsToCargoMessageStream(

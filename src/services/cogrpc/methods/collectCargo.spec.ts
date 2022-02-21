@@ -5,6 +5,8 @@ import {
   CargoCollectionAuthorization,
   CargoMessageSet,
   CargoMessageStream,
+  CertificateRotation,
+  derSerializePublicKey,
   generateRSAKeyPair,
   InvalidMessageError,
   issueEndpointCertificate,
@@ -17,7 +19,7 @@ import {
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addDays } from 'date-fns';
+import { addDays, addSeconds, subSeconds } from 'date-fns';
 import {
   arrayBufferFrom,
   arrayToAsyncIterable,
@@ -54,7 +56,7 @@ let cdaChain: CDAChain;
 let privateGatewayAddress: string;
 beforeAll(async () => {
   pdaChain = await generatePdaChain();
-  cdaChain = await generateCDAChain(pdaChain);
+  cdaChain = await generateCDAChain(pdaChain, addDays(new Date(), 181));
   privateGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
@@ -571,9 +573,72 @@ test('CCA payload encryption key should be stored', async () => {
   await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
   expect(CALL.input).toHaveLength(1);
-  const cargo = await Cargo.deserialize(bufferToArray(CALL.input[0].cargo));
-  const cargoUnwrap = await cargo.unwrapPayload(privateGatewaySessionPrivateKey);
-  expect(cargoUnwrap.payload.messages).toHaveLength(1);
+  const { messages } = await unwrapCargoMessages(CALL.input[0].cargo);
+  expect(messages).toHaveLength(1);
+});
+
+describe('Private gateway certificate rotation', () => {
+  const PRIVATE_GATEWAY_MIN_TTL_DAYS = 90;
+
+  test('Rotation message should be included if certificate expires within 90 days', async () => {
+    const cutoffDate = addDays(new Date(), PRIVATE_GATEWAY_MIN_TTL_DAYS);
+    const expiringCDAChain = await generateCDAChain(pdaChain, subSeconds(cutoffDate, 1));
+    const { ccaSerialized: expiringCCA, sessionPrivateKey } = await generateCCA(
+      STUB_PUBLIC_ADDRESS_URL,
+      expiringCDAChain,
+      publicGatewaySessionKeyPair.sessionKey,
+      pdaChain.privateGatewayPrivateKey,
+    );
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(expiringCCA));
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    const cargo = await Cargo.deserialize(bufferToArray(CALL.input[0].cargo));
+    const cargoUnwrap = await cargo.unwrapPayload(sessionPrivateKey);
+    const rotation = CertificateRotation.deserialize(cargoUnwrap.payload.messages[0]);
+    // Check private gateway certificate
+    await expect(
+      derSerializePublicKey(await rotation.subjectCertificate.getPublicKey()),
+    ).resolves.toEqual(
+      await derSerializePublicKey(await pdaChain.privateGatewayCert.getPublicKey()),
+    );
+    await expect(
+      rotation.subjectCertificate.getCertificationPath([], [pdaChain.publicGatewayCert]),
+    ).resolves.toHaveLength(2);
+    // Check public gateway certificate
+    expect(rotation.chain).toHaveLength(1);
+    expect(pdaChain.publicGatewayCert.isEqual(rotation.chain[0])).toBeTrue();
+    // Other checks
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('info', 'Sending certificate rotation', {
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayAddress,
+      }),
+    );
+  });
+
+  test('Rotation message should not be included if certificate has more than 90 days', async () => {
+    const cutoffDate = addDays(new Date(), PRIVATE_GATEWAY_MIN_TTL_DAYS);
+    const expiringCDAChain = await generateCDAChain(pdaChain, addSeconds(cutoffDate, 10));
+    const { ccaSerialized: expiringCCA } = await generateCCA(
+      STUB_PUBLIC_ADDRESS_URL,
+      expiringCDAChain,
+      publicGatewaySessionKeyPair.sessionKey,
+      pdaChain.privateGatewayPrivateKey,
+    );
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(expiringCCA));
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+
+    expect(CALL.input).toHaveLength(0);
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('debug', 'Skipping certificate rotation', {
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayAddress,
+        peerGatewayCertificateExpiry: expiringCDAChain.privateGatewayCert.expiryDate.toISOString(),
+      }),
+    );
+  });
 });
 
 describe('Errors while generating cargo', () => {

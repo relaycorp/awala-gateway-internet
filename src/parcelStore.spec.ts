@@ -19,7 +19,6 @@ import {
 } from './_test_utils';
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
-import * as certs from './certs';
 import * as parcelCollection from './parcelCollection';
 import {
   ParcelObject,
@@ -27,6 +26,7 @@ import {
   ParcelStore,
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
+import * as pki from './pki';
 import {
   configureMockEnvVars,
   generatePdaChain,
@@ -408,7 +408,7 @@ describe('storeGatewayBoundParcel', () => {
   const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   const mockRetrieveOwnCertificates = mockSpy(
-    jest.spyOn(certs, 'retrieveOwnCertificates'),
+    jest.spyOn(pki, 'retrieveOwnCertificates'),
     async () => [pdaChain.publicGatewayCert],
   );
 

@@ -5,7 +5,7 @@ import LightMyRequest, { Response as LightMyRequestResponse } from 'light-my-req
 
 import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import * as certs from '../../certs';
+import * as certs from '../../pki';
 import { getMockInstance, testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';

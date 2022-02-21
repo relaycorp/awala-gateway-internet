@@ -9,8 +9,8 @@ import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from './backingServices/objectStorage';
-import { retrieveOwnCertificates } from './certs';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
+import { retrieveOwnCertificates } from './pki';
 import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';

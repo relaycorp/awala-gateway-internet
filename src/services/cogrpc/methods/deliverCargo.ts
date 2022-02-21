@@ -6,8 +6,9 @@ import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
+
 import { NatsStreamingClient, PublisherMessage } from '../../../backingServices/natsStreaming';
-import { retrieveOwnCertificates } from '../../../certs';
+import { retrieveOwnCertificates } from '../../../pki';
 import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 
 export default async function deliverCargo(

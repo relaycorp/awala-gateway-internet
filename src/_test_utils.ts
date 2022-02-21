@@ -167,12 +167,15 @@ export interface PdaChain extends ExternalPdaChain {
   readonly publicGatewayPrivateKey: CryptoKey;
 }
 
-export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAChain> {
+export async function generateCDAChain(
+  pdaChain: ExternalPdaChain,
+  privateGatewayCertExpiryDate?: Date,
+): Promise<CDAChain> {
   const privateGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
       issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
       subjectPublicKey: await pdaChain.privateGatewayCert.getPublicKey(),
-      validityEndDate: pdaChain.privateGatewayCert.expiryDate,
+      validityEndDate: privateGatewayCertExpiryDate ?? pdaChain.privateGatewayCert.expiryDate,
     }),
   );
   const publicGatewayCert = reSerializeCertificate(

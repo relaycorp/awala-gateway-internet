@@ -1,33 +1,22 @@
 import {
-  Certificate,
   derSerializePublicKey,
-  issueGatewayCertificate,
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
   SessionKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { addDays } from 'date-fns';
 import { FastifyInstance, FastifyReply } from 'fastify';
+
 import { initVaultKeyStore } from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
+import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';
-
 import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/nodes';
-
-/**
- * Number of hours in the past, when the the private gateway's certificate validity should start.
- *
- * This is needed to account for clock drift.
- */
-const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
-
-const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_DAYS = 180;
 
 export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
@@ -113,24 +102,5 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION)
         .send(Buffer.from(await registration.serialize()));
     },
-  });
-}
-
-async function issuePrivateGatewayCertificate(
-  privateGatewayPublicKey: CryptoKey,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
-): Promise<Certificate> {
-  const validityStartDate = new Date();
-  validityStartDate.setHours(
-    validityStartDate.getHours() - PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS,
-  );
-  const validityEndDate = addDays(new Date(), PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_DAYS);
-  return issueGatewayCertificate({
-    issuerCertificate: publicGatewayCertificate,
-    issuerPrivateKey: publicGatewayPrivateKey,
-    subjectPublicKey: privateGatewayPublicKey,
-    validityEndDate,
-    validityStartDate,
   });
 }

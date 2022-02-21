@@ -1,6 +1,7 @@
 import {
   Cargo,
   CargoMessageSet,
+  CertificateRotation,
   GatewayManager,
   InvalidMessageError,
   Parcel,
@@ -99,7 +100,7 @@ async function processCargo(
   }
 
   for (const itemSerialized of cargoMessageSet.messages) {
-    let item: Parcel | ParcelCollectionAck;
+    let item: Parcel | ParcelCollectionAck | CertificateRotation;
     try {
       item = await CargoMessageSet.deserializeItem(itemSerialized);
     } catch (err) {
@@ -116,13 +117,15 @@ async function processCargo(
         natsStreamingClient,
         cargoAwareLogger.child({ parcelId: item.id }),
       );
-    } else {
+    } else if (item instanceof ParcelCollectionAck) {
       await parcelStore.deleteGatewayBoundParcel(
         item.parcelId,
         item.senderEndpointPrivateAddress,
         item.recipientEndpointAddress,
         peerGatewayAddress,
       );
+    } else {
+      cargoAwareLogger.info('Ignoring certificate rotation message');
     }
   }
 

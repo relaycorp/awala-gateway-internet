@@ -1,6 +1,7 @@
 import {
   Cargo,
   CargoMessageSet,
+  CertificateRotation,
   derSerializePublicKey,
   InvalidMessageError,
   MockPrivateKeyStore,
@@ -405,6 +406,26 @@ describe('PCA processing', () => {
 
     await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(err);
   });
+});
+
+test('CertificateRotation messages should be ignored', async () => {
+  const rotation = new CertificateRotation(certificateChain.publicGatewayCert, [
+    certificateChain.publicGatewayCert,
+  ]);
+  const cargoSerialized = await generateCargoSerialized(rotation.serialize());
+  mockQueueMessages = [mockStanMessage(cargoSerialized)];
+
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  const cargoSenderAddress =
+    await certificateChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Ignoring certificate rotation message', {
+      cargoId: (await Cargo.deserialize(cargoSerialized)).id,
+      peerGatewayAddress: cargoSenderAddress,
+      worker: STUB_WORKER_NAME,
+    }),
+  );
 });
 
 test('Cargo containing invalid messages should be logged and ignored', async () => {

@@ -33,8 +33,8 @@ import {
   NatsStreamingClient,
   NatsStreamingSubscriptionError,
 } from '../../backingServices/natsStreaming';
-import * as certs from '../../certs';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
+import * as certs from '../../pki';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer } from './parcelCollection';

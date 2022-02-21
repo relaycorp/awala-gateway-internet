@@ -1,5 +1,5 @@
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
-import { rotateCertificate } from '../certs';
+import { rotateOwnCertificate } from '../pki';
 import { makeLogger } from '../utilities/logging';
 
 const LOGGER = makeLogger();
@@ -7,7 +7,7 @@ const LOGGER = makeLogger();
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();
   try {
-    const newCertificate = await rotateCertificate(connection);
+    const newCertificate = await rotateOwnCertificate(connection);
 
     if (newCertificate) {
       LOGGER.info({ expiryDate: newCertificate.expiryDate }, 'Created new certificate');

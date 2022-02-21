@@ -4,8 +4,8 @@ import { Connection } from 'mongoose';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { initVaultKeyStore } from '../backingServices/vault';
-import { CERTIFICATE_TTL_DAYS } from '../certs';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
+import { CERTIFICATE_TTL_DAYS } from '../pki';
 import { Config, ConfigKey } from '../utilities/config';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';

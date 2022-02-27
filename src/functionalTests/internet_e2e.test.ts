@@ -107,8 +107,9 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
-      cdaChain,
       publicGatewaySessionKey,
+      cdaChain.publicGatewayCert,
+      pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));

@@ -81,10 +81,12 @@ describe('Cargo collection', () => {
 
     await sleep(1);
 
+    const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
-      await generateCDAChain(pdaChain),
       publicGatewaySessionKey,
+      cdaChain.publicGatewayCert,
+      pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
@@ -109,8 +111,9 @@ describe('Cargo collection', () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
-      cdaChain,
       publicGatewaySessionKey,
+      cdaChain.publicGatewayCert,
+      pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
@@ -145,8 +148,9 @@ describe('Cargo collection', () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
-      cdaChain,
       publicGatewaySessionKey,
+      cdaChain.publicGatewayCert,
+      pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     await expect(asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized))).toResolve();

@@ -8,6 +8,7 @@ import {
   Certificate,
   CertificateRotation,
   GatewayManager,
+  RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
@@ -39,9 +40,9 @@ export default async function collectCargo(
   });
   const authorizationMetadata = call.metadata.get('Authorization');
 
-  const ccaOrError = await parseAndValidateCCAFromMetadata(authorizationMetadata);
+  const ccaOrError = await parseCCAFromMetadata(authorizationMetadata);
   if (ccaOrError instanceof Error) {
-    logger.info({ reason: ccaOrError.message }, 'Refusing malformed/invalid CCA');
+    logger.info({ reason: ccaOrError.message }, 'Refusing malformed CCA');
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
       message: ccaOrError.message,
@@ -53,21 +54,25 @@ export default async function collectCargo(
   const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
   const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
-  let ccaRecipientURL: URL | null = null;
+  const config = new Config(mongooseConnection);
+  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
+  const publicGatewayPrivateKey = await vaultKeyStore.retrieveIdentityKey(
+    publicGatewayPrivateAddress,
+  );
+  const certificateStore = new MongoCertificateStore(mongooseConnection);
+  const allCertificates = await certificateStore.retrieveAll(publicGatewayPrivateAddress);
   try {
-    ccaRecipientURL = new URL(cca.recipientAddress);
+    await cca.validate(RecipientAddressType.PUBLIC, allCertificates);
   } catch (err) {
-    ccaAwareLogger.info(
-      { ccaRecipientAddress: cca.recipientAddress },
-      'Refusing CCA with malformed recipient',
-    );
+    ccaAwareLogger.info({ ccaRecipientAddress: cca.recipientAddress, err }, 'Refusing invalid CCA');
     call.emit('error', {
-      code: grpc.status.INVALID_ARGUMENT,
-      message: 'CCA recipient is malformed',
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'CCA is invalid',
     });
     return;
   }
 
+  const ccaRecipientURL = new URL(cca.recipientAddress);
   if (ccaRecipientURL.hostname !== ownPublicAddress) {
     ccaAwareLogger.info(
       { ccaRecipientAddress: cca.recipientAddress },
@@ -106,12 +111,6 @@ export default async function collectCargo(
 
   let cargoesCollected = 0;
 
-  const config = new Config(mongooseConnection);
-  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
-  const publicGatewayPrivateKey = await vaultKeyStore.retrieveIdentityKey(
-    publicGatewayPrivateAddress,
-  );
-
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
     yield* await gateway.generateCargoes(
       messages,
@@ -131,7 +130,6 @@ export default async function collectCargo(
     }
   }
 
-  const certificateStore = new MongoCertificateStore(mongooseConnection);
   const cargoMessageStream = await generateCargoMessageStream(
     cca,
     peerGatewayAddress,
@@ -155,13 +153,13 @@ export default async function collectCargo(
 }
 
 /**
- * Parse and validate the CCA in `authorizationMetadata`, or return an error if validation fails.
+ * Parse the CCA in `authorizationMetadata`, or return an error if malformed.
  *
  * We're returning an error instead of throwing it to distinguish validation errors from bugs.
  *
  * @param authorizationMetadata
  */
-async function parseAndValidateCCAFromMetadata(
+async function parseCCAFromMetadata(
   authorizationMetadata: readonly grpc.MetadataValue[],
 ): Promise<CargoCollectionAuthorization | Error> {
   if (authorizationMetadata.length !== 1) {

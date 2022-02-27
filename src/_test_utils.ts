@@ -167,15 +167,13 @@ export interface PdaChain extends ExternalPdaChain {
   readonly publicGatewayPrivateKey: CryptoKey;
 }
 
-export async function generateCDAChain(
-  pdaChain: ExternalPdaChain,
-  privateGatewayCertExpiryDate?: Date,
-): Promise<CDAChain> {
+// TODO: Replace with respective function in @relaycorp/relaynet-testing
+export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAChain> {
   const privateGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
       issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
       subjectPublicKey: await pdaChain.privateGatewayCert.getPublicKey(),
-      validityEndDate: privateGatewayCertExpiryDate ?? pdaChain.privateGatewayCert.expiryDate,
+      validityEndDate: pdaChain.privateGatewayCert.expiryDate,
     }),
   );
   const publicGatewayCert = reSerializeCertificate(
@@ -183,7 +181,7 @@ export async function generateCDAChain(
       issuerCertificate: privateGatewayCert,
       issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
       subjectPublicKey: await pdaChain.publicGatewayCert.getPublicKey(),
-      validityEndDate: TOMORROW,
+      validityEndDate: pdaChain.publicGatewayCert.expiryDate,
     }),
   );
   return { privateGatewayCert, publicGatewayCert };
@@ -196,19 +194,20 @@ export interface GeneratedCCA {
 }
 
 export async function generateCCA(
-  recipientAddress: string,
-  chain: CDAChain,
+  publicGatewayAddress: string,
   publicGatewaySessionKey: SessionKey,
+  publicGatewayCDA: Certificate,
+  privateGatewayCertificate: Certificate,
   privateGatewayPrivateKey: CryptoKey,
 ): Promise<GeneratedCCA> {
-  const ccr = new CargoCollectionRequest(chain.publicGatewayCert);
+  const ccr = new CargoCollectionRequest(publicGatewayCDA);
   const { envelopedData, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     ccr.serialize(),
     publicGatewaySessionKey,
   );
   const cca = new CargoCollectionAuthorization(
-    recipientAddress,
-    chain.privateGatewayCert,
+    publicGatewayAddress,
+    privateGatewayCertificate,
     Buffer.from(envelopedData.serialize()),
   );
   const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);

@@ -58,6 +58,7 @@ export function castMock<T>(partialMock: Partial<T>): T {
   return partialMock as unknown as T;
 }
 
+// TODO: Replace with respective function in @relaycorp/relaynet-testing
 export async function generatePdaChain(): Promise<PdaChain> {
   const publicGatewayKeyPair = await generateRSAKeyPair();
   const publicGatewayCert = reSerializeCertificate(

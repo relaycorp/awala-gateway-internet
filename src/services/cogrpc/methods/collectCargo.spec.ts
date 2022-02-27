@@ -18,18 +18,23 @@ import {
   SessionKeyPair,
   UnknownKeyError,
 } from '@relaycorp/relaynet-core';
+import {
+  CDACertPath,
+  generateCDACertificationPath,
+  generateIdentityKeyPairSet,
+  generatePDACertificationPath,
+  NodeKeyPairSet,
+  PDACertPath,
+} from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 import {
   arrayBufferFrom,
   arrayToAsyncIterable,
-  CDAChain,
   generateCCA,
-  generateCDAChain,
   mockSpy,
   partialPinoLog,
   partialPinoLogger,
-  PdaChain,
   UUID4_REGEX,
 } from '../../../_test_utils';
 
@@ -39,7 +44,6 @@ import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore'
 import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
 import { Config, ConfigKey } from '../../../utilities/config';
-import { generatePdaChain } from '../../_test_utils';
 import {
   MockGrpcBidiCall,
   setUpTestEnvironment,
@@ -51,13 +55,15 @@ import { makeServiceImplementation } from '../service';
 
 const TOMORROW = addDays(new Date(), 1);
 
-let pdaChain: PdaChain;
-let cdaChain: CDAChain;
+let keyPairSet: NodeKeyPairSet;
+let pdaChain: PDACertPath;
+let cdaChain: CDACertPath;
 let privateGatewayAddress: string;
 beforeAll(async () => {
-  pdaChain = await generatePdaChain();
-  cdaChain = await generateCDAChain(pdaChain, addDays(new Date(), 181));
-  privateGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  keyPairSet = await generateIdentityKeyPairSet();
+  pdaChain = await generatePDACertificationPath(keyPairSet, addDays(new Date(), 181));
+  cdaChain = await generateCDACertificationPath(keyPairSet);
+  privateGatewayAddress = await pdaChain.privateGateway.calculateSubjectPrivateAddress();
 });
 
 const { getMongooseConnection, getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
@@ -69,7 +75,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   PRIVATE_KEY_STORE.clear();
-  await PRIVATE_KEY_STORE.saveIdentityKey(pdaChain.publicGatewayPrivateKey);
+  await PRIVATE_KEY_STORE.saveIdentityKey(keyPairSet.publicGateway.privateKey);
   await PRIVATE_KEY_STORE.saveBoundSessionKey(
     publicGatewaySessionKeyPair.privateKey,
     publicGatewaySessionKeyPair.sessionKey.keyId,
@@ -82,12 +88,12 @@ beforeEach(async () => {
   const connection = getMongooseConnection();
 
   const certificateStore = new MongoCertificateStore(connection);
-  await certificateStore.save(pdaChain.publicGatewayCert);
+  await certificateStore.save(pdaChain.publicGateway);
 
   const config = new Config(connection);
   await config.set(
     ConfigKey.CURRENT_PRIVATE_ADDRESS,
-    await pdaChain.publicGatewayCert.calculateSubjectPrivateAddress(),
+    await pdaChain.publicGateway.calculateSubjectPrivateAddress(),
   );
 });
 
@@ -135,9 +141,10 @@ let privateGatewaySessionPrivateKey: CryptoKey;
 beforeAll(async () => {
   const generatedCCA = await generateCCA(
     STUB_PUBLIC_ADDRESS_URL,
-    cdaChain,
     publicGatewaySessionKeyPair.sessionKey,
-    pdaChain.privateGatewayPrivateKey,
+    cdaChain.publicGateway,
+    pdaChain.privateGateway,
+    keyPairSet.privateGateway.privateKey,
   );
   cca = generatedCCA.cca;
   ccaSerialized = generatedCCA.ccaSerialized;
@@ -224,7 +231,7 @@ describe('CCA validation', () => {
     });
 
     const invalidCCASerialized = Buffer.from('I am not really a RAMF message');
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -244,7 +251,7 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       new ArrayBuffer(0),
     );
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -269,7 +276,7 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       envelopedData.serialize(),
     );
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -293,20 +300,20 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       envelopedData.serialize(),
     );
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
 
-  test('INVALID_ARGUMENT should be returned if CCA recipient is malformed', async (cb) => {
+  test('INVALID_ARGUMENT should be returned if CCA recipient address is private', async (cb) => {
     const malformedCCA = new CargoCollectionAuthorization(
       '0deadbeef',
-      pdaChain.privateGatewayCert,
+      pdaChain.privateGateway,
       Buffer.from([]),
     );
     CALL.on('error', (error) => {
       expect(getMockLogs()).toContainEqual(
-        partialPinoLog('info', 'Refusing CCA with malformed recipient', {
+        partialPinoLog('info', 'Refusing invalid CCA', {
           ccaRecipientAddress: malformedCCA.recipientAddress,
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
@@ -314,17 +321,17 @@ describe('CCA validation', () => {
         }),
       );
       expect(error).toEqual({
-        code: grpc.status.INVALID_ARGUMENT,
-        message: 'CCA recipient is malformed',
+        code: grpc.status.UNAUTHENTICATED,
+        message: 'CCA is invalid',
       });
 
       cb();
     });
 
     const invalidCCASerialized = Buffer.from(
-      await malformedCCA.serialize(pdaChain.privateGatewayPrivateKey),
+      await malformedCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -332,7 +339,7 @@ describe('CCA validation', () => {
   test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
     const invalidCCA = new CargoCollectionAuthorization(
       `https://different-${STUB_PUBLIC_ADDRESS}`,
-      pdaChain.privateGatewayCert,
+      pdaChain.privateGateway,
       Buffer.from([]),
     );
     CALL.on('error', (error) => {
@@ -353,9 +360,40 @@ describe('CCA validation', () => {
     });
 
     const invalidCCASerialized = Buffer.from(
-      await invalidCCA.serialize(pdaChain.privateGatewayPrivateKey),
+      await invalidCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
-    CALL.metadata.add('Authorization', `Relaynet-CCA ${invalidCCASerialized.toString('base64')}`);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+
+    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+  });
+
+  test('PERMISSION_DENIED should be returned if CCA sender is unauthorized', async (cb) => {
+    const ccaSenderCertificate = pdaChain.pdaGrantee;
+    const invalidCCA = new CargoCollectionAuthorization(
+      STUB_PUBLIC_ADDRESS_URL,
+      ccaSenderCertificate,
+      Buffer.from([]),
+    );
+
+    CALL.on('error', async (error) => {
+      expect(getMockLogs()).toContainEqual(
+        partialPinoLog('info', 'Refusing invalid CCA', {
+          err: expect.objectContaining({ type: InvalidMessageError.name }),
+          grpcClient: CALL.getPeer(),
+          grpcMethod: 'collectCargo',
+          peerGatewayAddress: await ccaSenderCertificate.calculateSubjectPrivateAddress(),
+        }),
+      );
+      expect(error).toEqual({
+        code: grpc.status.UNAUTHENTICATED,
+        message: 'CCA is invalid',
+      });
+
+      cb();
+    });
+
+    const invalidCCASerialized = await invalidCCA.serialize(keyPairSet.pdaGrantee.privateKey);
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -385,7 +423,7 @@ describe('CCA validation', () => {
   });
 
   function invalidCCALog(errorMessage: string): ReturnType<typeof partialPinoLog> {
-    return partialPinoLog('info', 'Refusing malformed/invalid CCA', {
+    return partialPinoLog('info', 'Refusing malformed CCA', {
       grpcClient: CALL.getPeer(),
       grpcMethod: 'collectCargo',
       reason: errorMessage,
@@ -483,7 +521,7 @@ test('PCAs should be limited to the sender of the CCA', async () => {
 
   expect(MOCK_GENERATE_PCAS).toBeCalledTimes(1);
   expect(MOCK_GENERATE_PCAS).toBeCalledWith(
-    await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+    await pdaChain.privateGateway.calculateSubjectPrivateAddress(),
     getMongooseConnection(),
   );
 });
@@ -530,7 +568,7 @@ test('Cargo should be signed with the current key', async () => {
 
   expect(CALL.input).toHaveLength(1);
   const cargo = await Cargo.deserialize(bufferToArray(CALL.input[0].cargo));
-  await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
+  await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGateway]);
 });
 
 test('CCA should be logged as fulfilled to make sure it is only used once', async () => {
@@ -582,12 +620,16 @@ describe('Private gateway certificate rotation', () => {
 
   test('Rotation message should be included if certificate expires within 90 days', async () => {
     const cutoffDate = addDays(new Date(), PRIVATE_GATEWAY_MIN_TTL_DAYS);
-    const expiringCDAChain = await generateCDAChain(pdaChain, subSeconds(cutoffDate, 1));
+    const expiringPDAChain = await generatePDACertificationPath(
+      keyPairSet,
+      subSeconds(cutoffDate, 1),
+    );
     const { ccaSerialized: expiringCCA, sessionPrivateKey } = await generateCCA(
       STUB_PUBLIC_ADDRESS_URL,
-      expiringCDAChain,
       publicGatewaySessionKeyPair.sessionKey,
-      pdaChain.privateGatewayPrivateKey,
+      cdaChain.publicGateway,
+      expiringPDAChain.privateGateway,
+      keyPairSet.privateGateway.privateKey,
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(expiringCCA));
 
@@ -599,15 +641,13 @@ describe('Private gateway certificate rotation', () => {
     // Check private gateway certificate
     await expect(
       derSerializePublicKey(await rotation.subjectCertificate.getPublicKey()),
-    ).resolves.toEqual(
-      await derSerializePublicKey(await pdaChain.privateGatewayCert.getPublicKey()),
-    );
+    ).resolves.toEqual(await derSerializePublicKey(await pdaChain.privateGateway.getPublicKey()));
     await expect(
-      rotation.subjectCertificate.getCertificationPath([], [pdaChain.publicGatewayCert]),
+      rotation.subjectCertificate.getCertificationPath([], [pdaChain.publicGateway]),
     ).resolves.toHaveLength(2);
     // Check public gateway certificate
     expect(rotation.chain).toHaveLength(1);
-    expect(pdaChain.publicGatewayCert.isEqual(rotation.chain[0])).toBeTrue();
+    expect(pdaChain.publicGateway.isEqual(rotation.chain[0])).toBeTrue();
     // Other checks
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Sending certificate rotation', {
@@ -619,12 +659,16 @@ describe('Private gateway certificate rotation', () => {
 
   test('Rotation message should not be included if certificate has more than 90 days', async () => {
     const cutoffDate = addDays(new Date(), PRIVATE_GATEWAY_MIN_TTL_DAYS);
-    const expiringCDAChain = await generateCDAChain(pdaChain, addSeconds(cutoffDate, 10));
+    const expiringPDAChain = await generatePDACertificationPath(
+      keyPairSet,
+      addSeconds(cutoffDate, 10),
+    );
     const { ccaSerialized: expiringCCA } = await generateCCA(
       STUB_PUBLIC_ADDRESS_URL,
-      expiringCDAChain,
       publicGatewaySessionKeyPair.sessionKey,
-      pdaChain.privateGatewayPrivateKey,
+      cdaChain.publicGateway,
+      expiringPDAChain.privateGateway,
+      keyPairSet.privateGateway.privateKey,
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(expiringCCA));
 
@@ -635,7 +679,7 @@ describe('Private gateway certificate rotation', () => {
       partialPinoLog('debug', 'Skipping certificate rotation', {
         grpcMethod: 'collectCargo',
         peerGatewayAddress: privateGatewayAddress,
-        peerGatewayCertificateExpiry: expiringCDAChain.privateGatewayCert.expiryDate.toISOString(),
+        peerGatewayCertificateExpiry: expiringPDAChain.privateGateway.expiryDate.toISOString(),
       }),
     );
   });
@@ -699,10 +743,10 @@ async function generateCCAForPayload(
 ): Promise<Buffer> {
   const auth = new CargoCollectionAuthorization(
     recipientAddress,
-    pdaChain.privateGatewayCert,
+    pdaChain.privateGateway,
     Buffer.from(payload),
   );
-  return Buffer.from(await auth.serialize(pdaChain.privateGatewayPrivateKey));
+  return Buffer.from(await auth.serialize(keyPairSet.privateGateway.privateKey));
 }
 
 async function validateCargoDelivery(

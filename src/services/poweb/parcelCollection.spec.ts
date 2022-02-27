@@ -37,7 +37,7 @@ import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
-import { makeWebSocketServer } from './parcelCollection';
+import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';
 import { WebSocketCode } from './websockets';
 
 jest.mock('../../utilities/exitHandling');
@@ -98,14 +98,14 @@ describe('WebSocket server configuration', () => {
     expect(wsServer.options.path).toEqual('/v1/parcel-collection');
   });
 
-  test('Maximum incoming payload size should be 2 kib', () => {
+  test('Maximum incoming payload size should honour PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS', () => {
     const wsServer = makeWebSocketServer(
       getFixtures().getMongooseConnection(),
       REQUEST_ID_HEADER,
       mockLogging.logger,
     );
 
-    expect(wsServer.options.maxPayload).toEqual(2 * 1024);
+    expect(wsServer.options.maxPayload).toEqual(PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS);
   });
 
   test('Clients should not be tracked', () => {

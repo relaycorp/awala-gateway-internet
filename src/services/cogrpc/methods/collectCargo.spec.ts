@@ -231,7 +231,7 @@ describe('CCA validation', () => {
     });
 
     const invalidCCASerialized = Buffer.from('I am not really a RAMF message');
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -251,7 +251,7 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       new ArrayBuffer(0),
     );
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -276,7 +276,7 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       envelopedData.serialize(),
     );
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -300,7 +300,7 @@ describe('CCA validation', () => {
       STUB_PUBLIC_ADDRESS_URL,
       envelopedData.serialize(),
     );
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -331,7 +331,7 @@ describe('CCA validation', () => {
     const invalidCCASerialized = Buffer.from(
       await malformedCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -362,7 +362,7 @@ describe('CCA validation', () => {
     const invalidCCASerialized = Buffer.from(
       await invalidCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -393,7 +393,7 @@ describe('CCA validation', () => {
     });
 
     const invalidCCASerialized = await invalidCCA.serialize(keyPairSet.pdaGrantee.privateKey);
-    CALL.metadata.add('Authorization', serializeAuthzMetadata(Buffer.from(invalidCCASerialized)));
+    CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
@@ -733,8 +733,9 @@ describe('Errors while generating cargo', () => {
   });
 });
 
-function serializeAuthzMetadata(ccaSerialization: Buffer): string {
-  return `Relaynet-CCA ${ccaSerialization.toString('base64')}`;
+function serializeAuthzMetadata(ccaSerialization: Buffer | ArrayBuffer): string {
+  const ccaHexSerialization = Buffer.from(ccaSerialization).toString('base64');
+  return `Relaynet-CCA ${ccaHexSerialization}`;
 }
 
 async function generateCCAForPayload(

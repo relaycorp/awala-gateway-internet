@@ -3,10 +3,11 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest, { Response as LightMyRequestResponse } from 'light-my-request';
 
-import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
-import { getMockInstance, testDisallowedMethods } from '../_test_utils';
+import { testDisallowedMethods } from '../../testUtils/fastify';
+import { getMockInstance, mockSpy } from '../../testUtils/jest';
+import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';

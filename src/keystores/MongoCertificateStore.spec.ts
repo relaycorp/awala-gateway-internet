@@ -7,8 +7,8 @@ import {
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 
-import { setUpTestDBConnection } from '../_test_utils';
 import { Certificate as CertificateModel } from '../models';
+import { setUpTestDBConnection } from '../testUtils/db';
 import { MongoCertificateStore } from './MongoCertificateStore';
 
 const getConnection = setUpTestDBConnection();

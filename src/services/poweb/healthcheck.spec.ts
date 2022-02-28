@@ -1,4 +1,4 @@
-import { testDisallowedMethods } from '../_test_utils';
+import { testDisallowedMethods } from '../../testUtils/fastify';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeServer } from './server';
 

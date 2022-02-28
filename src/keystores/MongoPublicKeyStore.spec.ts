@@ -10,8 +10,8 @@ import {
 import * as typegoose from '@typegoose/typegoose';
 import { Connection } from 'mongoose';
 
-import { mockSpy } from '../_test_utils';
 import { PeerPublicKeyData } from '../models';
+import { mockSpy } from '../testUtils/jest';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 
 const STUB_CONNECTION: Connection = { what: 'the-stub-connection' } as any;

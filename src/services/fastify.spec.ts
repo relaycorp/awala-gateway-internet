@@ -2,11 +2,12 @@ import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
-import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
+import { MONGO_ENV_VARS } from '../testUtils/db';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
-import { configureMockEnvVars, getMockContext, getMockInstance } from './_test_utils';
 import { configureFastify, runFastify } from './fastify';
 
 const mockFastify: FastifyInstance = {

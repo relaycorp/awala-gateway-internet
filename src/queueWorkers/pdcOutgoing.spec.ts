@@ -1,23 +1,16 @@
 import * as pohttp from '@relaycorp/relaynet-pohttp';
+import { addDays } from 'date-fns';
 import { EnvVarError } from 'env-var';
 import { Message } from 'node-nats-streaming';
 
-import {
-  arrayToAsyncIterable,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-} from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
-import {
-  configureMockEnvVars,
-  getMockInstance,
-  mockStanMessage,
-  TOMORROW,
-} from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { arrayToAsyncIterable } from '../testUtils/iter';
+import { getMockInstance, mockSpy } from '../testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
+import { mockStanMessage } from '../testUtils/stan';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processInternetBoundParcels } from './pdcOutgoing';
@@ -53,7 +46,7 @@ beforeEach(() => {
 
 const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
   deliveryAttempts: 0,
-  parcelExpiryDate: TOMORROW,
+  parcelExpiryDate: addDays(new Date(), 1),
   parcelObjectKey: 'foo.parcel',
   parcelRecipientAddress: 'https://endpoint.example/',
 };

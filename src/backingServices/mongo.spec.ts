@@ -1,9 +1,10 @@
 import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
-import { mockSpy, MONGO_ENV_VARS } from '../_test_utils';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
-import { configureMockEnvVars } from '../services/_test_utils';
+import { MONGO_ENV_VARS } from '../testUtils/db';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { mockSpy } from '../testUtils/jest';
 import {
   createMongooseConnectionFromEnv,
   getMongooseConnectionArgsFromEnv,

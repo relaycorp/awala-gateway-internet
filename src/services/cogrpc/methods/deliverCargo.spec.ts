@@ -1,11 +1,13 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
-import { mockSpy, partialPinoLog, PdaChain } from '../../../_test_utils';
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
-import { generatePdaChain, getMockInstance } from '../../_test_utils';
-import { MockGrpcBidiCall, setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
+import { MockGrpcBidiCall } from '../../../testUtils/grpc';
+import { getMockInstance, mockSpy } from '../../../testUtils/jest';
+import { partialPinoLog } from '../../../testUtils/logging';
+import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
+import { setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
 import { makeServiceImplementation } from '../service';
 
 let pdaChain: PdaChain;

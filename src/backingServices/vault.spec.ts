@@ -1,6 +1,6 @@
 import * as vaultKeyStore from '@relaycorp/keystore-vault';
 
-import { configureMockEnvVars } from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
 import { initVaultKeyStore } from './vault';
 
 jest.mock('@relaycorp/keystore-vault');

@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
 
-import { configureMockEnvVars } from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 

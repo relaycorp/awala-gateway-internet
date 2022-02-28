@@ -16,8 +16,9 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
-import { configureMockEnvVars, mockStanMessage } from './services/_test_utils';
+import { mockStanMessage } from './services/_test_utils';
 import { sha256Hex } from './testUtils/crypto';
+import { configureMockEnvVars } from './testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';

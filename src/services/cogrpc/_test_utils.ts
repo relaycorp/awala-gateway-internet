@@ -3,8 +3,8 @@ import { Connection } from 'mongoose';
 import { Duplex } from 'stream';
 
 import { setUpTestDBConnection } from '../../testUtils/db';
+import { configureMockEnvVars } from '../../testUtils/envVars';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
-import { configureMockEnvVars } from '../_test_utils';
 import { ServiceImplementationOptions } from './service';
 import SpyInstance = jest.SpyInstance;
 

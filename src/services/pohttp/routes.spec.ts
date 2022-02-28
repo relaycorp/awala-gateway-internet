@@ -5,14 +5,10 @@ import { InjectOptions } from 'light-my-request';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { MONGO_ENV_VARS } from '../../testUtils/db';
+import { configureMockEnvVars } from '../../testUtils/envVars';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
-import {
-  configureMockEnvVars,
-  generateStubParcel,
-  mockFastifyMongoose,
-  testDisallowedMethods,
-} from '../_test_utils';
+import { generateStubParcel, mockFastifyMongoose, testDisallowedMethods } from '../_test_utils';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');

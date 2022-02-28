@@ -6,11 +6,11 @@ import selfsigned from 'selfsigned';
 
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
+import { configureMockEnvVars } from '../../testUtils/envVars';
 import { getMockContext, mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
 import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
-import { configureMockEnvVars } from '../_test_utils';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 

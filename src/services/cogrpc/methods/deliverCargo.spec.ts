@@ -1,9 +1,9 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
-import { mockSpy } from '../../../_test_utils';
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
+import { mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
 import { getMockInstance } from '../../_test_utils';

@@ -1,4 +1,4 @@
-import { mockSpy } from '../../_test_utils';
+import { mockSpy } from '../../testUtils/jest';
 import * as fastifyUtils from '../fastify';
 import { makeServer } from './server';
 

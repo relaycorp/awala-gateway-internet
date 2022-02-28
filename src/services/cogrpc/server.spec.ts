@@ -4,9 +4,9 @@ import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
-import { mockSpy } from '../../_test_utils';
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
+import { mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
 import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';

@@ -1,7 +1,7 @@
 import pino from 'pino';
 
-import { mockSpy } from '../_test_utils';
 import { getMockContext } from '../services/_test_utils';
+import { mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { configureExitHandling } from './exitHandling';
 

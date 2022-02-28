@@ -2,7 +2,6 @@ import * as pohttp from '@relaycorp/relaynet-pohttp';
 import { EnvVarError } from 'env-var';
 import { Message } from 'node-nats-streaming';
 
-import { mockSpy } from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
@@ -13,6 +12,7 @@ import {
   TOMORROW,
 } from '../services/_test_utils';
 import { arrayToAsyncIterable } from '../testUtils/iter';
+import { mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';

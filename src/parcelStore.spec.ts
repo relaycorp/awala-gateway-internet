@@ -6,7 +6,7 @@ import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 
-import { mockSpy, sha256Hex } from './_test_utils';
+import { sha256Hex } from './_test_utils';
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
 import * as parcelCollection from './parcelCollection';
@@ -19,6 +19,7 @@ import {
 import * as pki from './pki';
 import { configureMockEnvVars, getMockInstance, mockStanMessage } from './services/_test_utils';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
+import { mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
 import { generatePdaChain, PdaChain } from './testUtils/pki';
 

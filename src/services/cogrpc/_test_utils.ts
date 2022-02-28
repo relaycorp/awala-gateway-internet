@@ -2,7 +2,8 @@ import * as grpc from '@grpc/grpc-js';
 import { Connection } from 'mongoose';
 import { Duplex } from 'stream';
 
-import { makeMockLogging, MockLogging, setUpTestDBConnection } from '../../_test_utils';
+import { setUpTestDBConnection } from '../../_test_utils';
+import { makeMockLogging, MockLogging } from '../../testUtils/logging';
 import { configureMockEnvVars } from '../_test_utils';
 import { ServiceImplementationOptions } from './service';
 import SpyInstance = jest.SpyInstance;

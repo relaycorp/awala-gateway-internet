@@ -17,16 +17,7 @@ import { EventEmitter } from 'events';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
-import {
-  arrayBufferFrom,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-  partialPinoLogger,
-  useFakeTimers,
-  UUID4_REGEX,
-} from '../../_test_utils';
+import { arrayBufferFrom, mockSpy, useFakeTimers, UUID4_REGEX } from '../../_test_utils';
 import {
   NatsStreamingClient,
   NatsStreamingSubscriptionError,
@@ -34,6 +25,12 @@ import {
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
 import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
+import {
+  makeMockLogging,
+  MockLogging,
+  partialPinoLog,
+  partialPinoLogger,
+} from '../../testUtils/logging';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';

@@ -49,7 +49,7 @@ export class ParcelStore {
     return new ParcelStore(objectStoreClient, objectStoreBucket);
   }
 
-  constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
+  constructor(protected objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
 
   /**
    * Output existing and new parcels for `peerGatewayAddress` until `abortSignal` is triggered.

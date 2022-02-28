@@ -844,7 +844,6 @@ describe('initFromEnv', () => {
     const store = ParcelStore.initFromEnv();
 
     expect(store.bucket).toEqual(requiredEnvVars.OBJECT_STORE_BUCKET);
-    expect(store.objectStoreClient).toBe(MOCK_OBJECT_STORE_CLIENT);
   });
 });
 

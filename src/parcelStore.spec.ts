@@ -16,13 +16,13 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
-import { mockStanMessage } from './services/_test_utils';
 import { sha256Hex } from './testUtils/crypto';
 import { configureMockEnvVars } from './testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
 import { generatePdaChain, PdaChain } from './testUtils/pki';
+import { mockStanMessage } from './testUtils/stan';
 
 const BUCKET = 'the-bucket-name';
 

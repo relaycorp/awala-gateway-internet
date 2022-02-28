@@ -17,13 +17,14 @@ import { EventEmitter } from 'events';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
-import { arrayBufferFrom, UUID4_REGEX } from '../../_test_utils';
+import { arrayBufferFrom } from '../../_test_utils';
 import {
   NatsStreamingClient,
   NatsStreamingSubscriptionError,
 } from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
+import { UUID4_REGEX } from '../../testUtils/crypto';
 import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
 import { mockSpy, useFakeTimers } from '../../testUtils/jest';
 import {

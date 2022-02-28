@@ -8,7 +8,6 @@ import {
 } from '@relaycorp/relaynet-core';
 import { addDays, addMinutes, addSeconds, subHours, subSeconds } from 'date-fns';
 
-import { setUpTestDBConnection } from './_test_utils';
 import * as vault from './backingServices/vault';
 import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import {
@@ -16,6 +15,7 @@ import {
   retrieveOwnCertificates,
   rotateOwnCertificate,
 } from './pki';
+import { setUpTestDBConnection } from './testUtils/db';
 import { mockSpy } from './testUtils/jest';
 import { reSerializeCertificate } from './testUtils/pki';
 import { Config, ConfigKey } from './utilities/config';

@@ -2,7 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import { Connection } from 'mongoose';
 import { Duplex } from 'stream';
 
-import { setUpTestDBConnection } from '../../_test_utils';
+import { setUpTestDBConnection } from '../../testUtils/db';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
 import { configureMockEnvVars } from '../_test_utils';
 import { ServiceImplementationOptions } from './service';

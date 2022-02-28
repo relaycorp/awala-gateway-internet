@@ -1,7 +1,7 @@
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 
-import { setUpTestDBConnection } from '../_test_utils';
 import { ConfigItem } from '../models';
+import { setUpTestDBConnection } from '../testUtils/db';
 import { Config, ConfigKey } from './config';
 
 const getConnection = setUpTestDBConnection();

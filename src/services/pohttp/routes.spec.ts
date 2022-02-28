@@ -2,9 +2,9 @@ import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
-import { MONGO_ENV_VARS } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
+import { MONGO_ENV_VARS } from '../../testUtils/db';
 import { mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import {

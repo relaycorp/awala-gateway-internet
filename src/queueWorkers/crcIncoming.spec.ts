@@ -17,7 +17,6 @@ import {
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
-import { arrayBufferFrom } from '../_test_utils';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
@@ -30,6 +29,7 @@ import {
   getMockInstance,
   mockStanMessage,
 } from '../services/_test_utils';
+import { arrayBufferFrom } from '../testUtils/buffers';
 import { mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../testUtils/pki';

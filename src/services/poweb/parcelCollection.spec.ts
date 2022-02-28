@@ -17,13 +17,13 @@ import { EventEmitter } from 'events';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
-import { arrayBufferFrom } from '../../_test_utils';
 import {
   NatsStreamingClient,
   NatsStreamingSubscriptionError,
 } from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
+import { arrayBufferFrom, expectBuffersToEqual } from '../../testUtils/buffers';
 import { UUID4_REGEX } from '../../testUtils/crypto';
 import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
 import { mockSpy, useFakeTimers } from '../../testUtils/jest';
@@ -33,7 +33,7 @@ import {
   partialPinoLog,
   partialPinoLogger,
 } from '../../testUtils/logging';
-import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
+import { getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';
 import { WebSocketCode } from './websockets';

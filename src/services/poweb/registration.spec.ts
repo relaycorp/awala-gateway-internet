@@ -11,7 +11,7 @@ import { addDays } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest from 'light-my-request';
 
-import { arrayBufferFrom } from '../../_test_utils';
+import { arrayBufferFrom } from '../../testUtils/buffers';
 import { sha256 } from '../../testUtils/crypto';
 import { makeMockLogging, MockLogSet, partialPinoLog } from '../../testUtils/logging';
 import { testDisallowedMethods } from '../_test_utils';

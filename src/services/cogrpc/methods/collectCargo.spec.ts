@@ -28,13 +28,13 @@ import {
 } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
-import { arrayBufferFrom } from '../../../_test_utils';
 
 import * as vault from '../../../backingServices/vault';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
+import { arrayBufferFrom } from '../../../testUtils/buffers';
 import { UUID4_REGEX } from '../../../testUtils/crypto';
 import { arrayToAsyncIterable } from '../../../testUtils/iter';
 import { mockSpy } from '../../../testUtils/jest';

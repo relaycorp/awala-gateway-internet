@@ -3,10 +3,11 @@ import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@rel
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
+import { MockGrpcBidiCall } from '../../../testUtils/grpc';
 import { getMockInstance, mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
-import { MockGrpcBidiCall, setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
+import { setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
 import { makeServiceImplementation } from '../service';
 
 let pdaChain: PdaChain;

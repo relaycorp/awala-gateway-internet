@@ -36,13 +36,13 @@ import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
 import { arrayBufferFrom } from '../../../testUtils/buffers';
 import { UUID4_REGEX } from '../../../testUtils/crypto';
+import { MockGrpcBidiCall } from '../../../testUtils/grpc';
 import { arrayToAsyncIterable } from '../../../testUtils/iter';
 import { mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog, partialPinoLogger } from '../../../testUtils/logging';
 import { generateCCA } from '../../../testUtils/pki';
 import { Config, ConfigKey } from '../../../utilities/config';
 import {
-  MockGrpcBidiCall,
   setUpTestEnvironment,
   STUB_OBJECT_STORE_BUCKET,
   STUB_PUBLIC_ADDRESS,

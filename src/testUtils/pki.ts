@@ -11,7 +11,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { addDays } from 'date-fns';
 
-export const TOMORROW = addDays(new Date(), 1);
+const TOMORROW = addDays(new Date(), 1);
 
 export interface CDAChain {
   readonly publicGatewayCert: Certificate;

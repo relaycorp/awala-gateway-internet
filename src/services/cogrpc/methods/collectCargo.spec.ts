@@ -30,7 +30,6 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 import {
   arrayBufferFrom,
-  arrayToAsyncIterable,
   mockSpy,
   partialPinoLog,
   partialPinoLogger,
@@ -42,6 +41,7 @@ import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
+import { arrayToAsyncIterable } from '../../../testUtils/iter';
 import { generateCCA } from '../../../testUtils/pki';
 import { Config, ConfigKey } from '../../../utilities/config';
 import {

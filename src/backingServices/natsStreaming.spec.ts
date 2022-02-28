@@ -5,13 +5,9 @@ import { EventEmitter } from 'events';
 import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
 
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  getPromiseRejection,
-  iterableTake,
-} from '../_test_utils';
+import { getPromiseRejection } from '../_test_utils';
 import { configureMockEnvVars } from '../services/_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
 
 class MockNatsSubscription extends EventEmitter {
   public readonly close = jest.fn();

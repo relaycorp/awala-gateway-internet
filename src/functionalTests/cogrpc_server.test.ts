@@ -13,8 +13,9 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 
-import { arrayToAsyncIterable, asyncIterableToArray, getPromiseRejection } from '../_test_utils';
+import { getPromiseRejection } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';

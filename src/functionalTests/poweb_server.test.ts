@@ -16,8 +16,8 @@ import {
 } from '@relaycorp/relaynet-poweb';
 import pipe from 'it-pipe';
 
-import { asyncIterableToArray, iterableTake } from '../_test_utils';
 import { expectBuffersToEqual } from '../services/_test_utils';
+import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { ExternalPdaChain } from '../testUtils/pki';
 import { GW_POWEB_LOCAL_PORT } from './services';
 import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';

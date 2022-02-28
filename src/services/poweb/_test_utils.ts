@@ -1,15 +1,11 @@
 import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import {
-  arrayToAsyncIterable,
-  mockSpy,
-  MONGO_ENV_VARS,
-  setUpTestDBConnection,
-} from '../../_test_utils';
+import { mockSpy, MONGO_ENV_VARS, setUpTestDBConnection } from '../../_test_utils';
 import * as vault from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { arrayToAsyncIterable } from '../../testUtils/iter';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { configureMockEnvVars, mockFastifyMongoose } from '../_test_utils';

@@ -19,7 +19,7 @@ import { get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
-import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import {
   GW_COGRPC_URL,

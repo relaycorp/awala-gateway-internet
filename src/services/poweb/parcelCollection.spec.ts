@@ -18,9 +18,7 @@ import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
 import {
-  appendErrorToAsyncIterable,
   arrayBufferFrom,
-  arrayToAsyncIterable,
   makeMockLogging,
   MockLogging,
   mockSpy,
@@ -35,6 +33,7 @@ import {
 } from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
+import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
 import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';

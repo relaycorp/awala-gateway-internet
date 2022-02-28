@@ -3,10 +3,9 @@ import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@rel
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
-import { mockSpy } from '../../../testUtils/jest';
+import { getMockInstance, mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
-import { getMockInstance } from '../../_test_utils';
 import { MockGrpcBidiCall, setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
 import { makeServiceImplementation } from '../service';
 

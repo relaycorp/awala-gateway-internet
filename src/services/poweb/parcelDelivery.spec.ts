@@ -5,9 +5,9 @@ import LightMyRequest, { Response as LightMyRequestResponse } from 'light-my-req
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
-import { mockSpy } from '../../testUtils/jest';
+import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
-import { getMockInstance, testDisallowedMethods } from '../_test_utils';
+import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
+import { getMockInstance } from '../../testUtils/jest';
 
 import { partialPinoLog } from '../../testUtils/logging';
-import { getMockInstance } from '../_test_utils';
 import { setUpTestEnvironment } from './_test_utils';
 import { makeServiceImplementation } from './service';
 

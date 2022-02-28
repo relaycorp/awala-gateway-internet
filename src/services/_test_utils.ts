@@ -1,23 +1,12 @@
 import { Certificate, Parcel } from '@relaycorp/relaynet-core';
-import { addDays } from 'date-fns';
 import envVar from 'env-var';
 import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
+import { castMock } from '../testUtils/jest';
 
 import { HTTP_METHODS } from './fastify';
-
-export const TOMORROW = addDays(new Date(), 1);
-
-export function getMockInstance(mockedObject: any): jest.MockInstance<any, any> {
-  return mockedObject as unknown as jest.MockInstance<any, any>;
-}
-
-export function getMockContext(mockedObject: any): jest.MockContext<any, any> {
-  const mockInstance = getMockInstance(mockedObject);
-  return mockInstance.mock;
-}
 
 interface EnvVarSet {
   readonly [key: string]: string | undefined;
@@ -44,10 +33,6 @@ export function configureMockEnvVars(envVars: EnvVarSet = {}): (envVars: EnvVarS
   });
 
   return (newEnvVars: EnvVarSet) => setEnvVars(newEnvVars);
-}
-
-export function castMock<T>(partialMock: Partial<T>): T {
-  return partialMock as unknown as T;
 }
 
 export interface StubParcelOptions {

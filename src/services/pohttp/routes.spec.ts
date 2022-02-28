@@ -5,12 +5,11 @@ import { InjectOptions } from 'light-my-request';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { MONGO_ENV_VARS } from '../../testUtils/db';
-import { mockSpy } from '../../testUtils/jest';
+import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import {
   configureMockEnvVars,
   generateStubParcel,
-  getMockInstance,
   mockFastifyMongoose,
   testDisallowedMethods,
 } from '../_test_utils';

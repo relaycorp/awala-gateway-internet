@@ -16,10 +16,10 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
-import { configureMockEnvVars, getMockInstance, mockStanMessage } from './services/_test_utils';
+import { configureMockEnvVars, mockStanMessage } from './services/_test_utils';
 import { sha256Hex } from './testUtils/crypto';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
-import { mockSpy } from './testUtils/jest';
+import { getMockInstance, mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
 import { generatePdaChain, PdaChain } from './testUtils/pki';
 

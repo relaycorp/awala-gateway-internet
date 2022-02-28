@@ -26,14 +26,13 @@ import * as certs from '../../pki';
 import { arrayBufferFrom, expectBuffersToEqual } from '../../testUtils/buffers';
 import { UUID4_REGEX } from '../../testUtils/crypto';
 import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
-import { mockSpy, useFakeTimers } from '../../testUtils/jest';
+import { getMockInstance, mockSpy, useFakeTimers } from '../../testUtils/jest';
 import {
   makeMockLogging,
   MockLogging,
   partialPinoLog,
   partialPinoLogger,
 } from '../../testUtils/logging';
-import { getMockInstance } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';
 import { WebSocketCode } from './websockets';

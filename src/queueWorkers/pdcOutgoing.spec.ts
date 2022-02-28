@@ -302,9 +302,11 @@ describe('processInternetBoundParcels', () => {
   test('Unknown deliveryAttempts should be treated as no prior attempts', async () => {
     const err = new pohttp.PoHTTPError('Server is down');
     getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
-    const message = mockStanMessage(
-      Buffer.from(JSON.stringify({ ...QUEUE_MESSAGE_DATA, deliveryAttempts: undefined })),
-    );
+    const messageData: QueuedInternetBoundParcelMessage = {
+      ...QUEUE_MESSAGE_DATA,
+      deliveryAttempts: undefined as any,
+    };
+    const message = mockStanMessage(Buffer.from(JSON.stringify(messageData)));
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
     await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);

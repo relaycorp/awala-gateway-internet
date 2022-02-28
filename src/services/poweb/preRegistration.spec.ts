@@ -1,7 +1,7 @@
 import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { testDisallowedMethods } from '../../testUtils/fastify';
 
-import { testDisallowedMethods } from '../_test_utils';
 import { setUpCommonFixtures } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';

@@ -6,9 +6,10 @@ import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { MONGO_ENV_VARS } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
+import { mockFastifyMongoose, testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
-import { generateStubParcel, mockFastifyMongoose, testDisallowedMethods } from '../_test_utils';
+import { generateStubParcel } from '../_test_utils';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');

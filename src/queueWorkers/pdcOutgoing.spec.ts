@@ -299,6 +299,25 @@ describe('processInternetBoundParcels', () => {
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalled();
   });
 
+  test('Unknown deliveryAttempts should be treated as no prior attempts', async () => {
+    const err = new pohttp.PoHTTPError('Server is down');
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
+    const messageData: QueuedInternetBoundParcelMessage = {
+      ...QUEUE_MESSAGE_DATA,
+      deliveryAttempts: undefined as any,
+    };
+    const message = mockStanMessage(Buffer.from(JSON.stringify(messageData)));
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
+      expect.toSatisfy((a) => JSON.parse(a).deliveryAttempts === 1),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   test('Non-PoHTTP errors should be propagated', async () => {
     const err = new Error('This is a bug');
     getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);

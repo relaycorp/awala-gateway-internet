@@ -16,7 +16,7 @@ import {
   retrieveOwnCertificates,
   rotateOwnCertificate,
 } from './pki';
-import { reSerializeCertificate } from './services/_test_utils';
+import { reSerializeCertificate } from './testUtils/pki';
 import { Config, ConfigKey } from './utilities/config';
 
 const getMongooseConnection = setUpTestDBConnection();

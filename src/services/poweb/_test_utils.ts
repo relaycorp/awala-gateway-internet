@@ -5,14 +5,14 @@ import {
   arrayToAsyncIterable,
   mockSpy,
   MONGO_ENV_VARS,
-  PdaChain,
   setUpTestDBConnection,
 } from '../../_test_utils';
 import * as vault from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
-import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
+import { configureMockEnvVars, mockFastifyMongoose } from '../_test_utils';
 
 export interface FixtureSet extends PdaChain {
   readonly getMongooseConnection: () => Connection;

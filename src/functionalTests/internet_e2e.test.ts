@@ -19,14 +19,8 @@ import { get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  ExternalPdaChain,
-  generateCCA,
-  generateCDAChain,
-  iterableTake,
-} from '../_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../_test_utils';
+import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import {
   GW_COGRPC_URL,
   GW_POWEB_LOCAL_PORT,

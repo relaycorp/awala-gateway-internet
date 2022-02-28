@@ -1,22 +1,14 @@
-import {
-  Certificate,
-  generateRSAKeyPair,
-  issueDeliveryAuthorization,
-  issueEndpointCertificate,
-  issueGatewayCertificate,
-  Parcel,
-} from '@relaycorp/relaynet-core';
+import { Certificate, Parcel } from '@relaycorp/relaynet-core';
+import { addDays } from 'date-fns';
 import envVar from 'env-var';
 import { FastifyInstance, HTTPMethods } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
-import { PdaChain } from '../_test_utils';
 import { HTTP_METHODS } from './fastify';
 
-export const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
+export const TOMORROW = addDays(new Date(), 1);
 
 export function getMockInstance(mockedObject: any): jest.MockInstance<any, any> {
   return mockedObject as unknown as jest.MockInstance<any, any>;
@@ -58,69 +50,6 @@ export function castMock<T>(partialMock: Partial<T>): T {
   return partialMock as unknown as T;
 }
 
-// TODO: Replace with respective function in @relaycorp/relaynet-testing
-export async function generatePdaChain(): Promise<PdaChain> {
-  const publicGatewayKeyPair = await generateRSAKeyPair();
-  const publicGatewayCert = reSerializeCertificate(
-    await issueGatewayCertificate({
-      issuerPrivateKey: publicGatewayKeyPair.privateKey,
-      subjectPublicKey: publicGatewayKeyPair.publicKey,
-      validityEndDate: TOMORROW,
-    }),
-  );
-
-  const privateGatewayKeyPair = await generateRSAKeyPair();
-  const privateGatewayCert = reSerializeCertificate(
-    await issueGatewayCertificate({
-      issuerCertificate: publicGatewayCert,
-      issuerPrivateKey: publicGatewayKeyPair.privateKey,
-      subjectPublicKey: privateGatewayKeyPair.publicKey,
-      validityEndDate: TOMORROW,
-    }),
-  );
-
-  const peerEndpointKeyPair = await generateRSAKeyPair();
-  const peerEndpointCert = reSerializeCertificate(
-    await issueEndpointCertificate({
-      issuerCertificate: privateGatewayCert,
-      issuerPrivateKey: privateGatewayKeyPair.privateKey,
-      subjectPublicKey: peerEndpointKeyPair.publicKey,
-      validityEndDate: TOMORROW,
-    }),
-  );
-
-  const endpointKeyPair = await generateRSAKeyPair();
-  const endpointPdaCert = reSerializeCertificate(
-    await issueDeliveryAuthorization({
-      issuerCertificate: peerEndpointCert,
-      issuerPrivateKey: peerEndpointKeyPair.privateKey,
-      subjectPublicKey: endpointKeyPair.publicKey,
-      validityEndDate: TOMORROW,
-    }),
-  );
-
-  return {
-    pdaCert: endpointPdaCert,
-    pdaGranteePrivateKey: endpointKeyPair.privateKey,
-    peerEndpointCert,
-    peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
-    privateGatewayCert,
-    privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    publicGatewayCert,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
-  };
-}
-
-export async function generateStubEndpointCertificate(
-  keyPair: CryptoKeyPair,
-): Promise<Certificate> {
-  return issueEndpointCertificate({
-    issuerPrivateKey: keyPair.privateKey,
-    subjectPublicKey: keyPair.publicKey,
-    validityEndDate: TOMORROW,
-  });
-}
-
 export interface StubParcelOptions {
   readonly recipientAddress: string;
   readonly senderCertificate: Certificate;
@@ -148,15 +77,6 @@ export function expectBuffersToEqual<T extends Buffer | ArrayBuffer>(buffer1: T,
     const actualBuffer2 = Buffer.from(buffer2);
     expect(actualBuffer1.equals(actualBuffer2)).toBeTrue();
   }
-}
-
-export function reSerializeCertificate(cert: Certificate): Certificate {
-  // TODO: Raise bug in PKI.js project
-  // PKI.js sometimes tries to use attributes that are only set *after* the certificate has been
-  // deserialized, so you'd get a TypeError if you use a certificate you just created in memory.
-  // For example, `extension.parsedValue` would be `undefined` in
-  // https://github.com/PeculiarVentures/PKI.js/blob/9a39551aa9f1445406f96680318014c8d714e8e3/src/CertificateChainValidationEngine.js#L155
-  return Certificate.deserialize(cert.serialize());
 }
 
 export function mockStanMessage(messageData: Buffer | ArrayBuffer): stan.Message {

@@ -14,7 +14,6 @@ import {
   MockLogging,
   mockSpy,
   partialPinoLog,
-  PdaChain,
   sha256Hex,
 } from './_test_utils';
 import * as natsStreaming from './backingServices/natsStreaming';
@@ -27,12 +26,8 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  mockStanMessage,
-} from './services/_test_utils';
+import { configureMockEnvVars, getMockInstance, mockStanMessage } from './services/_test_utils';
+import { generatePdaChain, PdaChain } from './testUtils/pki';
 
 const BUCKET = 'the-bucket-name';
 

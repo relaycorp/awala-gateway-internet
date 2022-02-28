@@ -1,22 +1,8 @@
-import {
-  CargoCollectionAuthorization,
-  CargoCollectionRequest,
-  Certificate,
-  issueDeliveryAuthorization,
-  issueGatewayCertificate,
-  SessionEnvelopedData,
-  SessionKey,
-} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { BinaryLike, createHash, Hash } from 'crypto';
 import { Connection, createConnection } from 'mongoose';
 import pino, { symbols as PinoSymbols } from 'pino';
 import split2 from 'split2';
-
-import { reSerializeCertificate } from './services/_test_utils';
-
-export const TOMORROW = new Date();
-TOMORROW.setDate(TOMORROW.getDate() + 1);
 
 export const UUID4_REGEX = expect.stringMatching(/^[0-9a-f-]+$/);
 
@@ -148,70 +134,6 @@ export function iterableTake<T>(max: number): (iterable: AsyncIterable<T>) => As
       }
     }
   };
-}
-
-export interface CDAChain {
-  readonly publicGatewayCert: Certificate;
-  readonly privateGatewayCert: Certificate;
-}
-
-export interface ExternalPdaChain extends CDAChain {
-  readonly privateGatewayPrivateKey: CryptoKey;
-  readonly peerEndpointCert: Certificate;
-  readonly peerEndpointPrivateKey: CryptoKey;
-  readonly pdaCert: Certificate;
-  readonly pdaGranteePrivateKey: CryptoKey;
-}
-
-export interface PdaChain extends ExternalPdaChain {
-  readonly publicGatewayPrivateKey: CryptoKey;
-}
-
-// TODO: Replace with respective function in @relaycorp/relaynet-testing
-export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAChain> {
-  const privateGatewayCert = reSerializeCertificate(
-    await issueGatewayCertificate({
-      issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
-      subjectPublicKey: await pdaChain.privateGatewayCert.getPublicKey(),
-      validityEndDate: pdaChain.privateGatewayCert.expiryDate,
-    }),
-  );
-  const publicGatewayCert = reSerializeCertificate(
-    await issueDeliveryAuthorization({
-      issuerCertificate: privateGatewayCert,
-      issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
-      subjectPublicKey: await pdaChain.publicGatewayCert.getPublicKey(),
-      validityEndDate: pdaChain.publicGatewayCert.expiryDate,
-    }),
-  );
-  return { privateGatewayCert, publicGatewayCert };
-}
-
-export interface GeneratedCCA {
-  readonly cca: CargoCollectionAuthorization;
-  readonly ccaSerialized: Buffer;
-  readonly sessionPrivateKey: CryptoKey;
-}
-
-export async function generateCCA(
-  publicGatewayAddress: string,
-  publicGatewaySessionKey: SessionKey,
-  publicGatewayCDA: Certificate,
-  privateGatewayCertificate: Certificate,
-  privateGatewayPrivateKey: CryptoKey,
-): Promise<GeneratedCCA> {
-  const ccr = new CargoCollectionRequest(publicGatewayCDA);
-  const { envelopedData, dhPrivateKey } = await SessionEnvelopedData.encrypt(
-    ccr.serialize(),
-    publicGatewaySessionKey,
-  );
-  const cca = new CargoCollectionAuthorization(
-    publicGatewayAddress,
-    privateGatewayCertificate,
-    Buffer.from(envelopedData.serialize()),
-  );
-  const ccaSerialized = await cca.serialize(privateGatewayPrivateKey);
-  return { cca, ccaSerialized: Buffer.from(ccaSerialized), sessionPrivateKey: dhPrivateKey };
 }
 
 export function useFakeTimers(): void {

@@ -2,12 +2,12 @@ import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
+import { mockSpy, MONGO_ENV_VARS } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
+import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import {
   configureMockEnvVars,
-  generatePdaChain,
   generateStubParcel,
   getMockInstance,
   mockFastifyMongoose,

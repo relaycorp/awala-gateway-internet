@@ -23,7 +23,6 @@ import {
   MockLogging,
   mockSpy,
   partialPinoLog,
-  PdaChain,
 } from '../_test_utils';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
@@ -34,10 +33,10 @@ import { ParcelStore } from '../parcelStore';
 import {
   castMock,
   configureMockEnvVars,
-  generatePdaChain,
   getMockInstance,
   mockStanMessage,
 } from '../services/_test_utils';
+import { generatePdaChain, PdaChain } from '../testUtils/pki';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';

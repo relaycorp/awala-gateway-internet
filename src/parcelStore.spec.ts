@@ -235,12 +235,12 @@ describe('streamActiveParcelsForGateway', () => {
   });
 
   test('Only existing, active parcels should be retrieved', async () => {
-    const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+    const parcelStore = new ParcelStore(new MockObjectStore([]), BUCKET);
     const parcelRetrieverSpy = jest
-      .spyOn(store, 'retrieveActiveParcelsForGateway')
+      .spyOn(parcelStore, 'retrieveActiveParcelsForGateway')
       .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
-    const activeParcels = store.streamActiveParcelsForGateway(
+    const activeParcels = parcelStore.streamActiveParcelsForGateway(
       peerGatewayAddress,
       mockLogging.logger,
     );
@@ -253,18 +253,24 @@ describe('streamActiveParcelsForGateway', () => {
 
   describe('Acknowledgement callback', () => {
     test('Parcel should be deleted from store when callback is called', async () => {
-      const store = new ParcelStore(mockObjectStoreClient, BUCKET);
+      const deleteObjectCall = new DeleteObjectCall();
+      const objectStore = new MockObjectStore([deleteObjectCall]);
+      const parcelStore = new ParcelStore(objectStore, BUCKET);
       jest
-        .spyOn(store, 'retrieveActiveParcelsForGateway')
+        .spyOn(parcelStore, 'retrieveActiveParcelsForGateway')
         .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
       const [message] = await asyncIterableToArray(
-        store.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+        parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
       );
 
-      expect(mockObjectStoreClient.deleteObject).not.toBeCalled();
+      expect(deleteObjectCall.wasCalled).toBeFalse();
       await message.ack();
-      expect(mockObjectStoreClient.deleteObject).toBeCalledWith(parcelObject.key, BUCKET);
+      expect(deleteObjectCall.wasCalled).toBeTrue();
+      expect(deleteObjectCall.arguments).toEqual<DeleteObjectArgs>({
+        bucket: BUCKET,
+        key: parcelObject.key,
+      });
     });
   });
 });

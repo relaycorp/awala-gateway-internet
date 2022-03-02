@@ -176,7 +176,10 @@ describe('liveStreamActiveParcelsForGateway', () => {
   describe('Acknowledgement callback', () => {
     test('NATS Streaming ack callback should be called', async () => {
       const stanMessage = mockParcelStanMessage(activeParcelKey);
-      const objectStore = new MockObjectStore([new GetObjectCall(activeParcelObject)]);
+      const objectStore = new MockObjectStore([
+        new GetObjectCall(activeParcelObject),
+        new DeleteObjectCall(),
+      ]);
       const parcelStore = new ParcelStore(objectStore, BUCKET);
 
       const [activeParcel] = await pipe(
@@ -362,19 +365,6 @@ describe('retrieveActiveParcelsForGateway', () => {
       ),
     ).resolves.toHaveLength(0);
   });
-
-  function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
-    readonly getObjectCalls: readonly GetObjectCall[];
-    readonly listObjectKeysCall: ListObjectKeysCall;
-    readonly objectStore: MockObjectStore;
-  } {
-    const listObjectKeysCall = new ListObjectKeysCall(
-      arrayToAsyncIterable(Object.keys(objectsByKey)),
-    );
-    const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
-    const objectStore = new MockObjectStore([listObjectKeysCall, ...getObjectCalls]);
-    return { listObjectKeysCall, getObjectCalls, objectStore };
-  }
 });
 
 describe('storeParcelFromPeerGateway', () => {
@@ -868,32 +858,34 @@ describe('storeEndpointBoundParcel', () => {
 });
 
 describe('deleteEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-
   test('Object should be deleted from the right bucket', async () => {
-    await store.deleteEndpointBoundParcel('');
+    const deleteObjectCall = new DeleteObjectCall();
+    const parcelStore = new ParcelStore(new MockObjectStore([deleteObjectCall]), BUCKET);
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    await parcelStore.deleteEndpointBoundParcel('');
+
+    expect(deleteObjectCall.wasCalled).toBeTrue();
+    expect(deleteObjectCall.arguments?.bucket).toEqual(BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
     const key = 'thingy.parcel';
-    await store.deleteEndpointBoundParcel(key);
+    const deleteObjectCall = new DeleteObjectCall();
+    const parcelStore = new ParcelStore(new MockObjectStore([deleteObjectCall]), BUCKET);
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
+    await parcelStore.deleteEndpointBoundParcel(key);
+
+    expect(deleteObjectCall.wasCalled).toBeTrue();
+    expect(deleteObjectCall.arguments?.bucket).toEqual(`parcels/endpoint-bound/${key}`);
   });
 });
 
 describe('initFromEnv', () => {
-  const requiredEnvVars = {
-    OBJECT_STORE_BUCKET: 'the-bucket',
-  };
+  const requiredEnvVars = { OBJECT_STORE_BUCKET: BUCKET };
   const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 
-  jest.spyOn(objectStorage, 'initObjectStoreFromEnv').mockReturnValue(mockObjectStoreClient);
+  const objectStore = new MockObjectStore([]);
+  jest.spyOn(objectStorage, 'initObjectStoreFromEnv').mockReturnValue(objectStore);
 
   test('OBJECT_STORE_BUCKET should be required', () => {
     mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });
@@ -909,25 +901,24 @@ describe('initFromEnv', () => {
 });
 
 describe('makeActiveParcelRetriever', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-
   test('Active parcels should be output', async () => {
     const parcelObjectMetadata: ParcelObjectMetadata<{ readonly foo: string }> = {
       extra: { foo: 'bar' },
       key: 'prefix/active.parcel',
     };
     const expiryDate = getDateRelativeToNow(1);
-    setMockParcelObjectStore({
+    const { objectStore } = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
       },
     });
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(mockLogging.logger),
+        parcelStore.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toEqual([{ ...parcelObjectMetadata, body: parcelSerialized, expiryDate }]);
@@ -939,17 +930,18 @@ describe('makeActiveParcelRetriever', () => {
       key: 'prefix/expired.parcel',
     };
     const expiryDate = getDateRelativeToNow(0);
-    setMockParcelObjectStore({
+    const { objectStore } = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
       },
     });
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(mockLogging.logger),
+        parcelStore.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
@@ -967,17 +959,18 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/invalid.parcel',
     };
-    setMockParcelObjectStore({
+    const { objectStore } = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: {},
       },
     });
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(mockLogging.logger),
+        parcelStore.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
@@ -994,17 +987,18 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/invalid-expiry.parcel',
     };
-    setMockParcelObjectStore({
+    const { objectStore } = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': 'I have seen many numbers in my life. This is not one.' },
       },
     });
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(mockLogging.logger),
+        parcelStore.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
@@ -1021,12 +1015,13 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/deleted.parcel',
     };
-    getMockInstance(mockObjectStoreClient.getObject).mockResolvedValue(null);
+    const objectStore = new MockObjectStore([new GetObjectCall(null)]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
     await expect(
       pipe(
         [parcelObjectMetadata],
-        store.makeActiveParcelRetriever(mockLogging.logger),
+        parcelStore.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
     ).resolves.toHaveLength(0);
@@ -1041,17 +1036,20 @@ describe('makeActiveParcelRetriever', () => {
       ),
     );
   });
-
-  function setMockParcelObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): void {
-    getMockInstance(mockObjectStoreClient.listObjectKeys).mockReturnValue(
-      arrayToAsyncIterable(Object.keys(objectsByKey)),
-    );
-
-    getMockInstance(mockObjectStoreClient.getObject).mockImplementation(
-      (objectKey) => objectsByKey[objectKey],
-    );
-  }
 });
+
+function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
+  readonly getObjectCalls: readonly GetObjectCall[];
+  readonly listObjectKeysCall: ListObjectKeysCall;
+  readonly objectStore: MockObjectStore;
+} {
+  const listObjectKeysCall = new ListObjectKeysCall(
+    arrayToAsyncIterable(Object.keys(objectsByKey)),
+  );
+  const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
+  const objectStore = new MockObjectStore([listObjectKeysCall, ...getObjectCalls]);
+  return { listObjectKeysCall, getObjectCalls, objectStore };
+}
 
 function getDateRelativeToNow(deltaSeconds: number): Date {
   const date = new Date();

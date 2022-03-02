@@ -598,27 +598,32 @@ describe('storeGatewayBoundParcel', () => {
 });
 
 describe('deleteGatewayBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-
   test('Object should be deleted from the right bucket', async () => {
-    await store.deleteGatewayBoundParcel('', '', '', '');
+    const deleteObjectCall = new DeleteObjectCall();
+    const parcelStore = new ParcelStore(new MockObjectStore([deleteObjectCall]), BUCKET);
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
+    await parcelStore.deleteGatewayBoundParcel('', '', '', '');
+
+    expect(deleteObjectCall.wasCalled).toBeTrue();
+    expect(deleteObjectCall.arguments?.bucket).toEqual(BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
+    const deleteObjectCall = new DeleteObjectCall();
+    const parcelStore = new ParcelStore(new MockObjectStore([deleteObjectCall]), BUCKET);
     const parcelId = 'thingy.parcel';
     const senderPrivateAddress = '0deadbeef';
     const recipientAddress = '0deadc0de';
     const recipientGatewayAddress = '0beef';
-    await store.deleteGatewayBoundParcel(
+
+    await parcelStore.deleteGatewayBoundParcel(
       parcelId,
       senderPrivateAddress,
       recipientAddress,
       recipientGatewayAddress,
     );
 
-    expect(mockObjectStoreClient.deleteObject).toBeCalledWith(
+    expect(deleteObjectCall.arguments?.key).toEqual(
       [
         'parcels/gateway-bound',
         recipientGatewayAddress,
@@ -626,46 +631,50 @@ describe('deleteGatewayBoundParcel', () => {
         senderPrivateAddress,
         sha256Hex(parcelId),
       ].join('/'),
-      expect.anything(),
     );
   });
 });
 
 describe('retrieveEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-
-  beforeEach(() => {
-    getMockInstance(mockObjectStoreClient.getObject).mockResolvedValue({
-      body: parcelSerialized,
-    });
-  });
+  const parcelObject: StoreObject = {
+    body: parcelSerialized,
+    metadata: {},
+  };
 
   test('Object should be retrieved from the right bucket', async () => {
-    await store.retrieveEndpointBoundParcel('');
+    const getObjectCall = new GetObjectCall(parcelObject);
+    const parcelStore = new ParcelStore(new MockObjectStore([getObjectCall]), BUCKET);
 
-    expect(mockObjectStoreClient.getObject).toBeCalledWith(expect.anything(), BUCKET);
+    await parcelStore.retrieveEndpointBoundParcel('');
+
+    expect(getObjectCall.wasCalled).toBeTrue();
+    expect(getObjectCall.arguments?.bucket).toEqual(BUCKET);
   });
 
   test('Lookup object key should be prefixed', async () => {
+    const getObjectCall = new GetObjectCall(parcelObject);
+    const parcelStore = new ParcelStore(new MockObjectStore([getObjectCall]), BUCKET);
     const key = 'thingy.parcel';
-    await store.retrieveEndpointBoundParcel(key);
 
-    expect(mockObjectStoreClient.getObject).toBeCalledWith(
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
+    await parcelStore.retrieveEndpointBoundParcel(key);
+
+    expect(getObjectCall.arguments?.key).toEqual(`parcels/endpoint-bound/${key}`);
   });
 
   test('Parcel should be returned', async () => {
-    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
+    const objectStore = new MockObjectStore([new GetObjectCall(parcelObject)]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    const retrievedParcelSerialized = await parcelStore.retrieveEndpointBoundParcel('key');
 
     expect(retrievedParcelSerialized).toEqual(parcelSerialized);
   });
 
   test('Nothing should be returned if the object does not exist', async () => {
-    getMockInstance(mockObjectStoreClient.getObject).mockResolvedValue(null);
+    const objectStore = new MockObjectStore([new GetObjectCall(null)]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
 
-    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
+    const retrievedParcelSerialized = await parcelStore.retrieveEndpointBoundParcel('key');
 
     expect(retrievedParcelSerialized).toBeNull();
   });

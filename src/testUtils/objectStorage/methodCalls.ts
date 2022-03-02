@@ -12,7 +12,7 @@ import {
 
 export class MockMethodCall<CallArguments extends CallArgs, ResultType> {
   // tslint:disable-next-line:readonly-keyword
-  public _wasCalled = false;
+  private _wasCalled = false;
   // tslint:disable-next-line:readonly-keyword
   private args: CallArguments | undefined = undefined;
 

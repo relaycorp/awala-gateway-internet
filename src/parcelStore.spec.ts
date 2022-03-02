@@ -109,10 +109,9 @@ describe('liveStreamActiveParcelsForGateway', () => {
   test('Only key in message should be retrieved', async () => {
     mockParcelStanMessage(activeParcelKey);
     const getObjectCall = new GetObjectCall(activeParcelObject);
-    const objectStore = new MockObjectStore([getObjectCall]);
-    const parcelStore = new ParcelStore(objectStore, BUCKET);
+    const parcelStore = new ParcelStore(new MockObjectStore([getObjectCall]), BUCKET);
 
-    pipe(
+    await pipe(
       parcelStore.liveStreamActiveParcelsForGateway(
         peerGatewayAddress,
         MOCK_NATS_CLIENT,
@@ -120,6 +119,7 @@ describe('liveStreamActiveParcelsForGateway', () => {
         mockLogging.logger,
       ),
       iterableTake(1),
+      asyncIterableToArray,
     );
 
     expect(getObjectCall.wasCalled).toBeTrue();
@@ -365,6 +365,19 @@ describe('retrieveActiveParcelsForGateway', () => {
       ),
     ).resolves.toHaveLength(0);
   });
+
+  function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
+    readonly getObjectCalls: readonly GetObjectCall[];
+    readonly listObjectKeysCall: ListObjectKeysCall;
+    readonly objectStore: MockObjectStore;
+  } {
+    const listObjectKeysCall = new ListObjectKeysCall(
+      arrayToAsyncIterable(Object.keys(objectsByKey)),
+    );
+    const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
+    const objectStore = new MockObjectStore([listObjectKeysCall, ...getObjectCalls]);
+    return { listObjectKeysCall, getObjectCalls, objectStore };
+  }
 });
 
 describe('storeParcelFromPeerGateway', () => {
@@ -628,10 +641,10 @@ describe('deleteGatewayBoundParcel', () => {
 });
 
 describe('retrieveEndpointBoundParcel', () => {
-  const parcelObject: StoreObject = {
-    body: parcelSerialized,
-    metadata: {},
-  };
+  let parcelObject: StoreObject;
+  beforeAll(() => {
+    parcelObject = { body: parcelSerialized, metadata: {} };
+  });
 
   test('Object should be retrieved from the right bucket', async () => {
     const getObjectCall = new GetObjectCall(parcelObject);
@@ -803,7 +816,7 @@ describe('storeEndpointBoundParcel', () => {
     expect(putObjectCall.wasCalled).toBeTrue();
     expect(putObjectCall.arguments).toEqual<PutObjectArgs>({
       bucket: BUCKET,
-      key: key!!,
+      key: `parcels/endpoint-bound/${key}`,
       object: { body: parcelSerialized, metadata: {} },
     });
   });
@@ -876,7 +889,7 @@ describe('deleteEndpointBoundParcel', () => {
     await parcelStore.deleteEndpointBoundParcel(key);
 
     expect(deleteObjectCall.wasCalled).toBeTrue();
-    expect(deleteObjectCall.arguments?.bucket).toEqual(`parcels/endpoint-bound/${key}`);
+    expect(deleteObjectCall.arguments?.key).toEqual(`parcels/endpoint-bound/${key}`);
   });
 });
 
@@ -1036,20 +1049,16 @@ describe('makeActiveParcelRetriever', () => {
       ),
     );
   });
-});
 
-function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
-  readonly getObjectCalls: readonly GetObjectCall[];
-  readonly listObjectKeysCall: ListObjectKeysCall;
-  readonly objectStore: MockObjectStore;
-} {
-  const listObjectKeysCall = new ListObjectKeysCall(
-    arrayToAsyncIterable(Object.keys(objectsByKey)),
-  );
-  const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
-  const objectStore = new MockObjectStore([listObjectKeysCall, ...getObjectCalls]);
-  return { listObjectKeysCall, getObjectCalls, objectStore };
-}
+  function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
+    readonly getObjectCalls: readonly GetObjectCall[];
+    readonly objectStore: MockObjectStore;
+  } {
+    const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
+    const objectStore = new MockObjectStore(getObjectCalls);
+    return { getObjectCalls, objectStore };
+  }
+});
 
 function getDateRelativeToNow(deltaSeconds: number): Date {
   const date = new Date();

@@ -920,7 +920,7 @@ describe('makeActiveParcelRetriever', () => {
       key: 'prefix/active.parcel',
     };
     const expiryDate = getDateRelativeToNow(1);
-    const { objectStore } = makeMockObjectStore({
+    const objectStore = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
@@ -943,7 +943,7 @@ describe('makeActiveParcelRetriever', () => {
       key: 'prefix/expired.parcel',
     };
     const expiryDate = getDateRelativeToNow(0);
-    const { objectStore } = makeMockObjectStore({
+    const objectStore = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': getTimestamp(expiryDate).toString() },
@@ -972,7 +972,7 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/invalid.parcel',
     };
-    const { objectStore } = makeMockObjectStore({
+    const objectStore = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: {},
@@ -1000,7 +1000,7 @@ describe('makeActiveParcelRetriever', () => {
       extra: null,
       key: 'prefix/invalid-expiry.parcel',
     };
-    const { objectStore } = makeMockObjectStore({
+    const objectStore = makeMockObjectStore({
       [parcelObjectMetadata.key]: {
         body: parcelSerialized,
         metadata: { 'parcel-expiry': 'I have seen many numbers in my life. This is not one.' },
@@ -1050,13 +1050,11 @@ describe('makeActiveParcelRetriever', () => {
     );
   });
 
-  function makeMockObjectStore(objectsByKey: { readonly [key: string]: StoreObject }): {
-    readonly getObjectCalls: readonly GetObjectCall[];
-    readonly objectStore: MockObjectStore;
-  } {
+  function makeMockObjectStore(objectsByKey: {
+    readonly [key: string]: StoreObject;
+  }): MockObjectStore {
     const getObjectCalls = Object.values(objectsByKey).map((obj) => new GetObjectCall(obj));
-    const objectStore = new MockObjectStore(getObjectCalls);
-    return { getObjectCalls, objectStore };
+    return new MockObjectStore(getObjectCalls);
   }
 });
 

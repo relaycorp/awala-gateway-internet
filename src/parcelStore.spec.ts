@@ -1,6 +1,7 @@
 import { StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
+import { addSeconds } from 'date-fns';
 import { EnvVarError } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
@@ -25,6 +26,7 @@ import {
   DeleteObjectArgs,
   GetObjectArgs,
   ListObjectKeysArgs,
+  PutObjectArgs,
 } from './testUtils/objectStorage/args';
 import {
   DeleteObjectCall,
@@ -681,8 +683,6 @@ describe('retrieveEndpointBoundParcel', () => {
 });
 
 describe('storeEndpointBoundParcel', () => {
-  const store = new ParcelStore(mockObjectStoreClient, BUCKET);
-
   const mockWasParcelCollected = mockSpy(
     jest.spyOn(parcelCollection, 'wasParcelCollected'),
     () => false,
@@ -693,8 +693,8 @@ describe('storeEndpointBoundParcel', () => {
   );
 
   test('Parcel should be refused if it is invalid', async () => {
-    const invalidParcelCreationDate = new Date();
-    invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() + 5);
+    const parcelStore = new ParcelStore(new MockObjectStore([]), BUCKET);
+    const invalidParcelCreationDate = addSeconds(new Date(), 5);
     const invalidParcel = new Parcel(
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
       pdaChain.pdaCert,
@@ -704,7 +704,7 @@ describe('storeEndpointBoundParcel', () => {
     const invalidParcelSerialized = await invalidParcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     await expect(
-      store.storeEndpointBoundParcel(
+      parcelStore.storeEndpointBoundParcel(
         invalidParcel,
         Buffer.from(invalidParcelSerialized),
         peerGatewayAddress,
@@ -713,11 +713,13 @@ describe('storeEndpointBoundParcel', () => {
         mockLogging.logger,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(mockObjectStoreClient.putObject).not.toBeCalled();
   });
 
   test('Debug log confirming validity of parcel should be recorded', async () => {
-    await store.storeEndpointBoundParcel(
+    const objectStore = new MockObjectStore([new PutObjectCall()]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -730,10 +732,11 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel should be ignored if it was already processed', async () => {
+    const parcelStore = new ParcelStore(new MockObjectStore([]), BUCKET);
     mockWasParcelCollected.mockResolvedValue(true);
 
     await expect(
-      store.storeEndpointBoundParcel(
+      parcelStore.storeEndpointBoundParcel(
         parcel,
         parcelSerialized,
         peerGatewayAddress,
@@ -743,7 +746,6 @@ describe('storeEndpointBoundParcel', () => {
       ),
     ).resolves.toBeNull();
 
-    expect(mockObjectStoreClient.putObject).not.toBeCalled();
     expect(mockWasParcelCollected).toBeCalledWith(
       parcel,
       peerGatewayAddress,
@@ -755,7 +757,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('The processing of the parcel should be recorded if successful', async () => {
-    await store.storeEndpointBoundParcel(
+    const objectStore = new MockObjectStore([new PutObjectCall()]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -775,7 +780,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Generated object key should be output', async () => {
-    const key = await store.storeEndpointBoundParcel(
+    const objectStore = new MockObjectStore([new PutObjectCall()]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    const key = await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -789,8 +797,11 @@ describe('storeEndpointBoundParcel', () => {
     expect(key).toMatch(expectedKey);
   });
 
-  test('Object should be put in the right bucket', async () => {
-    await store.storeEndpointBoundParcel(
+  test('Parcel should be put in the right bucket and key', async () => {
+    const putObjectCall = new PutObjectCall();
+    const parcelStore = new ParcelStore(new MockObjectStore([putObjectCall]), BUCKET);
+
+    const key = await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -799,15 +810,19 @@ describe('storeEndpointBoundParcel', () => {
       mockLogging.logger,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
-      expect.anything(),
-      expect.anything(),
-      BUCKET,
-    );
+    expect(putObjectCall.wasCalled).toBeTrue();
+    expect(putObjectCall.arguments).toEqual<PutObjectArgs>({
+      bucket: BUCKET,
+      key: key!!,
+      object: { body: parcelSerialized, metadata: {} },
+    });
   });
 
-  test('Parcel should be stored with generated object key', async () => {
-    const key = await store.storeEndpointBoundParcel(
+  test('Successful parcel storage should be logged', async () => {
+    const objectStore = new MockObjectStore([new PutObjectCall()]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    const parcelObjectKey = await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -816,35 +831,16 @@ describe('storeEndpointBoundParcel', () => {
       mockLogging.logger,
     );
 
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
-      expect.anything(),
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
-  });
-
-  test('Parcel serialization should be stored', async () => {
-    const parcelObjectKey = await store.storeEndpointBoundParcel(
-      parcel,
-      parcelSerialized,
-      peerGatewayAddress,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
-
-    expect(mockObjectStoreClient.putObject).toBeCalledWith(
-      expect.objectContaining({ body: parcelSerialized }),
-      expect.anything(),
-      expect.anything(),
-    );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel object was successfully stored', { parcelObjectKey }),
     );
   });
 
   test('Parcel data should be published to right NATS Streaming channel', async () => {
-    const parcelObjectKey = await store.storeEndpointBoundParcel(
+    const objectStore = new MockObjectStore([new PutObjectCall()]);
+    const parcelStore = new ParcelStore(objectStore, BUCKET);
+
+    const parcelObjectKey = await parcelStore.storeEndpointBoundParcel(
       parcel,
       parcelSerialized,
       peerGatewayAddress,

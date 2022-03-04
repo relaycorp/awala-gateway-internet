@@ -1,4 +1,5 @@
 import {
+  CertificateScope,
   derSerializePublicKey,
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
@@ -55,7 +56,10 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
-      const publicGatewayCertificate = await certificateStore.retrieveLatest(privateAddress!!);
+      const publicGatewayCertificate = await certificateStore.retrieveLatest(
+        privateAddress!!,
+        CertificateScope.PDA,
+      );
       const gatewayPublicKey = await publicGatewayCertificate!!.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;

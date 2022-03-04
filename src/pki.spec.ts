@@ -1,5 +1,6 @@
 import {
   Certificate,
+  CertificateScope,
   derSerializePublicKey,
   generateRSAKeyPair,
   getPrivateAddressFromIdentityKey,
@@ -62,7 +63,7 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('A single certificate should be returned when there is one certificate', async () => {
-    await certificateStore.save(certificate1);
+    await certificateStore.save(certificate1, CertificateScope.PDA);
 
     const certs = await retrieveOwnCertificates(getMongooseConnection());
 
@@ -71,8 +72,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('Multiple certificates should be returned when there are multiple certificates', async () => {
-    await certificateStore.save(certificate1);
-    await certificateStore.save(certificate2);
+    await certificateStore.save(certificate1, CertificateScope.PDA);
+    await certificateStore.save(certificate2, CertificateScope.PDA);
 
     const certs = await retrieveOwnCertificates(getMongooseConnection());
 
@@ -93,11 +94,15 @@ describe('rotateOwnCertificate', () => {
   mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
   test('New certificate should be created if there are none', async () => {
-    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.toBeNull();
+    await expect(
+      certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA),
+    ).resolves.toBeNull();
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    await expect(certificateStore.retrieveLatest(privateAddress)).resolves.not.toBeNull();
+    await expect(
+      certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA),
+    ).resolves.not.toBeNull();
   });
 
   test('New certificate should be created if latest expires in less than 180 days', async () => {
@@ -107,11 +112,14 @@ describe('rotateOwnCertificate', () => {
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: subSeconds(cutoffDate, 1),
     });
-    await certificateStore.save(certificate);
+    await certificateStore.save(certificate, CertificateScope.PDA);
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    const newCertificate = await certificateStore.retrieveLatest(privateAddress);
+    const newCertificate = await certificateStore.retrieveLatest(
+      privateAddress,
+      CertificateScope.PDA,
+    );
     expect(certificate.isEqual(newCertificate!!)).toBeFalse();
   });
 
@@ -122,18 +130,24 @@ describe('rotateOwnCertificate', () => {
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: addSeconds(cutoffDate, 1),
     });
-    await certificateStore.save(certificate);
+    await certificateStore.save(certificate, CertificateScope.PDA);
 
     await expect(rotateOwnCertificate(getMongooseConnection())).resolves.toBeNull();
 
-    const newCertificate = await certificateStore.retrieveLatest(privateAddress);
+    const newCertificate = await certificateStore.retrieveLatest(
+      privateAddress,
+      CertificateScope.PDA,
+    );
     expect(certificate.isEqual(newCertificate!!)).toBeTrue();
   });
 
   test('New certificate should be output', async () => {
     const newCertificate = await rotateOwnCertificate(getMongooseConnection());
 
-    const latestCertificate = await certificateStore.retrieveLatest(privateAddress);
+    const latestCertificate = await certificateStore.retrieveLatest(
+      privateAddress,
+      CertificateScope.PDA,
+    );
 
     expect(newCertificate!.isEqual(latestCertificate!!)).toBeTrue();
   });
@@ -141,14 +155,14 @@ describe('rotateOwnCertificate', () => {
   test('New certificate should be self-issued', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const certificate = await certificateStore.retrieveLatest(privateAddress);
+    const certificate = await certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA);
     expect(certificate!.getIssuerPrivateAddress()).toEqual(privateAddress);
   });
 
   test('New certificate should use existing key pair', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const certificate = await certificateStore.retrieveLatest(privateAddress);
+    const certificate = await certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA);
     await expect(derSerializePublicKey(await certificate!.getPublicKey())).resolves.toEqual(
       await derSerializePublicKey(identityKeyPair.publicKey),
     );
@@ -159,7 +173,7 @@ describe('rotateOwnCertificate', () => {
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    const certificate = await certificateStore.retrieveLatest(privateAddress);
+    const certificate = await certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA);
     expect(certificate!.startDate).toBeAfter(subSeconds(expectedStartDate, 1));
     expect(certificate!.startDate).toBeBeforeOrEqualTo(addSeconds(expectedStartDate, 10));
   });
@@ -167,7 +181,7 @@ describe('rotateOwnCertificate', () => {
   test('New certificate should expire in 360 days', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const certificate = await certificateStore.retrieveLatest(privateAddress);
+    const certificate = await certificateStore.retrieveLatest(privateAddress, CertificateScope.PDA);
     const expectedExpiryDate = addDays(new Date(), 360);
     expect(certificate!.expiryDate).toBeBeforeOrEqualTo(expectedExpiryDate);
     expect(certificate!.expiryDate).toBeAfter(subSeconds(expectedExpiryDate, 5));

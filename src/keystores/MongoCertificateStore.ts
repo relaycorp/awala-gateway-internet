@@ -1,4 +1,4 @@
-import { CertificateStore } from '@relaycorp/relaynet-core';
+import { CertificateScope, CertificateStore } from '@relaycorp/relaynet-core';
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Connection } from 'mongoose';
@@ -22,16 +22,19 @@ export class MongoCertificateStore extends CertificateStore {
     subjectPrivateAddress: string,
     subjectCertificateSerialized: ArrayBuffer,
     subjectCertificateExpiryDate: Date,
+    scope: CertificateScope,
   ): Promise<void> {
     const record: Certificate = {
       certificateSerialized: Buffer.from(subjectCertificateSerialized),
       expiryDate: subjectCertificateExpiryDate,
+      scope,
       subjectPrivateAddress,
     };
     await this.certificateModel
       .updateOne(
         {
           expiryDate: subjectCertificateExpiryDate,
+          scope,
           subjectPrivateAddress,
         },
         record,

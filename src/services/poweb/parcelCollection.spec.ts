@@ -1,12 +1,11 @@
 import {
   CertificateError,
   CMSError,
-  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
   InvalidMessageError,
+  ParcelCollectionHandshakeSigner,
   ParcelDelivery,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
@@ -54,11 +53,9 @@ beforeEach(() => {
   );
 });
 
-let nonceSigner: Signer;
 let peerGatewayAddress: string;
 beforeAll(async () => {
   const fixtures = getFixtures();
-  nonceSigner = new Signer(fixtures.privateGatewayCert, fixtures.privateGatewayPrivateKey);
   peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
@@ -762,9 +759,12 @@ class MockPoWebClient extends MockClient {
 
   protected async completeHandshake(): Promise<void> {
     const challenge = HandshakeChallenge.deserialize((await this.receive()) as ArrayBuffer);
-    const response = new HandshakeResponse([
-      await nonceSigner.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE),
-    ]);
+    const fixtures = getFixtures();
+    const nonceSigner = new ParcelCollectionHandshakeSigner(
+      fixtures.privateGatewayCert,
+      fixtures.privateGatewayPrivateKey,
+    );
+    const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
 
     await this.send(Buffer.from(response.serialize()));
   }

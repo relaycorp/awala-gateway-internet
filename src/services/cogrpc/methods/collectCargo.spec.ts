@@ -6,6 +6,7 @@ import {
   CargoMessageSet,
   CargoMessageStream,
   CertificateRotation,
+  CertificateScope,
   derSerializePublicKey,
   generateRSAKeyPair,
   InvalidMessageError,
@@ -85,7 +86,7 @@ beforeEach(async () => {
   const connection = getMongooseConnection();
 
   const certificateStore = new MongoCertificateStore(connection);
-  await certificateStore.save(pdaChain.publicGateway);
+  await certificateStore.save(pdaChain.publicGateway, CertificateScope.PDA);
 
   const config = new Config(connection);
   await config.set(

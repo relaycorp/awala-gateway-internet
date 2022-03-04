@@ -4,12 +4,13 @@ import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import selfsigned from 'selfsigned';
 
-import { makeMockLogging, mockSpy, partialPinoLog } from '../../_test_utils';
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
+import { configureMockEnvVars } from '../../testUtils/envVars';
+import { getMockContext, mockSpy } from '../../testUtils/jest';
+import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
 import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
-import { configureMockEnvVars, getMockContext } from '../_test_utils';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 

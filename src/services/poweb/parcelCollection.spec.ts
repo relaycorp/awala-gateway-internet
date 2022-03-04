@@ -1,12 +1,11 @@
 import {
   CertificateError,
   CMSError,
-  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
   InvalidMessageError,
+  ParcelCollectionHandshakeSigner,
   ParcelDelivery,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
@@ -18,24 +17,21 @@ import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
 import {
-  appendErrorToAsyncIterable,
-  arrayBufferFrom,
-  arrayToAsyncIterable,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-  partialPinoLogger,
-  useFakeTimers,
-  UUID4_REGEX,
-} from '../../_test_utils';
-import {
   NatsStreamingClient,
   NatsStreamingSubscriptionError,
 } from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
-import { expectBuffersToEqual, getMockInstance } from '../_test_utils';
+import { arrayBufferFrom, expectBuffersToEqual } from '../../testUtils/buffers';
+import { UUID4_REGEX } from '../../testUtils/crypto';
+import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
+import { getMockInstance, mockSpy, useFakeTimers } from '../../testUtils/jest';
+import {
+  makeMockLogging,
+  MockLogging,
+  partialPinoLog,
+  partialPinoLogger,
+} from '../../testUtils/logging';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';
 import { WebSocketCode } from './websockets';
@@ -57,11 +53,9 @@ beforeEach(() => {
   );
 });
 
-let nonceSigner: Signer;
 let peerGatewayAddress: string;
 beforeAll(async () => {
   const fixtures = getFixtures();
-  nonceSigner = new Signer(fixtures.privateGatewayCert, fixtures.privateGatewayPrivateKey);
   peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
 });
 
@@ -765,9 +759,12 @@ class MockPoWebClient extends MockClient {
 
   protected async completeHandshake(): Promise<void> {
     const challenge = HandshakeChallenge.deserialize((await this.receive()) as ArrayBuffer);
-    const response = new HandshakeResponse([
-      await nonceSigner.sign(challenge.nonce, DETACHED_SIGNATURE_TYPES.NONCE),
-    ]);
+    const fixtures = getFixtures();
+    const nonceSigner = new ParcelCollectionHandshakeSigner(
+      fixtures.privateGatewayCert,
+      fixtures.privateGatewayPrivateKey,
+    );
+    const response = new HandshakeResponse([await nonceSigner.sign(challenge.nonce)]);
 
     await this.send(Buffer.from(response.serialize()));
   }

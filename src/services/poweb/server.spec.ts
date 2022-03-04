@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-import { mockSpy } from '../../_test_utils';
+import { mockSpy } from '../../testUtils/jest';
 import * as fastifyUtils from '../fastify';
 import { setUpCommonFixtures } from './_test_utils';
 import { makeServer } from './server';

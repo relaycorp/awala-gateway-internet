@@ -1,8 +1,8 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
+  ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
@@ -189,12 +189,12 @@ async function doHandshake(
 
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
 
+      const nonceVerifier = new ParcelCollectionHandshakeVerifier(trustedCertificates);
       let peerGatewayCertificate: Certificate;
       try {
-        peerGatewayCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
+        peerGatewayCertificate = await nonceVerifier.verify(
           handshakeResponse.nonceSignatures[0],
           nonce,
-          trustedCertificates,
         );
       } catch (err) {
         logger.info({ err }, 'Refusing handshake response with invalid signature');

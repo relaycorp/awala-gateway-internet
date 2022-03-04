@@ -1,7 +1,7 @@
 import { initObjectStoreClient } from '@relaycorp/object-storage';
 import { EnvVarError } from 'env-var';
 
-import { configureMockEnvVars } from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
 import { initObjectStoreFromEnv } from './objectStorage';
 
 jest.mock('@relaycorp/object-storage');

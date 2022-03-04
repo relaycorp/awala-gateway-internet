@@ -1,5 +1,6 @@
 import {
   Certificate,
+  CertificateScope,
   getRSAPublicKeyFromPrivate,
   issueGatewayCertificate,
 } from '@relaycorp/relaynet-core';
@@ -29,7 +30,7 @@ export async function retrieveOwnCertificates(
   const config = new Config(connection);
 
   const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-  return store.retrieveAll(privateAddress!!);
+  return store.retrieveAll(privateAddress!!, CertificateScope.PDA);
 }
 
 export async function rotateOwnCertificate(connection: Connection): Promise<Certificate | null> {
@@ -39,7 +40,7 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
 
   const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
 
-  const latestCertificate = await store.retrieveLatest(privateAddress!!);
+  const latestCertificate = await store.retrieveLatest(privateAddress!!, CertificateScope.PDA);
 
   const minExpiryDate = addDays(now, MIN_CERTIFICATE_TTL_DAYS);
   if (latestCertificate && minExpiryDate < latestCertificate.expiryDate) {
@@ -54,7 +55,7 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
     validityEndDate: addDays(now, CERTIFICATE_TTL_DAYS),
     validityStartDate: subHours(now, CERTIFICATE_START_OFFSET_HOURS),
   });
-  await store.save(newCertificate);
+  await store.save(newCertificate, CertificateScope.PDA);
 
   return newCertificate;
 }

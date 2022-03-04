@@ -7,6 +7,7 @@ import {
   CargoMessageStream,
   Certificate,
   CertificateRotation,
+  CertificateScope,
   GatewayManager,
   RecipientAddressType,
 } from '@relaycorp/relaynet-core';
@@ -60,7 +61,10 @@ export default async function collectCargo(
     publicGatewayPrivateAddress,
   );
   const certificateStore = new MongoCertificateStore(mongooseConnection);
-  const allCertificates = await certificateStore.retrieveAll(publicGatewayPrivateAddress);
+  const allCertificates = await certificateStore.retrieveAll(
+    publicGatewayPrivateAddress,
+    CertificateScope.PDA,
+  );
   try {
     await cca.validate(RecipientAddressType.PUBLIC, allCertificates);
   } catch (err) {
@@ -136,7 +140,7 @@ export default async function collectCargo(
     parcelStore,
     mongooseConnection,
     publicGatewayPrivateKey,
-    (await certificateStore.retrieveLatest(publicGatewayPrivateAddress))!!,
+    (await certificateStore.retrieveLatest(publicGatewayPrivateAddress, CertificateScope.PDA))!!,
     ccaAwareLogger,
   );
   try {

@@ -1,4 +1,4 @@
-import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { CertificateScope, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
 import * as vault from '../../backingServices/vault';
@@ -59,7 +59,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     const connection = getMongooseConnection();
 
     const certificateStore = new MongoCertificateStore(connection);
-    await certificateStore.save(certificatePath.publicGatewayCert);
+    await certificateStore.save(certificatePath.publicGatewayCert, CertificateScope.PDA);
 
     const config = new Config(connection);
     await config.set(

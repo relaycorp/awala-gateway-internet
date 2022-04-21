@@ -128,7 +128,10 @@ describe('rotateOwnCertificate', () => {
     const certificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
-      validityEndDate: addSeconds(cutoffDate, 1),
+      validityEndDate: addSeconds(
+        cutoffDate,
+        10, // Be generous -- GitHub Actions are too slow
+      ),
     });
     await certificateStore.save(certificate, CertificateScope.PDA);
 

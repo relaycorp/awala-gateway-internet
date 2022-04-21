@@ -5,89 +5,17 @@ on:
     branches: [master]
 jobs:
   ci:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v1
-      - name: Setup node
-        uses: actions/setup-node@v1
-        with:
-          node-version: 14
-      - name: Cache dependencies
-        uses: actions/cache@v1
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-      - name: Install dependencies
-        run: npm ci
-      - run: npm run static-checks
-      - run: npm run test:unit
-
-      - uses: azure/setup-helm@v1
-        with:
-          version: v3.4.0
-      - name: Update Helm chart dependencies
-        run: helm dependency update chart/
-      - name: Lint Helm chart
-        run: helm lint chart/ --values=chart/values.dev.yml --strict
-      - name: Template Helm chart
-        run: helm template --values=chart/values.dev.yml chart/
-
-      # Functional tests
-      - name: Create Kind cluster
-        uses: helm/kind-action@v1.2.0
-        with:
-          cluster_name: default
-      - name: Run Skaffold pipeline
-        uses: hiberbee/github-action-skaffold@1.4.0
-        with:
-          command: run
-          skaffold-version: 1.19.0
-        env:
-          # Work around https://github.com/hiberbee/github-action-skaffold/issues/7
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: "true"
-        timeout-minutes: 8
-      - name: Start port-forwarding
-        run: |
-          # Ugly workaround for https://github.com/GoogleContainerTools/skaffold/issues/4022
-
-          set -o nounset
-          set -o errexit
-          set -o pipefail
-          set +x
-
-          kubectl port-forward --address 127.0.0.1 svc/public-gateway-poweb 8080:8082 &
-          kubectl port-forward --address 127.0.0.1 svc/public-gateway-pohttp 8081:8080 &
-          kubectl port-forward --address 127.0.0.1 svc/public-gateway-cogrpc 8082:8081 &
-          kubectl port-forward --address 127.0.0.1 svc/relaynet-pong-pohttp 8083:80 &
-          kubectl port-forward --address 127.0.0.1 svc/nats 4222:4222 &
-          kubectl port-forward --address 127.0.0.1 svc/minio 9000:9000 &
-
-          # Check at least one of the ports:
-          timeout 5 sh -c "while ! wget --spider http://127.0.0.1:8080 ; do sleep 1s ; done"
-      - run: npm run test:functional
-        env:
-          IS_GITHUB: 'true'
-        timeout-minutes: 2
-      - name: Output diagnostic information upon failure
-        if: failure()
-        run: .github/scripts/output-diagnostics.sh
-
-      # Export Docker image so it can be published
-      - name: Export Docker image
-        run: docker save -o /tmp/docker-image public-gateway:latest
-      - name: Upload Docker image
-        uses: actions/upload-artifact@v2
-        with:
-          name: docker-image
-          path: /tmp/docker-image
+    uses: relaycorp/shared-workflows/.github/workflows/nodejs-server-ci.yml@main
+    with:
+      docker_image_local_name: public-gateway
+      nodejs_version: 14
 
   release:
     needs: ci
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-server-release.yml@main
     with:
       main_branch: master
+      nodejs_version: 14
     secrets:
       helm_repo_access_token: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}
       ghcr_password: ${{ secrets.GH_CONTAINER_REGISTRY_PASSWORD }}

@@ -1,8 +1,8 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   HandshakeChallenge,
   HandshakeResponse,
+  ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import AbortController from 'abort-controller';
@@ -28,8 +28,15 @@ import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { retrieveOwnCertificates } from '../../pki';
 import { WebSocketCode } from './websockets';
 
-// The largest payload the client could send is the handshake response, which should be < 1.9 kib
-const MAX_PAYLOAD = 2 * 1024;
+/**
+ * Maximum size of each incoming message.
+ *
+ * ACK messages are tiny, but HandshakeResponse messages contain digital signatures with their
+ * respective signers' certificates. Keeping in mind that each certificate takes up around 1.9 kib
+ * and a private gateway could have 2-3 valid certificates (whilst order certificates are being
+ * rotated out), we should allow 6 kib.
+ */
+export const PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS = 6 * 1024;
 
 const WEBSOCKET_PING_INTERVAL_MS = 5_000;
 
@@ -64,7 +71,7 @@ export function makeWebSocketServer(
     : { noServer: true };
   const wsServer = new WSServer({
     clientTracking: false,
-    maxPayload: MAX_PAYLOAD,
+    maxPayload: PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS,
     path: '/v1/parcel-collection',
     ...serverOptions,
   });
@@ -182,12 +189,12 @@ async function doHandshake(
 
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
 
+      const nonceVerifier = new ParcelCollectionHandshakeVerifier(trustedCertificates);
       let peerGatewayCertificate: Certificate;
       try {
-        peerGatewayCertificate = await DETACHED_SIGNATURE_TYPES.NONCE.verify(
+        peerGatewayCertificate = await nonceVerifier.verify(
           handshakeResponse.nonceSignatures[0],
           nonce,
-          trustedCertificates,
         );
       } catch (err) {
         logger.info({ err }, 'Refusing handshake response with invalid signature');

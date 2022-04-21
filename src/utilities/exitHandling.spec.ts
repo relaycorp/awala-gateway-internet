@@ -1,7 +1,7 @@
 import pino from 'pino';
 
-import { makeMockLogging, MockLogging, mockSpy, partialPinoLog } from '../_test_utils';
-import { getMockContext } from '../services/_test_utils';
+import { getMockContext, mockSpy } from '../testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { configureExitHandling } from './exitHandling';
 
 const ERROR = new Error('Oh noes');

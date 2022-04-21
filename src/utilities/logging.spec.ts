@@ -2,7 +2,8 @@ import { getPinoOptions } from '@relaycorp/pino-cloud';
 import { EnvVarError } from 'env-var';
 import pino from 'pino';
 
-import { configureMockEnvVars, getMockInstance } from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { getMockInstance } from '../testUtils/jest';
 import { makeLogger } from './logging';
 
 const REQUIRED_ENV_VARS = {

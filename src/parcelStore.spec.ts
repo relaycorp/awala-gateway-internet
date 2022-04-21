@@ -6,17 +6,6 @@ import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  iterableTake,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-  PdaChain,
-  sha256Hex,
-} from './_test_utils';
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
 import * as parcelCollection from './parcelCollection';
@@ -27,12 +16,13 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  mockStanMessage,
-} from './services/_test_utils';
+import { sha256Hex } from './testUtils/crypto';
+import { configureMockEnvVars } from './testUtils/envVars';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
+import { getMockInstance, mockSpy } from './testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
+import { generatePdaChain, PdaChain } from './testUtils/pki';
+import { mockStanMessage } from './testUtils/stan';
 
 const BUCKET = 'the-bucket-name';
 

@@ -1,4 +1,8 @@
-import { generateRSAKeyPair, issueGatewayCertificate } from '@relaycorp/relaynet-core';
+import {
+  CertificateScope,
+  generateRSAKeyPair,
+  issueGatewayCertificate,
+} from '@relaycorp/relaynet-core';
 import { addDays } from 'date-fns';
 import { Connection } from 'mongoose';
 
@@ -46,7 +50,7 @@ async function generateKeyPair(
     subjectPublicKey: gatewayKeyPair.publicKey,
     validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
   });
-  await certificateStore.save(gatewayCertificate);
+  await certificateStore.save(gatewayCertificate, CertificateScope.PDA);
 
   await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
 

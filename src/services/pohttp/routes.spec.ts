@@ -1,18 +1,14 @@
-import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
+import { Certificate, InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
-import { mockSpy, MONGO_ENV_VARS, PdaChain } from '../../_test_utils';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  generateStubParcel,
-  getMockInstance,
-  mockFastifyMongoose,
-  testDisallowedMethods,
-} from '../_test_utils';
+import { MONGO_ENV_VARS } from '../../testUtils/db';
+import { configureMockEnvVars } from '../../testUtils/envVars';
+import { mockFastifyMongoose, testDisallowedMethods } from '../../testUtils/fastify';
+import { getMockInstance, mockSpy } from '../../testUtils/jest';
+import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');
@@ -31,6 +27,13 @@ const validRequestOptions: InjectOptions = {
 let stubPdaChain: PdaChain;
 
 let PARCEL: Parcel;
+
+interface StubParcelOptions {
+  readonly recipientAddress: string;
+  readonly senderCertificate: Certificate;
+  readonly senderCertificateChain?: readonly Certificate[];
+}
+
 beforeAll(async () => {
   stubPdaChain = await generatePdaChain();
 
@@ -200,3 +203,12 @@ describe('receiveParcel', () => {
     expect(mockNatsClientInit).toBeCalledWith(expect.stringMatching(/^pohttp-req-req-\w+$/));
   });
 });
+
+async function generateStubParcel(options: StubParcelOptions): Promise<Parcel> {
+  return new Parcel(
+    options.recipientAddress,
+    options.senderCertificate,
+    Buffer.from('the payload'),
+    { senderCaCertificateChain: options.senderCertificateChain ?? [] },
+  );
+}

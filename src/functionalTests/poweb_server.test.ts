@@ -4,8 +4,9 @@ import {
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
+  ParcelCollectionHandshakeSigner,
+  ParcelDeliverySigner,
   PrivateNodeRegistrationRequest,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import {
@@ -16,8 +17,9 @@ import {
 } from '@relaycorp/relaynet-poweb';
 import pipe from 'it-pipe';
 
-import { asyncIterableToArray, ExternalPdaChain, iterableTake } from '../_test_utils';
-import { expectBuffersToEqual } from '../services/_test_utils';
+import { expectBuffersToEqual } from '../testUtils/buffers';
+import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
+import { ExternalPdaChain } from '../testUtils/pki';
 import { GW_POWEB_LOCAL_PORT } from './services';
 import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';
 
@@ -66,13 +68,21 @@ describe('PoWeb server', () => {
 
       await client.deliverParcel(
         parcelSerialized,
-        new Signer(senderChain.privateGatewayCert, senderChain.privateGatewayPrivateKey),
+        new ParcelDeliverySigner(
+          senderChain.privateGatewayCert,
+          senderChain.privateGatewayPrivateKey,
+        ),
       );
 
       await sleep(2);
 
       const parcelCollection = client.collectParcels(
-        [new Signer(recipientChain.privateGatewayCert, recipientChain.privateGatewayPrivateKey)],
+        [
+          new ParcelCollectionHandshakeSigner(
+            recipientChain.privateGatewayCert,
+            recipientChain.privateGatewayPrivateKey,
+          ),
+        ],
         StreamingMode.CLOSE_UPON_COMPLETION,
       );
       const incomingParcels = await pipe(
@@ -98,12 +108,20 @@ describe('PoWeb server', () => {
 
       await client.deliverParcel(
         parcelSerialized,
-        new Signer(senderChain.privateGatewayCert, senderChain.privateGatewayPrivateKey),
+        new ParcelDeliverySigner(
+          senderChain.privateGatewayCert,
+          senderChain.privateGatewayPrivateKey,
+        ),
       );
 
       const incomingParcels = await pipe(
         client.collectParcels(
-          [new Signer(recipientChain.privateGatewayCert, recipientChain.privateGatewayPrivateKey)],
+          [
+            new ParcelCollectionHandshakeSigner(
+              recipientChain.privateGatewayCert,
+              recipientChain.privateGatewayPrivateKey,
+            ),
+          ],
           StreamingMode.KEEP_ALIVE,
         ),
         async function* (collections): AsyncIterable<ArrayBuffer> {
@@ -132,7 +150,10 @@ describe('PoWeb server', () => {
       await expect(
         client.deliverParcel(
           new ArrayBuffer(0),
-          new Signer(privateGatewayRegistration.privateNodeCertificate, invalidKeyPair.privateKey),
+          new ParcelDeliverySigner(
+            privateGatewayRegistration.privateNodeCertificate,
+            invalidKeyPair.privateKey,
+          ),
         ),
       ).rejects.toBeInstanceOf(ParcelDeliveryError);
     });
@@ -159,7 +180,7 @@ describe('PoWeb server', () => {
       await expect(
         client.deliverParcel(
           parcelSerialized,
-          new Signer(
+          new ParcelDeliverySigner(
             privateGatewayRegistration.privateNodeCertificate,
             privateGatewayKeyPair.privateKey,
           ),

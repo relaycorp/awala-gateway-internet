@@ -1,23 +1,16 @@
 import * as pohttp from '@relaycorp/relaynet-pohttp';
+import { addDays } from 'date-fns';
 import { EnvVarError } from 'env-var';
 import { Message } from 'node-nats-streaming';
 
-import {
-  arrayToAsyncIterable,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-} from '../_test_utils';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
-import {
-  configureMockEnvVars,
-  getMockInstance,
-  mockStanMessage,
-  TOMORROW,
-} from '../services/_test_utils';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { arrayToAsyncIterable } from '../testUtils/iter';
+import { getMockInstance, mockSpy } from '../testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
+import { mockStanMessage } from '../testUtils/stan';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processInternetBoundParcels } from './pdcOutgoing';
@@ -53,7 +46,7 @@ beforeEach(() => {
 
 const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
   deliveryAttempts: 0,
-  parcelExpiryDate: TOMORROW,
+  parcelExpiryDate: addDays(new Date(), 1),
   parcelObjectKey: 'foo.parcel',
   parcelRecipientAddress: 'https://endpoint.example/',
 };
@@ -297,6 +290,25 @@ describe('processInternetBoundParcels', () => {
     expect(message.ack).toBeCalled();
     expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
     expect(MOCK_DELETE_INTERNET_PARCEL).toBeCalled();
+  });
+
+  test('Unknown deliveryAttempts should be treated as no prior attempts', async () => {
+    const err = new pohttp.PoHTTPError('Server is down');
+    getMockInstance(pohttp.deliverParcel).mockRejectedValue(err);
+    const messageData: QueuedInternetBoundParcelMessage = {
+      ...QUEUE_MESSAGE_DATA,
+      deliveryAttempts: undefined as any,
+    };
+    const message = mockStanMessage(Buffer.from(JSON.stringify(messageData)));
+    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
+
+    await processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS);
+
+    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
+      expect.toSatisfy((a) => JSON.parse(a).deliveryAttempts === 1),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   test('Non-PoHTTP errors should be propagated', async () => {

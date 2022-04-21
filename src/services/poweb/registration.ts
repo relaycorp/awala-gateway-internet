@@ -1,7 +1,6 @@
 import {
-  Certificate,
+  CertificateScope,
   derSerializePublicKey,
-  issueGatewayCertificate,
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
   PrivateNodeRegistrationRequest,
@@ -9,24 +8,16 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
+
 import { initVaultKeyStore } from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
+import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';
-
 import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/nodes';
-
-/**
- * Number of hours in the past, when the the private gateway's certificate validity should start.
- *
- * This is needed to account for clock drift.
- */
-const PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS = 3;
-
-const PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS = 1;
 
 export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
@@ -65,7 +56,10 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
-      const publicGatewayCertificate = await certificateStore.retrieveLatest(privateAddress!!);
+      const publicGatewayCertificate = await certificateStore.retrieveLatest(
+        privateAddress!!,
+        CertificateScope.PDA,
+      );
       const gatewayPublicKey = await publicGatewayCertificate!!.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
@@ -112,27 +106,5 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.REGISTRATION)
         .send(Buffer.from(await registration.serialize()));
     },
-  });
-}
-
-async function issuePrivateGatewayCertificate(
-  privateGatewayPublicKey: CryptoKey,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
-): Promise<Certificate> {
-  const validityStartDate = new Date();
-  validityStartDate.setHours(
-    validityStartDate.getHours() - PRIVATE_GATEWAY_CERTIFICATE_START_OFFSET_HOURS,
-  );
-  const validityEndDate = new Date();
-  validityEndDate.setFullYear(
-    validityEndDate.getFullYear() + PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_YEARS,
-  );
-  return issueGatewayCertificate({
-    issuerCertificate: publicGatewayCertificate,
-    issuerPrivateKey: publicGatewayPrivateKey,
-    subjectPublicKey: privateGatewayPublicKey,
-    validityEndDate,
-    validityStartDate,
   });
 }

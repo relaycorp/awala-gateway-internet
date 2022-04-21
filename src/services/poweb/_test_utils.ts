@@ -1,18 +1,16 @@
-import { MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { CertificateScope, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import {
-  arrayToAsyncIterable,
-  mockSpy,
-  MONGO_ENV_VARS,
-  PdaChain,
-  setUpTestDBConnection,
-} from '../../_test_utils';
 import * as vault from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { MONGO_ENV_VARS, setUpTestDBConnection } from '../../testUtils/db';
+import { configureMockEnvVars } from '../../testUtils/envVars';
+import { mockFastifyMongoose } from '../../testUtils/fastify';
+import { arrayToAsyncIterable } from '../../testUtils/iter';
+import { mockSpy } from '../../testUtils/jest';
+import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
-import { configureMockEnvVars, generatePdaChain, mockFastifyMongoose } from '../_test_utils';
 
 export interface FixtureSet extends PdaChain {
   readonly getMongooseConnection: () => Connection;
@@ -61,7 +59,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     const connection = getMongooseConnection();
 
     const certificateStore = new MongoCertificateStore(connection);
-    await certificateStore.save(certificatePath.publicGatewayCert);
+    await certificateStore.save(certificatePath.publicGatewayCert, CertificateScope.PDA);
 
     const config = new Config(connection);
     await config.set(

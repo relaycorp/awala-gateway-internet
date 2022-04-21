@@ -1,16 +1,16 @@
 import {
   Certificate,
-  DETACHED_SIGNATURE_TYPES,
   InvalidMessageError,
   Parcel,
+  ParcelDeliveryVerifier,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Connection } from 'mongoose';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
-import { retrieveOwnCertificates } from '../../certs';
 import { ParcelStore } from '../../parcelStore';
+import { retrieveOwnCertificates } from '../../pki';
 import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
@@ -111,12 +111,9 @@ async function verifyCountersignature(
     return null;
   }
   const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
+  const verifier = new ParcelDeliveryVerifier(trustedCertificates);
   try {
-    return await DETACHED_SIGNATURE_TYPES.PARCEL_DELIVERY.verify(
-      bufferToArray(countersignature),
-      parcelSerialized,
-      trustedCertificates,
-    );
+    return await verifier.verify(bufferToArray(countersignature), parcelSerialized);
   } catch (err) {
     logger.debug({ err }, 'Invalid countersignature');
     return null;

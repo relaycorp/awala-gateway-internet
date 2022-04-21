@@ -6,11 +6,12 @@ import {
   issueDeliveryAuthorization,
   Parcel,
   ParcelCollectionAck,
+  ParcelCollectionHandshakeSigner,
+  ParcelDeliverySigner,
   PublicNodeConnectionParams,
   ServiceMessage,
   SessionEnvelopedData,
   SessionKey,
-  Signer,
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
@@ -19,14 +20,8 @@ import { get as httpGet } from 'http';
 import pipe from 'it-pipe';
 import uuid from 'uuid-random';
 
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  ExternalPdaChain,
-  generateCCA,
-  generateCDAChain,
-  iterableTake,
-} from '../_test_utils';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
+import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import {
   GW_COGRPC_URL,
   GW_POWEB_LOCAL_PORT,
@@ -39,10 +34,6 @@ import { createAndRegisterPrivateGateway, IS_GITHUB, sleep } from './utils';
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
   const { pdaChain } = await createAndRegisterPrivateGateway();
-  const privateGatewaySigner = new Signer(
-    pdaChain.privateGatewayCert,
-    pdaChain.privateGatewayPrivateKey,
-  );
 
   const pongEndpointSessionCertificate = await getPongEndpointKeyPairs();
   const pingId = uuid();
@@ -54,11 +45,22 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   );
 
   // Deliver the ping message
-  await powebClient.deliverParcel(pingParcelData.parcelSerialized, privateGatewaySigner);
+  await powebClient.deliverParcel(
+    pingParcelData.parcelSerialized,
+    new ParcelDeliverySigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey),
+  );
 
   // Collect the pong message once it's been received
   const incomingParcels = await pipe(
-    powebClient.collectParcels([privateGatewaySigner], StreamingMode.KEEP_ALIVE),
+    powebClient.collectParcels(
+      [
+        new ParcelCollectionHandshakeSigner(
+          pdaChain.privateGatewayCert,
+          pdaChain.privateGatewayPrivateKey,
+        ),
+      ],
+      StreamingMode.KEEP_ALIVE,
+    ),
     async function* (collections): AsyncIterable<ArrayBuffer> {
       for await (const collection of collections) {
         yield collection.parcelSerialized;
@@ -107,8 +109,9 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_PUBLIC_ADDRESS_URL,
-      cdaChain,
       publicGatewaySessionKey,
+      cdaChain.publicGatewayCert,
+      pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));

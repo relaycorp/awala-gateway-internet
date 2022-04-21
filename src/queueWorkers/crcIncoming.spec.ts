@@ -1,6 +1,7 @@
 import {
   Cargo,
   CargoMessageSet,
+  CertificateRotation,
   derSerializePublicKey,
   InvalidMessageError,
   MockPrivateKeyStore,
@@ -16,27 +17,18 @@ import {
 import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
-import {
-  arrayBufferFrom,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-  PdaChain,
-} from '../_test_utils';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import * as vault from '../backingServices/vault';
 import * as mongoPublicKeyStore from '../keystores/MongoPublicKeyStore';
 import { ParcelStore } from '../parcelStore';
-import {
-  castMock,
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  mockStanMessage,
-} from '../services/_test_utils';
+import { arrayBufferFrom } from '../testUtils/buffers';
+import { configureMockEnvVars } from '../testUtils/envVars';
+import { castMock, getMockInstance, mockSpy } from '../testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
+import { generatePdaChain, PdaChain } from '../testUtils/pki';
+import { mockStanMessage } from '../testUtils/stan';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';
@@ -221,7 +213,7 @@ describe('Queue subscription', () => {
 
 test('Cargo with invalid payload should be logged and ignored', async () => {
   const cargo = new Cargo(
-    await certificateChain.publicGatewayCert.getCommonName(),
+    certificateChain.publicGatewayCert.getCommonName(),
     certificateChain.privateGatewayCert,
     Buffer.from('Not a CMS EnvelopedData value'),
   );
@@ -268,7 +260,7 @@ test('Session keys of sender should be stored if present', async () => {
     publicGatewaySessionKey,
   );
   const cargo = new Cargo(
-    await certificateChain.publicGatewayCert.getCommonName(),
+    certificateChain.publicGatewayCert.getCommonName(),
     certificateChain.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );
@@ -405,6 +397,26 @@ describe('PCA processing', () => {
 
     await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toEqual(err);
   });
+});
+
+test('CertificateRotation messages should be ignored', async () => {
+  const rotation = new CertificateRotation(certificateChain.publicGatewayCert, [
+    certificateChain.publicGatewayCert,
+  ]);
+  const cargoSerialized = await generateCargoSerialized(rotation.serialize());
+  mockQueueMessages = [mockStanMessage(cargoSerialized)];
+
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
+
+  const cargoSenderAddress =
+    await certificateChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('info', 'Ignoring certificate rotation message', {
+      cargoId: (await Cargo.deserialize(cargoSerialized)).id,
+      peerGatewayAddress: cargoSenderAddress,
+      worker: STUB_WORKER_NAME,
+    }),
+  );
 });
 
 test('Cargo containing invalid messages should be logged and ignored', async () => {

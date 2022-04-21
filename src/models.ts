@@ -12,14 +12,6 @@ export class ConfigItem {
   public value!: string;
 }
 
-/**
- * @deprecated Use [Certificate] instead
- */
-export class OwnCertificate {
-  @prop({ required: true })
-  public serializationDer!: Buffer;
-}
-
 @index({ subjectPrivateAddress: 1 })
 export class Certificate {
   @prop({ required: true })
@@ -30,6 +22,11 @@ export class Certificate {
 
   @prop({ required: true, expires: 0 })
   public expiryDate!: Date;
+
+  // TODO: Make field required once we can write migrations
+  // See https://github.com/relaycorp/relaynet-internet-gateway/issues/751
+  @prop()
+  public scope?: string;
 }
 
 export class PeerPublicKeyData {

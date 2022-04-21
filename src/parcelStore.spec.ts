@@ -6,20 +6,8 @@ import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 
-import {
-  arrayToAsyncIterable,
-  asyncIterableToArray,
-  iterableTake,
-  makeMockLogging,
-  MockLogging,
-  mockSpy,
-  partialPinoLog,
-  PdaChain,
-  sha256Hex,
-} from './_test_utils';
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
-import * as certs from './certs';
 import * as parcelCollection from './parcelCollection';
 import {
   ParcelObject,
@@ -27,12 +15,14 @@ import {
   ParcelStore,
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
-import {
-  configureMockEnvVars,
-  generatePdaChain,
-  getMockInstance,
-  mockStanMessage,
-} from './services/_test_utils';
+import * as pki from './pki';
+import { sha256Hex } from './testUtils/crypto';
+import { configureMockEnvVars } from './testUtils/envVars';
+import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
+import { getMockInstance, mockSpy } from './testUtils/jest';
+import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
+import { generatePdaChain, PdaChain } from './testUtils/pki';
+import { mockStanMessage } from './testUtils/stan';
 
 const BUCKET = 'the-bucket-name';
 
@@ -408,7 +398,7 @@ describe('storeGatewayBoundParcel', () => {
   const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
 
   const mockRetrieveOwnCertificates = mockSpy(
-    jest.spyOn(certs, 'retrieveOwnCertificates'),
+    jest.spyOn(pki, 'retrieveOwnCertificates'),
     async () => [pdaChain.publicGatewayCert],
   );
 

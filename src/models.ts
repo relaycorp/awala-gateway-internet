@@ -13,12 +13,15 @@ export class ConfigItem {
 }
 
 @index({ subjectPrivateAddress: 1 })
-export class Certificate {
+export class CertificationPath {
   @prop({ required: true })
   public subjectPrivateAddress!: string;
 
   @prop({ required: true })
-  public certificateSerialized!: Buffer;
+  public issuerPrivateAddress!: string;
+
+  @prop({ required: true })
+  public pathSerialized!: Buffer;
 
   @prop({ required: true, expires: 0 })
   public expiryDate!: Date;

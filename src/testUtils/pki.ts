@@ -11,6 +11,8 @@ import {
 } from '@relaycorp/relaynet-core';
 import { addDays } from 'date-fns';
 
+import { CERTIFICATE_TTL_DAYS } from '../pki';
+
 const TOMORROW = addDays(new Date(), 1);
 
 export interface CDAChain {
@@ -37,7 +39,7 @@ export async function generatePdaChain(): Promise<PdaChain> {
     await issueGatewayCertificate({
       issuerPrivateKey: publicGatewayKeyPair.privateKey,
       subjectPublicKey: publicGatewayKeyPair.publicKey,
-      validityEndDate: TOMORROW,
+      validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
     }),
   );
 

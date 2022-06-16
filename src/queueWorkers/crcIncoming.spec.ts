@@ -2,33 +2,35 @@ import {
   Cargo,
   CargoMessageSet,
   CertificateRotation,
+  CertificationPath,
   derSerializePublicKey,
   InvalidMessageError,
+  KeyStoreError,
+  MockKeyStoreSet,
   MockPrivateKeyStore,
-  MockPublicKeyStore,
   Parcel,
   ParcelCollectionAck,
-  PrivateKeyStoreError,
   SessionEnvelopedData,
   SessionKey,
   SessionKeyPair,
   SessionPublicKeyData,
 } from '@relaycorp/relaynet-core';
-import { Connection } from 'mongoose';
 import * as stan from 'node-nats-streaming';
 
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
-import * as vault from '../backingServices/vault';
-import * as mongoPublicKeyStore from '../keystores/MongoPublicKeyStore';
+import { PublicGatewayError } from '../errors';
+import { PublicGatewayManager } from '../node/PublicGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { arrayBufferFrom } from '../testUtils/buffers';
+import { setUpTestDBConnection } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
-import { castMock, getMockInstance, mockSpy } from '../testUtils/jest';
+import { castMock, getMockInstance, getPromiseRejection, mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../testUtils/pki';
 import { mockStanMessage } from '../testUtils/stan';
+import { Config, ConfigKey } from '../utilities/config';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';
@@ -59,19 +61,19 @@ const mockNatsInitFromEnv = mockSpy(
 
 //region Mongoose-related fixtures
 
-const MOCK_MONGOOSE_CONNECTION: Connection = { close: jest.fn() } as any;
-mockSpy(jest.spyOn(mongo, 'createMongooseConnectionFromEnv'), () => MOCK_MONGOOSE_CONNECTION);
+const getMongoConnection = setUpTestDBConnection();
+mockSpy(jest.spyOn(mongo, 'createMongooseConnectionFromEnv'), getMongoConnection);
 
 //region Keystore-related fixtures
 
-let mockPrivateKeyStore: MockPrivateKeyStore;
-let mockPublicKeyStore: MockPublicKeyStore;
+const mockKeyStores = new MockKeyStoreSet();
 beforeEach(() => {
-  mockPrivateKeyStore = new MockPrivateKeyStore();
-  mockPublicKeyStore = new MockPublicKeyStore();
+  mockKeyStores.clear();
 });
-mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
-mockSpy(jest.spyOn(mongoPublicKeyStore, 'MongoPublicKeyStore'), () => mockPublicKeyStore);
+const mockManagerInit = mockSpy(
+  jest.spyOn(PublicGatewayManager, 'init'),
+  (connection) => new PublicGatewayManager(connection, mockKeyStores),
+);
 
 //region Parcel store-related fixtures
 const OBJECT_STORE_BUCKET = 'the-bucket';
@@ -94,10 +96,14 @@ const BASE_ENV_VARS = {
 configureMockEnvVars(BASE_ENV_VARS);
 
 let certificateChain: PdaChain;
+let publicGatewayPrivateAddress: string;
 let publicGatewaySessionPrivateKey: CryptoKey;
 let publicGatewaySessionKey: SessionKey;
 beforeAll(async () => {
   certificateChain = await generatePdaChain();
+
+  publicGatewayPrivateAddress =
+    await certificateChain.publicGatewayCert.calculateSubjectPrivateAddress();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -107,11 +113,19 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await mockPrivateKeyStore.saveIdentityKey(certificateChain.publicGatewayPrivateKey);
-  await mockPrivateKeyStore.saveUnboundSessionKey(
+  await mockKeyStores.privateKeyStore.saveIdentityKey(
+    publicGatewayPrivateAddress,
+    certificateChain.publicGatewayPrivateKey,
+  );
+  await mockKeyStores.privateKeyStore.saveSessionKey(
     publicGatewaySessionPrivateKey,
     publicGatewaySessionKey.keyId,
+    publicGatewayPrivateAddress,
   );
+
+  const mongoConnection = getMongoConnection();
+  const config = new Config(mongoConnection);
+  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, publicGatewayPrivateAddress);
 });
 
 let PARCEL: Parcel;
@@ -128,7 +142,7 @@ beforeAll(async () => {
 });
 
 let mockLogging: MockLogging;
-beforeAll(() => {
+beforeEach(() => {
   mockLogging = makeMockLogging();
 });
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogging.logger);
@@ -242,14 +256,25 @@ test('Keystore errors should be propagated and cargo should remain in the queue'
     await cargo.serialize(certificateChain.privateGatewayPrivateKey),
   );
   mockQueueMessages = [stanMessage];
-
-  // Mimic a downtime in Vault
-  mockPrivateKeyStore = new MockPrivateKeyStore(false, true);
-
-  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).rejects.toBeInstanceOf(
-    PrivateKeyStoreError,
+  const privateKeyStore = new MockPrivateKeyStore();
+  await privateKeyStore.saveIdentityKey(
+    publicGatewayPrivateAddress,
+    certificateChain.publicGatewayPrivateKey,
+  );
+  const keyStoreError = new KeyStoreError('The planets are not aligned');
+  jest.spyOn(privateKeyStore, 'retrieveSessionKey').mockRejectedValue(keyStoreError);
+  mockManagerInit.mockImplementation(
+    async (connection) =>
+      new PublicGatewayManager(connection, { ...mockKeyStores, privateKeyStore }),
   );
 
+  const error = await getPromiseRejection(
+    processIncomingCrcCargo(STUB_WORKER_NAME),
+    PublicGatewayError,
+  );
+
+  expect(error.message).toStartWith('Failed to use key store to unwrap message:');
+  expect(error.cause()).toEqual(keyStoreError);
   expect(stanMessage.ack).not.toBeCalled();
 });
 
@@ -279,7 +304,7 @@ test('Session keys of sender should be stored if present', async () => {
     publicKeyDer: await derSerializePublicKey(originatorSessionKey.publicKey),
     publicKeyId: originatorSessionKey.keyId,
   };
-  await expect(mockPublicKeyStore.keys).toHaveProperty(
+  await expect(mockKeyStores.publicKeyStore.sessionKeys).toHaveProperty(
     await cargo.senderCertificate.calculateSubjectPrivateAddress(),
     expectedStoredKeyData,
   );
@@ -298,7 +323,7 @@ describe('Parcel processing', () => {
       expect.objectContaining({ id: PARCEL.id }),
       Buffer.from(PARCEL_SERIALIZED),
       await certificateChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-      MOCK_MONGOOSE_CONNECTION,
+      getMongoConnection(),
       mockNatsClient,
       expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );
@@ -400,9 +425,9 @@ describe('PCA processing', () => {
 });
 
 test('CertificateRotation messages should be ignored', async () => {
-  const rotation = new CertificateRotation(certificateChain.publicGatewayCert, [
-    certificateChain.publicGatewayCert,
-  ]);
+  const rotation = new CertificateRotation(
+    new CertificationPath(certificateChain.publicGatewayCert, [certificateChain.publicGatewayCert]),
+  );
   const cargoSerialized = await generateCargoSerialized(rotation.serialize());
   mockQueueMessages = [mockStanMessage(cargoSerialized)];
 
@@ -481,7 +506,7 @@ test('Mongoose connection should be closed when the queue ends', async () => {
 
   await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).toReject();
 
-  expect(MOCK_MONGOOSE_CONNECTION.close).toBeCalledTimes(1);
+  expect(getMongoConnection().readyState).toEqual(0);
 });
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {

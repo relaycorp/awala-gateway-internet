@@ -33,7 +33,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
       const authorizationSerialized = await generateAuthorization(
         privateGatewayPublicKeyDigest,
-        privateKey,
+        privateKey!,
       );
       return reply
         .header('Content-Type', CONTENT_TYPES.GATEWAY_REGISTRATION.AUTHORIZATION)

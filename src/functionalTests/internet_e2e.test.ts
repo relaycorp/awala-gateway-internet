@@ -3,6 +3,7 @@ import {
   Cargo,
   CargoMessageSet,
   Certificate,
+  CertificationPath,
   issueDeliveryAuthorization,
   Parcel,
   ParcelCollectionAck,
@@ -206,10 +207,10 @@ async function makePingParcel(
   };
 }
 
-function serializePing(id: string, pda: Certificate, pdaChain: readonly Certificate[]): Buffer {
-  const pdaDerBase64 = serializeCertificate(pda);
-  const pdaChainSerialized = pdaChain.map(serializeCertificate);
-  const pingSerialized = JSON.stringify({ id, pda: pdaDerBase64, pda_chain: pdaChainSerialized });
+function serializePing(id: string, pda: Certificate, pdaCAs: readonly Certificate[]): Buffer {
+  const path = new CertificationPath(pda, pdaCAs);
+  const pdaPathSerialized = Buffer.from(path.serialize()).toString('base64');
+  const pingSerialized = JSON.stringify({ id, pda_path: pdaPathSerialized });
   return Buffer.from(pingSerialized);
 }
 
@@ -221,10 +222,6 @@ async function deserializePong(
   const unwrapResult = await parcel.unwrapPayload(sessionKey);
   const serviceMessageContent = unwrapResult.payload.content;
   return serviceMessageContent.toString();
-}
-
-function serializeCertificate(certificate: Certificate): string {
-  return Buffer.from(certificate.serialize()).toString('base64');
 }
 
 async function encapsulateParcelsInCargo(

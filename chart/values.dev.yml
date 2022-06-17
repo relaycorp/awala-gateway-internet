@@ -99,8 +99,9 @@ relaynet-pong:
 
 redis:
   fullnameOverride: redis
-  usePassword: false
-  cluster:
+  auth:
     enabled: false
-  persistence:
-    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      enabled: false

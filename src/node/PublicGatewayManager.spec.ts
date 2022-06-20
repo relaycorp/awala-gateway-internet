@@ -1,9 +1,11 @@
 import { KeyStoreSet, MockKeyStoreSet } from '@relaycorp/relaynet-core';
+import { addDays, addSeconds } from 'date-fns';
 
 import * as vault from '../backingServices/vault';
 import { PublicGatewayError } from '../errors';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
+import { CERTIFICATE_TTL_DAYS } from '../pki';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { mockSpy } from '../testUtils/jest';
 import { Config, ConfigKey } from '../utilities/config';
@@ -55,6 +57,88 @@ describe('init', () => {
 
     expect(MongoCertificateStore).toBeCalledWith(mongoConnection);
     expect(MongoPublicKeyStore).toBeCalledWith(mongoConnection);
+  });
+});
+
+describe('generate', () => {
+  test('Private key should be stored', async () => {
+    const manager = new PublicGatewayManager(getMongoConnection(), keyStoreSet);
+
+    const privateAddress = await manager.generate();
+
+    await expect(
+      keyStoreSet.privateKeyStore.retrieveIdentityKey(privateAddress),
+    ).resolves.toBeTruthy();
+  });
+
+  describe('Certificate', () => {
+    test('Certificate should be stored', async () => {
+      const manager = new PublicGatewayManager(getMongoConnection(), keyStoreSet);
+
+      const privateAddress = await manager.generate();
+
+      await expect(
+        keyStoreSet.certificateStore.retrieveLatest(privateAddress, privateAddress),
+      ).resolves.toBeTruthy();
+    });
+
+    test('Certificate should be self-issued', async () => {
+      const manager = new PublicGatewayManager(getMongoConnection(), keyStoreSet);
+
+      const privateAddress = await manager.generate();
+
+      const certificatePath = await keyStoreSet.certificateStore.retrieveLatest(
+        privateAddress,
+        privateAddress,
+      );
+      expect(certificatePath!.certificateAuthorities).toHaveLength(0);
+      await expect(
+        certificatePath!.leafCertificate.calculateSubjectPrivateAddress(),
+      ).resolves.toEqual(certificatePath!.leafCertificate.getIssuerPrivateAddress());
+    });
+
+    test('Certificate should last 360 days', async () => {
+      const manager = new PublicGatewayManager(getMongoConnection(), keyStoreSet);
+      const preGenerationDate = new Date();
+
+      const privateAddress = await manager.generate();
+
+      const { leafCertificate: certificate } = (await keyStoreSet.certificateStore.retrieveLatest(
+        privateAddress,
+        privateAddress,
+      ))!;
+      const expectedExpiryDate = addDays(preGenerationDate, CERTIFICATE_TTL_DAYS);
+      expect(certificate.expiryDate).toBeAfterOrEqualTo(expectedExpiryDate);
+      expect(certificate.expiryDate).toBeBeforeOrEqualTo(addSeconds(expectedExpiryDate, 5));
+    });
+  });
+
+  test('Private address should be set as current', async () => {
+    const mongoConnection = getMongoConnection();
+    const manager = new PublicGatewayManager(mongoConnection, keyStoreSet);
+    const config = new Config(mongoConnection);
+
+    const privateAddress = await manager.generate();
+
+    await expect(config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toEqual(privateAddress);
+  });
+});
+
+describe('getCurrentPrivateAddress', () => {
+  test('Null should be returned if current address is unset', async () => {
+    const manager = new PublicGatewayManager(getMongoConnection(), keyStoreSet);
+
+    await expect(manager.getCurrentPrivateAddress()).resolves.toBeNull();
+  });
+
+  test('Private address should be returned if set', async () => {
+    const mongoConnection = getMongoConnection();
+    const manager = new PublicGatewayManager(mongoConnection, keyStoreSet);
+    const privateAddress = '0deadbeef';
+    const config = new Config(mongoConnection);
+    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+
+    await expect(manager.getCurrentPrivateAddress()).resolves.toEqual(privateAddress);
   });
 });
 

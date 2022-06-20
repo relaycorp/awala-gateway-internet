@@ -15,7 +15,20 @@ export class MongoPublicKeyStore extends PublicKeyStore {
     });
   }
 
-  protected async fetchKey(peerPrivateAddress: string): Promise<SessionPublicKeyData | null> {
+  protected retrieveIdentityKeySerialized(_peerPrivateAddress: string): Promise<Buffer | null> {
+    throw new Error('Method not yet implemented');
+  }
+
+  protected saveIdentityKeySerialized(
+    _keySerialized: Buffer,
+    _peerPrivateAddress: string,
+  ): Promise<void> {
+    throw new Error('Method not yet implemented');
+  }
+
+  protected async retrieveSessionKeyData(
+    peerPrivateAddress: string,
+  ): Promise<SessionPublicKeyData | null> {
     const query = this.keyDataModel.findOne({ peerPrivateAddress });
     const keyData: null | PeerPublicKeyData = await query.exec();
     if (keyData === null) {
@@ -28,7 +41,7 @@ export class MongoPublicKeyStore extends PublicKeyStore {
     };
   }
 
-  protected async saveKey(
+  protected async saveSessionKeyData(
     keyData: SessionPublicKeyData,
     peerPrivateAddress: string,
   ): Promise<void> {

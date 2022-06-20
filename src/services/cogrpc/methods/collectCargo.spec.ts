@@ -6,7 +6,7 @@ import {
   CargoMessageSet,
   CargoMessageStream,
   CertificateRotation,
-  CertificateScope,
+  CertificationPath,
   derSerializePublicKey,
   generateRSAKeyPair,
   InvalidMessageError,
@@ -56,12 +56,14 @@ const TOMORROW = addDays(new Date(), 1);
 let keyPairSet: NodeKeyPairSet;
 let pdaChain: PDACertPath;
 let cdaChain: CDACertPath;
-let privateGatewayAddress: string;
+let publicGatewayPrivateAddress: string;
+let privateGatewayPrivateAddress: string;
 beforeAll(async () => {
   keyPairSet = await generateIdentityKeyPairSet();
   pdaChain = await generatePDACertificationPath(keyPairSet, addDays(new Date(), 181));
   cdaChain = await generateCDACertificationPath(keyPairSet);
-  privateGatewayAddress = await pdaChain.privateGateway.calculateSubjectPrivateAddress();
+  publicGatewayPrivateAddress = await pdaChain.publicGateway.calculateSubjectPrivateAddress();
+  privateGatewayPrivateAddress = await pdaChain.privateGateway.calculateSubjectPrivateAddress();
 });
 
 const { getMongooseConnection, getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
@@ -73,11 +75,15 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   PRIVATE_KEY_STORE.clear();
-  await PRIVATE_KEY_STORE.saveIdentityKey(keyPairSet.publicGateway.privateKey);
-  await PRIVATE_KEY_STORE.saveBoundSessionKey(
+  await PRIVATE_KEY_STORE.saveIdentityKey(
+    publicGatewayPrivateAddress,
+    keyPairSet.publicGateway.privateKey,
+  );
+  await PRIVATE_KEY_STORE.saveSessionKey(
     publicGatewaySessionKeyPair.privateKey,
     publicGatewaySessionKeyPair.sessionKey.keyId,
-    privateGatewayAddress,
+    publicGatewayPrivateAddress,
+    privateGatewayPrivateAddress,
   );
 });
 mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
@@ -86,7 +92,10 @@ beforeEach(async () => {
   const connection = getMongooseConnection();
 
   const certificateStore = new MongoCertificateStore(connection);
-  await certificateStore.save(pdaChain.publicGateway, CertificateScope.PDA);
+  await certificateStore.save(
+    new CertificationPath(pdaChain.publicGateway, []),
+    publicGatewayPrivateAddress,
+  );
 
   const config = new Config(connection);
   await config.set(
@@ -315,7 +324,7 @@ describe('CCA validation', () => {
           ccaRecipientAddress: malformedCCA.recipientAddress,
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayAddress,
+          peerGatewayAddress: privateGatewayPrivateAddress,
         }),
       );
       expect(error).toEqual({
@@ -346,7 +355,7 @@ describe('CCA validation', () => {
           ccaRecipientAddress: invalidCCA.recipientAddress,
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayAddress,
+          peerGatewayAddress: privateGatewayPrivateAddress,
         }),
       );
       expect(error).toEqual({
@@ -404,7 +413,7 @@ describe('CCA validation', () => {
         partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayAddress,
+          peerGatewayAddress: privateGatewayPrivateAddress,
         }),
       );
       expect(error).toEqual({
@@ -454,8 +463,8 @@ test('Parcels retrieved should be limited to sender of CCA', async () => {
   await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
   expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-    privateGatewayAddress,
-    partialPinoLogger({ peerGatewayAddress: privateGatewayAddress }) as any,
+    privateGatewayPrivateAddress,
+    partialPinoLogger({ peerGatewayAddress: privateGatewayPrivateAddress }) as any,
   );
 });
 
@@ -587,7 +596,7 @@ test('CCA fulfillment should be logged and end the call', async () => {
       cargoesCollected: 0,
       grpcClient: CALL.getPeer(),
       grpcMethod: 'collectCargo',
-      peerGatewayAddress: privateGatewayAddress,
+      peerGatewayAddress: privateGatewayPrivateAddress,
     }),
   );
   expect(CALL.end).toBeCalledWith();
@@ -638,19 +647,21 @@ describe('Private gateway certificate rotation', () => {
     const rotation = CertificateRotation.deserialize(cargoUnwrap.payload.messages[0]);
     // Check private gateway certificate
     await expect(
-      derSerializePublicKey(await rotation.subjectCertificate.getPublicKey()),
+      derSerializePublicKey(await rotation.certificationPath.leafCertificate.getPublicKey()),
     ).resolves.toEqual(await derSerializePublicKey(await pdaChain.privateGateway.getPublicKey()));
     await expect(
-      rotation.subjectCertificate.getCertificationPath([], [pdaChain.publicGateway]),
+      rotation.certificationPath.leafCertificate.getCertificationPath([], [pdaChain.publicGateway]),
     ).resolves.toHaveLength(2);
     // Check public gateway certificate
-    expect(rotation.chain).toHaveLength(1);
-    expect(pdaChain.publicGateway.isEqual(rotation.chain[0])).toBeTrue();
+    expect(rotation.certificationPath.certificateAuthorities).toHaveLength(1);
+    expect(
+      pdaChain.publicGateway.isEqual(rotation.certificationPath.certificateAuthorities[0]),
+    ).toBeTrue();
     // Other checks
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Sending certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayAddress,
+        peerGatewayAddress: privateGatewayPrivateAddress,
       }),
     );
   });
@@ -676,7 +687,7 @@ describe('Private gateway certificate rotation', () => {
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('debug', 'Skipping certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayAddress,
+        peerGatewayAddress: privateGatewayPrivateAddress,
         peerGatewayCertificateExpiry: expiringPDAChain.privateGateway.expiryDate.toISOString(),
       }),
     );
@@ -699,7 +710,7 @@ describe('Errors while generating cargo', () => {
           err: expect.objectContaining({ message: err.message }),
           grpcClient: CALL.getPeer(),
           grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayAddress,
+          peerGatewayAddress: privateGatewayPrivateAddress,
         }),
       );
       cb();

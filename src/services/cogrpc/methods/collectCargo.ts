@@ -7,8 +7,7 @@ import {
   CargoMessageStream,
   Certificate,
   CertificateRotation,
-  CertificateScope,
-  GatewayManager,
+  CertificationPath,
   RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -18,9 +17,9 @@ import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
-import { initMongoDBKeyStore } from '../../../backingServices/mongo';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
+import { PublicGatewayManager } from '../../../node/PublicGatewayManager';
 import { generatePCAs } from '../../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../../parcelStore';
 import { issuePrivateGatewayCertificate } from '../../../pki';
@@ -61,10 +60,11 @@ export default async function collectCargo(
     publicGatewayPrivateAddress,
   );
   const certificateStore = new MongoCertificateStore(mongooseConnection);
-  const allCertificates = await certificateStore.retrieveAll(
+  const allCertificationPaths = await certificateStore.retrieveAll(
     publicGatewayPrivateAddress,
-    CertificateScope.PDA,
+    publicGatewayPrivateAddress,
   );
+  const allCertificates = allCertificationPaths.map((p) => p.leafCertificate);
   try {
     await cca.validate(RecipientAddressType.PUBLIC, allCertificates);
   } catch (err) {
@@ -89,8 +89,8 @@ export default async function collectCargo(
     return;
   }
 
-  const publicKeyStore = initMongoDBKeyStore(mongooseConnection);
-  const gateway = new GatewayManager(vaultKeyStore, publicKeyStore);
+  const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+  const gateway = await gatewayManager.getCurrent();
 
   let ccr: CargoCollectionRequest;
   try {
@@ -114,14 +114,13 @@ export default async function collectCargo(
   }
 
   let cargoesCollected = 0;
+  const channel = await gateway.getChannel(
+    ccr.cargoDeliveryAuthorization,
+    await cca.senderCertificate.getPublicKey(),
+  );
 
   async function* encapsulateMessagesInCargo(messages: CargoMessageStream): AsyncIterable<Buffer> {
-    yield* await gateway.generateCargoes(
-      messages,
-      await cca.senderCertificate.calculateSubjectPrivateAddress(),
-      publicGatewayPrivateKey,
-      ccr.cargoDeliveryAuthorization,
-    );
+    yield* await channel.generateCargoes(messages);
   }
 
   async function sendCargoes(cargoesSerialized: AsyncIterable<Buffer>): Promise<void> {
@@ -139,8 +138,11 @@ export default async function collectCargo(
     peerGatewayAddress,
     parcelStore,
     mongooseConnection,
-    publicGatewayPrivateKey,
-    (await certificateStore.retrieveLatest(publicGatewayPrivateAddress, CertificateScope.PDA))!!,
+    publicGatewayPrivateKey!,
+    (await certificateStore.retrieveLatest(
+      publicGatewayPrivateAddress,
+      publicGatewayPrivateAddress,
+    ))!.leafCertificate,
     ccaAwareLogger,
   );
   try {
@@ -214,7 +216,7 @@ async function* generateCargoMessageStream(
       publicGatewayCertificate,
     );
     yield {
-      expiryDate: certificateRotation.subjectCertificate.expiryDate,
+      expiryDate: certificateRotation.certificationPath.leafCertificate.expiryDate,
       message: Buffer.from(certificateRotation.serialize()),
     };
   } else {
@@ -235,7 +237,9 @@ async function generateCertificateRotation(
     publicGatewayPrivateKey,
     publicGatewayCertificate,
   );
-  return new CertificateRotation(privateGatewayCertificate, [publicGatewayCertificate]);
+  return new CertificateRotation(
+    new CertificationPath(privateGatewayCertificate, [publicGatewayCertificate]),
+  );
 }
 
 async function* convertParcelsToCargoMessageStream(

@@ -2,11 +2,10 @@ import {
   Cargo,
   CargoMessageSet,
   CertificateRotation,
-  GatewayManager,
   InvalidMessageError,
+  KeyStoreError,
   Parcel,
   ParcelCollectionAck,
-  PrivateKeyStoreError,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
@@ -18,8 +17,9 @@ import { Logger } from 'pino';
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
-import { initVaultKeyStore } from '../backingServices/vault';
-import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
+import { PublicGatewayError } from '../errors';
+import { PublicGateway } from '../node/PublicGateway';
+import { PublicGatewayManager } from '../node/PublicGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -47,10 +47,8 @@ function makeCargoProcessor(
 ): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
     const mongooseConnection = await createMongooseConnectionFromEnv();
-    const gateway = new GatewayManager(
-      initVaultKeyStore(),
-      new MongoPublicKeyStore(mongooseConnection),
-    );
+    const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+    const gateway = await gatewayManager.getCurrent();
 
     const objectStoreClient = initObjectStoreFromEnv();
     const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
@@ -75,7 +73,7 @@ function makeCargoProcessor(
 
 async function processCargo(
   message: Message,
-  gatewayManager: GatewayManager,
+  gateway: PublicGateway,
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
@@ -88,11 +86,10 @@ async function processCargo(
 
   let cargoMessageSet: CargoMessageSet;
   try {
-    cargoMessageSet = await gatewayManager.unwrapMessagePayload(cargo);
+    cargoMessageSet = await gateway.unwrapMessagePayload(cargo);
   } catch (err) {
-    if (err instanceof PrivateKeyStoreError) {
-      // Vault is down or returned an unexpected response
-      throw err;
+    if (err instanceof KeyStoreError) {
+      throw new PublicGatewayError(err, 'Failed to use key store to unwrap message');
     }
     cargoAwareLogger.info({ err }, 'Cargo payload is invalid');
     message.ack();

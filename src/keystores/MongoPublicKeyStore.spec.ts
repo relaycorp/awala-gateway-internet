@@ -37,13 +37,27 @@ const stubGetModelForClass = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 const mockFindOneExec = mockSpy(jest.fn(), async () => peerPublicKeyData);
 const mockFindOne = mockSpy(jest.fn(), () => ({ exec: mockFindOneExec }));
 
-describe('fetchKey', () => {
+test('Identity keys should not yet be supported', async () => {
+  const store = new MongoPublicKeyStore(STUB_CONNECTION);
+
+  const identityKeyPair = await generateRSAKeyPair();
+  await expect(store.saveIdentityKey(identityKeyPair.privateKey)).rejects.toThrowWithMessage(
+    Error,
+    'Method not yet implemented',
+  );
+  await expect(store.retrieveIdentityKey('0deadbeef')).rejects.toThrowWithMessage(
+    Error,
+    'Method not yet implemented',
+  );
+});
+
+describe('retrieveSessionKeyData', () => {
   beforeEach(() => stubGetModelForClass.mockReturnValue({ findOne: mockFindOne } as any));
 
   test('Existing connection should be used', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    await store.fetchLastSessionKey(peerPrivateAddress);
+    await store.retrieveLastSessionKey(peerPrivateAddress);
 
     expect(stubGetModelForClass).toBeCalledTimes(1);
     expect(stubGetModelForClass).toBeCalledWith(PeerPublicKeyData, {
@@ -54,7 +68,7 @@ describe('fetchKey', () => {
   test('Key should be looked up by the private node address of the peer', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    await store.fetchLastSessionKey(peerPrivateAddress);
+    await store.retrieveLastSessionKey(peerPrivateAddress);
 
     expect(mockFindOne).toBeCalledTimes(1);
     expect(mockFindOne).toBeCalledWith({ peerPrivateAddress });
@@ -63,7 +77,7 @@ describe('fetchKey', () => {
   test('Existing key should be returned', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    const key = await store.fetchLastSessionKey(peerPrivateAddress);
+    const key = await store.retrieveLastSessionKey(peerPrivateAddress);
 
     expect(key?.keyId).toEqual(peerPublicKeyData.keyId);
     expect(await derSerializePublicKey(key!.publicKey)).toEqual(peerPublicKeyData.keyDer);
@@ -73,11 +87,11 @@ describe('fetchKey', () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
     mockFindOneExec.mockResolvedValue(null);
 
-    await expect(store.fetchLastSessionKey(peerPrivateAddress)).resolves.toBeNull();
+    await expect(store.retrieveLastSessionKey(peerPrivateAddress)).resolves.toBeNull();
   });
 });
 
-describe('saveKey', () => {
+describe('saveSessionKeyData', () => {
   const mockUpdateOne = mockSpy(jest.fn(), () => ({ exec: jest.fn() }));
   beforeEach(() =>
     stubGetModelForClass.mockReturnValue({ findOne: mockFindOne, updateOne: mockUpdateOne } as any),

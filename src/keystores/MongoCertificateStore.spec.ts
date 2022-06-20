@@ -1,6 +1,6 @@
 import {
   Certificate,
-  CertificateScope,
+  CertificationPath,
   generateRSAKeyPair,
   getPrivateAddressFromIdentityKey,
   issueGatewayCertificate,
@@ -8,23 +8,25 @@ import {
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 
-import { Certificate as CertificateModel } from '../models';
+import { CertificationPath as CertificationPathModel } from '../models';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { MongoCertificateStore } from './MongoCertificateStore';
 
 const getConnection = setUpTestDBConnection();
-let certificateModel: ReturnModelType<typeof CertificateModel>;
+let certificateModel: ReturnModelType<typeof CertificationPathModel>;
 let store: MongoCertificateStore;
 beforeAll(async () => {
   const connection = getConnection();
-  certificateModel = getModelForClass(CertificateModel, { existingConnection: connection });
+  certificateModel = getModelForClass(CertificationPathModel, { existingConnection: connection });
   store = new MongoCertificateStore(connection);
 });
 
 let identityKeyPair: CryptoKeyPair;
 let subjectPrivateAddress: string;
 let validCertificate: Certificate;
+let validCertificationPath: CertificationPath;
 let expiredCertificate: Certificate;
+let expiredCertificationPath: CertificationPath;
 beforeAll(async () => {
   identityKeyPair = await generateRSAKeyPair();
   subjectPrivateAddress = await getPrivateAddressFromIdentityKey(identityKeyPair.publicKey);
@@ -34,23 +36,26 @@ beforeAll(async () => {
     subjectPublicKey: identityKeyPair.publicKey,
     validityEndDate: addSeconds(new Date(), 15),
   });
+  validCertificationPath = new CertificationPath(validCertificate, []);
+
   expiredCertificate = await issueGatewayCertificate({
     issuerPrivateKey: identityKeyPair.privateKey,
     subjectPublicKey: identityKeyPair.publicKey,
     validityEndDate: subSeconds(new Date(), 1),
     validityStartDate: subSeconds(new Date(), 2),
   });
+  expiredCertificationPath = new CertificationPath(expiredCertificate, []);
 });
 
 describe('saveData', () => {
   test('All attributes should be saved', async () => {
-    await store.save(validCertificate, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
 
     const certificateStored = await certificateModel.findOne({ subjectPrivateAddress }).exec();
-    expect(certificateStored).toMatchObject<Partial<CertificateModel>>({
-      certificateSerialized: Buffer.from(validCertificate.serialize()),
+    expect(certificateStored).toMatchObject<Partial<CertificationPathModel>>({
       expiryDate: validCertificate.expiryDate,
-      scope: CertificateScope.PDA,
+      issuerPrivateAddress: subjectPrivateAddress,
+      pathSerialized: Buffer.from(validCertificationPath.serialize()),
     });
   });
 
@@ -60,19 +65,20 @@ describe('saveData', () => {
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: addDays(validCertificate.expiryDate, 1),
     });
+    const certificationPath2 = new CertificationPath(certificate2, []);
 
-    await store.save(validCertificate, CertificateScope.PDA);
-    await store.save(certificate2, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
+    await store.save(certificationPath2, subjectPrivateAddress);
 
     const certificateRecords = await certificateModel.find({ subjectPrivateAddress }).exec();
     expect(certificateRecords).toHaveLength(2);
-    expect(certificateRecords[0]).toMatchObject<Partial<CertificateModel>>({
-      certificateSerialized: Buffer.from(validCertificate.serialize()),
+    expect(certificateRecords[0]).toMatchObject<Partial<CertificationPathModel>>({
       expiryDate: validCertificate.expiryDate,
+      pathSerialized: Buffer.from(validCertificationPath.serialize()),
     });
-    expect(certificateRecords[1]).toMatchObject<Partial<CertificateModel>>({
-      certificateSerialized: Buffer.from(certificate2.serialize()),
+    expect(certificateRecords[1]).toMatchObject<Partial<CertificationPathModel>>({
       expiryDate: certificate2.expiryDate,
+      pathSerialized: Buffer.from(certificationPath2.serialize()),
     });
   });
 
@@ -82,15 +88,16 @@ describe('saveData', () => {
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: validCertificate.expiryDate,
     });
+    const certificationPath2 = new CertificationPath(certificate2, []);
 
-    await store.save(validCertificate, CertificateScope.PDA);
-    await store.save(certificate2, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
+    await store.save(certificationPath2, subjectPrivateAddress);
 
     const certificateRecords = await certificateModel.find({ subjectPrivateAddress }).exec();
     expect(certificateRecords).toHaveLength(1);
-    expect(certificateRecords[0]).toMatchObject<Partial<CertificateModel>>({
-      certificateSerialized: Buffer.from(certificate2.serialize()),
+    expect(certificateRecords[0]).toMatchObject<Partial<CertificationPathModel>>({
       expiryDate: certificate2.expiryDate,
+      pathSerialized: Buffer.from(certificationPath2.serialize()),
     });
   });
 
@@ -101,14 +108,18 @@ describe('saveData', () => {
       validityEndDate: validCertificate.expiryDate,
     });
 
-    await store.save(validCertificate, CertificateScope.CDA);
-    await store.save(certificate2, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
+    await store.save(new CertificationPath(certificate2, []), subjectPrivateAddress);
 
     await expect(
-      certificateModel.find({ subjectPrivateAddress, scope: CertificateScope.CDA }).exec(),
+      certificateModel
+        .find({ subjectPrivateAddress, issuerPrivateAddress: subjectPrivateAddress })
+        .exec(),
     ).resolves.toHaveLength(1);
     await expect(
-      certificateModel.find({ subjectPrivateAddress, scope: CertificateScope.PDA }).exec(),
+      certificateModel
+        .find({ subjectPrivateAddress, issuerPrivateAddress: subjectPrivateAddress })
+        .exec(),
     ).resolves.toHaveLength(1);
   });
 });
@@ -116,94 +127,87 @@ describe('saveData', () => {
 describe('retrieveLatestSerialization', () => {
   test('Nothing should be returned if subject has no certificates', async () => {
     await expect(
-      store.retrieveLatest(subjectPrivateAddress, CertificateScope.PDA),
+      store.retrieveLatest(subjectPrivateAddress, subjectPrivateAddress),
     ).resolves.toBeNull();
   });
 
   test('Expired certificates should not be returned', async () => {
-    await store.save(expiredCertificate, CertificateScope.PDA);
+    await store.save(expiredCertificationPath, subjectPrivateAddress);
 
     await expect(
-      store.retrieveLatest(subjectPrivateAddress, CertificateScope.PDA),
+      store.retrieveLatest(subjectPrivateAddress, subjectPrivateAddress),
     ).resolves.toBeNull();
   });
 
   test('The latest valid certificate should be returned', async () => {
-    await store.save(validCertificate, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
     const newestCertificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: addSeconds(validCertificate.expiryDate, 1),
     });
-    await store.save(newestCertificate, CertificateScope.PDA);
+    await store.save(new CertificationPath(newestCertificate, []), subjectPrivateAddress);
 
     await expect(
-      store.retrieveLatest(subjectPrivateAddress, CertificateScope.PDA),
-    ).resolves.toSatisfy((c) => newestCertificate.isEqual(c));
-  });
-
-  test('Scope should be temporarily ignored', async () => {
-    await store.save(validCertificate, CertificateScope.CDA);
-
-    const latestCertificate = await store.retrieveLatest(
-      subjectPrivateAddress,
-      CertificateScope.PDA,
-    );
-
-    expect(latestCertificate!.isEqual(validCertificate)).toBeTrue();
+      store.retrieveLatest(subjectPrivateAddress, subjectPrivateAddress),
+    ).resolves.toSatisfy((p) => newestCertificate.isEqual(p.leafCertificate));
   });
 });
 
 describe('retrieveAllSerializations', () => {
   test('Nothing should be returned if there are no certificates', async () => {
     await expect(
-      store.retrieveAll(subjectPrivateAddress, CertificateScope.PDA),
+      store.retrieveAll(subjectPrivateAddress, subjectPrivateAddress),
     ).resolves.toBeEmpty();
   });
 
   test('Expired certificates should not be returned', async () => {
-    await store.save(expiredCertificate, CertificateScope.PDA);
+    await store.save(expiredCertificationPath, subjectPrivateAddress);
 
     await expect(
-      store.retrieveAll(subjectPrivateAddress, CertificateScope.PDA),
+      store.retrieveAll(subjectPrivateAddress, subjectPrivateAddress),
     ).resolves.toBeEmpty();
   });
 
   test('All valid certificates should be returned', async () => {
-    await store.save(expiredCertificate, CertificateScope.PDA);
-    await store.save(validCertificate, CertificateScope.PDA);
+    await store.save(expiredCertificationPath, subjectPrivateAddress);
+    await store.save(validCertificationPath, subjectPrivateAddress);
     const newestCertificate = await issueGatewayCertificate({
       issuerPrivateKey: identityKeyPair.privateKey,
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: addSeconds(validCertificate.expiryDate, 1),
     });
-    await store.save(newestCertificate, CertificateScope.PDA);
+    await store.save(new CertificationPath(newestCertificate, []), subjectPrivateAddress);
 
-    const allCertificates = await store.retrieveAll(subjectPrivateAddress, CertificateScope.PDA);
+    const allCertificates = await store.retrieveAll(subjectPrivateAddress, subjectPrivateAddress);
 
     expect(allCertificates).toHaveLength(2);
-    expect(allCertificates.filter((c) => c.isEqual(validCertificate))).not.toBeEmpty();
-    expect(allCertificates.filter((c) => c.isEqual(newestCertificate))).not.toBeEmpty();
+    expect(
+      allCertificates.filter((p) => p.leafCertificate.isEqual(validCertificate)),
+    ).not.toBeEmpty();
+    expect(
+      allCertificates.filter((p) => p.leafCertificate.isEqual(newestCertificate)),
+    ).not.toBeEmpty();
   });
 
   test('Scope should be temporarily stored', async () => {
-    await store.save(validCertificate, CertificateScope.CDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
 
-    const allCertificates = await store.retrieveAll(subjectPrivateAddress, CertificateScope.PDA);
+    const allCertificates = await store.retrieveAll(subjectPrivateAddress, subjectPrivateAddress);
 
     expect(allCertificates).toHaveLength(1);
-    expect(allCertificates[0].isEqual(validCertificate)).toBeTrue();
+    expect(allCertificates[0].leafCertificate.isEqual(validCertificate)).toBeTrue();
   });
 });
 
 describe('deleteExpired', () => {
   test('Valid certificates should not be deleted', async () => {
-    await store.save(validCertificate, CertificateScope.PDA);
+    await store.save(validCertificationPath, subjectPrivateAddress);
 
     await store.deleteExpired();
 
     await expect(
-      store.retrieveAll(subjectPrivateAddress, CertificateScope.PDA),
+      store.retrieveAll(subjectPrivateAddress, subjectPrivateAddress),
     ).resolves.toHaveLength(1);
   });
 });

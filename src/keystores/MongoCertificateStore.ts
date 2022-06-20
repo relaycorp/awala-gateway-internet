@@ -1,17 +1,17 @@
-import { CertificateScope, CertificateStore } from '@relaycorp/relaynet-core';
+import { CertificateStore } from '@relaycorp/relaynet-core';
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { Connection } from 'mongoose';
 
-import { Certificate } from '../models';
+import { CertificationPath } from '../models';
 
 export class MongoCertificateStore extends CertificateStore {
-  private readonly certificateModel: ReturnModelType<typeof Certificate>;
+  private readonly certificateModel: ReturnModelType<typeof CertificationPath>;
 
   constructor(connection: Connection) {
     super();
 
-    this.certificateModel = getModelForClass(Certificate, { existingConnection: connection });
+    this.certificateModel = getModelForClass(CertificationPath, { existingConnection: connection });
   }
 
   public async deleteExpired(): Promise<void> {
@@ -19,22 +19,21 @@ export class MongoCertificateStore extends CertificateStore {
   }
 
   protected async saveData(
-    subjectPrivateAddress: string,
     subjectCertificateSerialized: ArrayBuffer,
+    subjectPrivateAddress: string,
     subjectCertificateExpiryDate: Date,
-    scope: CertificateScope,
+    issuerPrivateAddress: string,
   ): Promise<void> {
-    const record: Certificate = {
-      certificateSerialized: Buffer.from(subjectCertificateSerialized),
+    const record: CertificationPath = {
       expiryDate: subjectCertificateExpiryDate,
-      scope,
+      issuerPrivateAddress,
+      pathSerialized: Buffer.from(subjectCertificateSerialized),
       subjectPrivateAddress,
     };
     await this.certificateModel
       .updateOne(
         {
           expiryDate: subjectCertificateExpiryDate,
-          scope,
           subjectPrivateAddress,
         },
         record,
@@ -50,13 +49,13 @@ export class MongoCertificateStore extends CertificateStore {
       .findOne({ subjectPrivateAddress })
       .sort({ expiryDate: -1 })
       .exec();
-    return record ? bufferToArray(record.certificateSerialized) : null;
+    return record ? bufferToArray(record.pathSerialized) : null;
   }
 
   protected async retrieveAllSerializations(
     subjectPrivateAddress: string,
   ): Promise<readonly ArrayBuffer[]> {
     const records = await this.certificateModel.find({ subjectPrivateAddress }).exec();
-    return records.map((r) => bufferToArray(r.certificateSerialized));
+    return records.map((r) => bufferToArray(r.pathSerialized));
   }
 }

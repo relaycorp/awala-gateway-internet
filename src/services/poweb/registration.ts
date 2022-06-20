@@ -1,5 +1,4 @@
 import {
-  CertificateScope,
   derSerializePublicKey,
   PrivateNodeRegistration,
   PrivateNodeRegistrationAuthorization,
@@ -56,11 +55,11 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
-      const publicGatewayCertificate = await certificateStore.retrieveLatest(
-        privateAddress!!,
-        CertificateScope.PDA,
+      const publicGatewayCertificationPath = await certificateStore.retrieveLatest(
+        privateAddress!,
+        privateAddress!,
       );
-      const gatewayPublicKey = await publicGatewayCertificate!!.getPublicKey();
+      const gatewayPublicKey = await publicGatewayCertificationPath!.leafCertificate.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
@@ -87,18 +86,19 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
       const privateGatewayCertificate = await issuePrivateGatewayCertificate(
         registrationRequest.privateNodePublicKey,
-        privateKey,
-        publicGatewayCertificate!!,
+        privateKey!,
+        publicGatewayCertificationPath!.leafCertificate,
       );
       const sessionKeyPair = await SessionKeyPair.generate();
-      await privateKeyStore.saveBoundSessionKey(
+      await privateKeyStore.saveSessionKey(
         sessionKeyPair.privateKey,
         sessionKeyPair.sessionKey.keyId,
+        privateAddress!,
         await privateGatewayCertificate.calculateSubjectPrivateAddress(),
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
-        publicGatewayCertificate!!,
+        publicGatewayCertificationPath!.leafCertificate,
         sessionKeyPair.sessionKey,
       );
       return reply

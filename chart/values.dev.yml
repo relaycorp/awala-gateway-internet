@@ -88,8 +88,6 @@ relaynet-pong:
   fullnameOverride: relaynet-pong
   pohttp_tls_required: false
   public_endpoint_address: relaynet-pong-pohttp.default
-  current_endpoint_key_id: "aGVsbG8K"
-  current_endpoint_session_key_id: "OTc1MzEK"
   vault:
     host: public-gateway-vault
     token: root
@@ -99,8 +97,9 @@ relaynet-pong:
 
 redis:
   fullnameOverride: redis
-  usePassword: false
-  cluster:
+  auth:
     enabled: false
-  persistence:
-    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      enabled: false

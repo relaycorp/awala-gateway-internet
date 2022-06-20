@@ -1,15 +1,10 @@
 import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
-import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { MONGO_ENV_VARS } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { mockSpy } from '../testUtils/jest';
-import {
-  createMongooseConnectionFromEnv,
-  getMongooseConnectionArgsFromEnv,
-  initMongoDBKeyStore,
-} from './mongo';
+import { createMongooseConnectionFromEnv, getMongooseConnectionArgsFromEnv } from './mongo';
 
 const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
 const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
@@ -122,13 +117,5 @@ describe('createMongooseConnectionFromEnv', () => {
       expect.anything(),
       expect.objectContaining({ useUnifiedTopology: true }),
     );
-  });
-});
-
-describe('initMongoDBKeyStore', () => {
-  test('MongoPublicKeyStore instance should be returned', () => {
-    const keyStore = initMongoDBKeyStore(MOCK_MONGOOSE_CONNECTION);
-
-    expect(keyStore).toBeInstanceOf(MongoPublicKeyStore);
   });
 });

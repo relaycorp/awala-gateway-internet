@@ -1,4 +1,4 @@
-import { CertificateScope, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
 import * as vault from '../../backingServices/vault';
@@ -43,15 +43,20 @@ export function setUpCommonFixtures(): () => FixtureSet {
   } as any;
   mockSpy(jest.spyOn(ParcelStore, 'initFromEnv'), () => mockParcelStore);
 
+  let privateAddress: string;
   let certificatePath: PdaChain;
   beforeAll(async () => {
     certificatePath = await generatePdaChain();
+    privateAddress = await certificatePath.publicGatewayCert.calculateSubjectPrivateAddress();
   });
 
   let mockPrivateKeyStore: MockPrivateKeyStore;
   beforeEach(async () => {
     mockPrivateKeyStore = new MockPrivateKeyStore();
-    await mockPrivateKeyStore.saveIdentityKey(certificatePath.publicGatewayPrivateKey);
+    await mockPrivateKeyStore.saveIdentityKey(
+      privateAddress,
+      certificatePath.publicGatewayPrivateKey,
+    );
   });
   mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
 
@@ -59,13 +64,13 @@ export function setUpCommonFixtures(): () => FixtureSet {
     const connection = getMongooseConnection();
 
     const certificateStore = new MongoCertificateStore(connection);
-    await certificateStore.save(certificatePath.publicGatewayCert, CertificateScope.PDA);
+    await certificateStore.save(
+      new CertificationPath(certificatePath.publicGatewayCert, []),
+      privateAddress,
+    );
 
     const config = new Config(connection);
-    await config.set(
-      ConfigKey.CURRENT_PRIVATE_ADDRESS,
-      await certificatePath.publicGatewayCert.calculateSubjectPrivateAddress(),
-    );
+    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
   });
 
   const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);

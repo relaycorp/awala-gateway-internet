@@ -1,6 +1,6 @@
 import {
   Certificate,
-  CertificateScope,
+  CertificationPath,
   getRSAPublicKeyFromPrivate,
   issueGatewayCertificate,
 } from '@relaycorp/relaynet-core';
@@ -30,7 +30,8 @@ export async function retrieveOwnCertificates(
   const config = new Config(connection);
 
   const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-  return store.retrieveAll(privateAddress!!, CertificateScope.PDA);
+  const allCertificationPaths = await store.retrieveAll(privateAddress!, privateAddress!);
+  return allCertificationPaths.map((p) => p.leafCertificate);
 }
 
 export async function rotateOwnCertificate(connection: Connection): Promise<Certificate | null> {
@@ -40,22 +41,22 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
 
   const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
 
-  const latestCertificate = await store.retrieveLatest(privateAddress!!, CertificateScope.PDA);
+  const latestCertificatePath = await store.retrieveLatest(privateAddress!, privateAddress!);
 
   const minExpiryDate = addDays(now, MIN_CERTIFICATE_TTL_DAYS);
-  if (latestCertificate && minExpiryDate < latestCertificate.expiryDate) {
+  if (latestCertificatePath && minExpiryDate < latestCertificatePath.leafCertificate.expiryDate) {
     return null;
   }
 
   const privateKeyStore = initVaultKeyStore();
   const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
   const newCertificate = await issueGatewayCertificate({
-    issuerPrivateKey: privateKey,
-    subjectPublicKey: await getRSAPublicKeyFromPrivate(privateKey),
+    issuerPrivateKey: privateKey!,
+    subjectPublicKey: await getRSAPublicKeyFromPrivate(privateKey!),
     validityEndDate: addDays(now, CERTIFICATE_TTL_DAYS),
     validityStartDate: subHours(now, CERTIFICATE_START_OFFSET_HOURS),
   });
-  await store.save(newCertificate, CertificateScope.PDA);
+  await store.save(new CertificationPath(newCertificate, []), privateAddress!);
 
   return newCertificate;
 }

@@ -44,7 +44,7 @@ async function generateKeyPair(
   });
   await certificateStore.save(new CertificationPath(gatewayCertificate, []), privateAddress);
 
-  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress!);
+  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
 
   LOGGER.info({ privateAddress }, 'Identity key pair was successfully generated');
 }

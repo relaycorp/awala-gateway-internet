@@ -9,20 +9,23 @@ build:
 deploy:
   helm:
     releases:
+    - name: dev-backing-services
+      chartPath: chart/dev-backing-services
+      valuesFiles:
+      - chart/dev-backing-services/values.yml
+      wait: true
+      skipBuildDependencies: true
     - name: public-gateway
       chartPath: chart
       valuesFiles:
       - chart/values.dev.yml
       artifactOverrides:
         image.repository: public-gateway
-      setValues:
-        relaynet-pong.current_endpoint_key_id: aGVsbG8K
-        relaynet-pong.current_endpoint_session_key_id: OTc1MzEK
       wait: true
       skipBuildDependencies: true
 portForward:
 - resourceType: service
-  resourceName: public-gateway-vault
+  resourceName: dev-backing-services-vault
   port: 8200
   localPort: 8200
 - resourceType: service

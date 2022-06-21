@@ -27,11 +27,8 @@ mongo:
   password: letmein
 
 nats:
-  nameOverride: nats
   serverUrl: nats://nats:4222
   clusterId: stan
-  natsbox:
-    enabled: false
 
 objectStore:
   backend: minio
@@ -41,65 +38,6 @@ objectStore:
   secretKey: test-secret
   tlsEnabled: false
 
-# Chart dependencies:
-
 vault:
-  nameOverride: vault
-  serverUrl: http://public-gateway-vault:8200
+  serverUrl: http://dev-backing-services-vault:8200
   token: root
-  server:
-    dev:
-      enabled: true
-
-minio:
-  fullnameOverride: minio
-  accessKey: test-key
-  secretKey: test-secret
-  buckets:
-    - name: public-gateway
-      policy: none
-  makeBucketJob:
-    annotations:
-      "helm.sh/hook-delete-policy": hook-succeeded
-  persistence:
-    enabled: false
-  resources:
-    requests:
-      # TODO: Try to get Minio to use less RAM
-      memory: 1Gi
-
-mongodb:
-  fullnameOverride: mongodb
-  auth:
-    rootPassword: letmein
-  persistence:
-    enabled: false
-
-stan:
-  nameOverride: stan
-  stan:
-    nats:
-      url: nats://nats:4222
-  store:
-    type: memory
-
-# Relaynet Pong dependencies
-relaynet-pong:
-  fullnameOverride: relaynet-pong
-  pohttp_tls_required: false
-  public_endpoint_address: relaynet-pong-pohttp.default
-  vault:
-    host: public-gateway-vault
-    token: root
-    enable_secret: true
-  redis:
-    host: redis-headless
-
-redis:
-  fullnameOverride: redis
-  auth:
-    enabled: false
-  architecture: standalone
-  master:
-    persistence:
-      enabled: false

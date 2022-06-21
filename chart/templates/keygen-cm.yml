@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+  labels:
+    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  GATEWAY_VERSION: {{ .Chart.Version }}
+
+  LOG_LEVEL: {{ .Values.logging.level | quote }}
+  {{- if .Values.logging.target }}
+  LOG_TARGET: {{ .Values.logging.target }}
+  {{- end }}
+  {{- if .Values.logging.envName }}
+  LOG_ENV_NAME: {{ .Values.logging.envName }}
+  {{- end }}
+
+  VAULT_URL: {{ .Values.vault.serverUrl }}
+  VAULT_KV_PREFIX: {{ .Values.vault.kvPrefix }}
+
+  MONGO_URI: {{ .Values.mongo.uri }}
+  MONGO_DB: {{ .Values.mongo.db }}
+  MONGO_USER: {{ .Values.mongo.user }}

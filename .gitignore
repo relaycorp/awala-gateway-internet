@@ -10,8 +10,8 @@ docs/.sass-cache
 docs/_site
 docs/vendor
 
-chart/charts
-chart/tmpcharts
+chart/dev-backing-services/charts
+chart/dev-backing-services/tmpcharts
 
 # Work around https://github.com/shelfio/jest-mongodb/issues/214
 /globalConfig.json

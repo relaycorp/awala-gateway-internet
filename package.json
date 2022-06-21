@@ -9,14 +9,15 @@
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
     "test": "run-s static-checks test:unit",
-    "test:unit": "jest --coverage",
-    "test:functional": "jest --config src/functionalTests/jest.config.js --runInBand --detectOpenHandles",
+    "test:unit": "MONGO_MEMORY_SERVER_FILE=jest-mongodb-config.cjs jest --coverage",
+    "test:functional": "jest --config src/functionalTests/jest.config.cjs --runInBand --detectOpenHandles",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",
     "cov": "run-s build test:unit && opn coverage/lcov-report/index.html",
     "clean": "trash build test coverage"
   },
+  "type": "module",
   "engines": {
     "node": ">=16"
   },

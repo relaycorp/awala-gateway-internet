@@ -1,6 +1,6 @@
 import { FastifyInstance, HTTPMethods } from 'fastify';
-import fastifyPlugin from 'fastify-plugin';
 import { Connection } from 'mongoose';
+
 import { HTTP_METHODS } from '../services/fastify';
 
 export function testDisallowedMethods(
@@ -32,14 +32,9 @@ export function testDisallowedMethods(
   });
 }
 
-export function mockFastifyMongoose(mockMongoProperty: () => { readonly db: Connection }): void {
-  const mockFastifyPlugin = fastifyPlugin;
-  jest.mock('fastify-mongoose', () => {
-    function mockFunc(fastify: FastifyInstance, _options: any, next: () => void): void {
-      fastify.decorate('mongo', mockMongoProperty());
-      next();
-    }
-
-    return mockFastifyPlugin(mockFunc, { name: 'fastify-mongoose' });
-  });
+export function mockFastifyMongoose(
+  fastify: FastifyInstance,
+  mockMongooseConnection: Connection,
+): any {
+  fastify.decorate('mongoose', mockMongooseConnection);
 }

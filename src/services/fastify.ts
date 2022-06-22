@@ -12,6 +12,7 @@ import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
+import fastifyMongoose from './fastifyMongoose';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;
@@ -70,7 +71,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
   });
 
   const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
-  await server.register(require('fastify-mongoose'), {
+  await server.register(fastifyMongoose, {
     ...mongoConnectionArgs.options,
     uri: mongoConnectionArgs.uri,
   });

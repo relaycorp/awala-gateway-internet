@@ -9,6 +9,7 @@ import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { configureFastify, runFastify } from './fastify';
+import fastifyMongoose from './fastifyMongoose';
 
 const mockFastify: FastifyInstance = {
   listen: mockSpy(jest.fn()),
@@ -120,7 +121,7 @@ describe('configureFastify', () => {
     await configureFastify([dummyRoutes]);
 
     expect(mockFastify.register).toBeCalledWith(
-      require('fastify-mongoose'),
+      fastifyMongoose,
       expect.objectContaining({
         dbName: MONGO_ENV_VARS.MONGO_DB,
         uri: MONGO_ENV_VARS.MONGO_URI,

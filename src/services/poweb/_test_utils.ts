@@ -1,4 +1,6 @@
 import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { FastifyInstance } from 'fastify';
+import fastifyPlugin from 'fastify-plugin';
 import { Connection } from 'mongoose';
 
 import * as vault from '../../backingServices/vault';
@@ -20,7 +22,13 @@ export interface FixtureSet extends PdaChain {
 
 export function setUpCommonFixtures(): () => FixtureSet {
   const getMongooseConnection = setUpTestDBConnection();
-  mockFastifyMongoose(() => ({ db: getMongooseConnection() }));
+  jest.mock('../fastifyMongoose', () => {
+    async function mockFastifyMongoose_(fastify: FastifyInstance): Promise<void> {
+      mockFastifyMongoose(fastify, getMongooseConnection());
+    }
+
+    return fastifyPlugin(mockFastifyMongoose_, { name: 'fastify-mongoose' });
+  });
 
   const mockParcelStore: ParcelStore = {
     liveStreamActiveParcelsForGateway: mockSpy(

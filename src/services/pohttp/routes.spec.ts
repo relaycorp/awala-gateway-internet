@@ -1,5 +1,6 @@
 import { Certificate, InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
+import fastifyPlugin from 'fastify-plugin';
 import { InjectOptions } from 'light-my-request';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
@@ -13,8 +14,14 @@ import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');
 
-const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' } as any, ObjectId: {} };
-mockFastifyMongoose(() => mockFastifyMongooseObject);
+const mockMongooseConnection = { what: 'The mongoose.Connection' } as any;
+jest.mock('../fastifyMongoose', () => {
+  async function mockFastifyMongoose_(fastify: FastifyInstance): Promise<void> {
+    mockFastifyMongoose(fastify, mockMongooseConnection);
+  }
+
+  return fastifyPlugin(mockFastifyMongoose_);
+});
 
 const validRequestOptions: InjectOptions = {
   headers: {
@@ -183,7 +190,7 @@ describe('receiveParcel', () => {
     expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
-      mockFastifyMongooseObject.db,
+      mockMongooseConnection,
       mockNatsClient,
       expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
     );

@@ -4,17 +4,16 @@ import { InjectOptions } from 'light-my-request';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
-import { MONGO_ENV_VARS } from '../../testUtils/db';
+import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
-import { mockFastifyMongoose, testDisallowedMethods } from '../../testUtils/fastify';
+import { testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');
 
-const mockFastifyMongooseObject = { db: { what: 'The mongoose.Connection' } as any, ObjectId: {} };
-mockFastifyMongoose(() => mockFastifyMongooseObject);
+const getMongooseConnection = setUpTestDBConnection();
 
 const validRequestOptions: InjectOptions = {
   headers: {
@@ -67,14 +66,13 @@ jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 
 describe('receiveParcel', () => {
   configureMockEnvVars({
-    ...MONGO_ENV_VARS,
     GATEWAY_VERSION: '1.0.2',
     NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
     NATS_SERVER_URL: STUB_NATS_SERVER_URL,
   });
 
   let serverInstance: FastifyInstance;
-  beforeAll(async () => {
+  beforeEach(async () => {
     serverInstance = await makeServer();
   });
 
@@ -183,7 +181,7 @@ describe('receiveParcel', () => {
     expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
-      mockFastifyMongooseObject.db,
+      getMongooseConnection(),
       mockNatsClient,
       expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
     );

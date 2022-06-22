@@ -40,7 +40,7 @@ export default async function registerRoutes(
       }
 
       const parcelSerialized = bufferToArray(request.body);
-      const mongooseConnection = (fastify as any).mongo.db;
+      const mongooseConnection = (fastify as any).mongoose;
       const countersignerCertificate = await verifyCountersignature(
         parcelSerialized,
         request.headers.authorization,

@@ -9,7 +9,6 @@ import {
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
-import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addSeconds } from 'date-fns';
 import { EventEmitter } from 'events';

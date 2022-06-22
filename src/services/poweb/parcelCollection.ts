@@ -5,7 +5,6 @@ import {
   ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
-import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';

@@ -9,5 +9,5 @@ FROM node:16.15.1-slim
 WORKDIR /opt/gw
 COPY --from=build /tmp/gw ./
 USER node
-ENTRYPOINT ["node", "--unhandled-rejections=strict"]
+ENTRYPOINT ["node", "--unhandled-rejections=strict", "--experimental-specifier-resolution=node"]
 EXPOSE 8080

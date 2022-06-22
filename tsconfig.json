@@ -3,7 +3,6 @@
   "compilerOptions": {
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "module": "es2015",
     "outDir": "build/main",
     "rootDir": "src",
     "types": ["node", "jest"],

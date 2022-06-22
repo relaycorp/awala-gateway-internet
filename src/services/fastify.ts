@@ -8,7 +8,7 @@ import {
 } from 'fastify';
 import { Logger } from 'pino';
 
-import { getMongooseConnectionArgsFromEnv } from '../backingServices/mongo';
+import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -70,11 +70,8 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
     trustProxy: true,
   });
 
-  const mongoConnectionArgs = getMongooseConnectionArgsFromEnv();
-  await server.register(fastifyMongoose, {
-    ...mongoConnectionArgs.options,
-    uri: mongoConnectionArgs.uri,
-  });
+  const mongooseConnection = await createMongooseConnectionFromEnv();
+  await server.register(fastifyMongoose, { connection: mongooseConnection });
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));
 

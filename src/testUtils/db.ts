@@ -1,19 +1,16 @@
 import { deleteModelWithClass } from '@typegoose/typegoose';
 import { Connection, ConnectOptions, createConnection } from 'mongoose';
+import * as mongoUtils from '../backingServices/mongo';
 
 import * as models from '../models';
-
-export const MONGO_ENV_VARS = {
-  MONGO_DB: 'the_db',
-  MONGO_PASSWORD: 'letmein',
-  MONGO_URI: 'mongodb://example.com',
-  MONGO_USER: 'alicia',
-};
+import { mockSpy } from './jest';
 
 const MODEL_CLASSES = Object.values(models).filter((m) => typeof m === 'function');
 
 export function setUpTestDBConnection(): () => Connection {
   let connection: Connection;
+
+  mockSpy(jest.spyOn(mongoUtils, 'createMongooseConnectionFromEnv'), () => connection);
 
   const connectionOptions: ConnectOptions = { bufferCommands: false };
   const connect = () =>

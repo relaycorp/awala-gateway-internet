@@ -1,27 +1,24 @@
 import { FastifyInstance } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { ConnectOptions, createConnection } from 'mongoose';
+import { Connection } from 'mongoose';
 
 export interface FastifyMongooseOptions {
-  readonly uri: string;
-  readonly options?: ConnectOptions;
+  readonly connection: Connection;
 }
 
 async function fastifyMongoose(
   fastify: FastifyInstance,
   options: FastifyMongooseOptions,
 ): Promise<void> {
-  if (!options.uri) {
-    throw new Error('MongoDB URI is missing from fastify-mongoose plugin registration');
+  if (!options.connection) {
+    throw new Error('Mongoose connection is missing from fastify-mongoose plugin registration');
   }
 
-  const connection = await createConnection(options.uri, options.options ?? {}).asPromise();
-
   fastify.addHook('onClose', async () => {
-    await connection.close();
+    await options.connection.close();
   });
 
-  fastify.decorate('mongoose', connection);
+  fastify.decorate('mongoose', options.connection);
 }
 
 export default fastifyPlugin(fastifyMongoose, { name: 'fastify-mongoose' });

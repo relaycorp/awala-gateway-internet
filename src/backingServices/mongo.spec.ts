@@ -1,10 +1,9 @@
 import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
-import { MONGO_ENV_VARS } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { mockSpy } from '../testUtils/jest';
-import { createMongooseConnectionFromEnv, getMongooseConnectionArgsFromEnv } from './mongo';
+import { createMongooseConnectionFromEnv } from './mongo';
 
 const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
 const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
@@ -12,34 +11,13 @@ const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
   jest.fn().mockReturnValue({ asPromise: () => MOCK_MONGOOSE_CONNECTION }),
 );
 
+const MONGO_ENV_VARS = {
+  MONGO_DB: 'the_db',
+  MONGO_PASSWORD: 'letmein',
+  MONGO_URI: 'mongodb://example.com',
+  MONGO_USER: 'alicia',
+};
 const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
-
-describe('getMongooseConnectionArgsFromEnv', () => {
-  test.each(Object.getOwnPropertyNames(MONGO_ENV_VARS))(
-    'Environment variable %s should be present',
-    (envVarName) => {
-      mockEnvVars({ ...MONGO_ENV_VARS, [envVarName]: undefined });
-
-      expect(getMongooseConnectionArgsFromEnv).toThrow(EnvVarError);
-    },
-  );
-
-  test('Connection should use MONGO_URI', () => {
-    expect(getMongooseConnectionArgsFromEnv().uri).toEqual(MONGO_ENV_VARS.MONGO_URI);
-  });
-
-  test('Connection should use MONGO_DB', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.dbName).toEqual(MONGO_ENV_VARS.MONGO_DB);
-  });
-
-  test('Connection should use MONGO_USER', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.user).toEqual(MONGO_ENV_VARS.MONGO_USER);
-  });
-
-  test('Connection should use MONGO_PASSWORD', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.pass).toEqual(MONGO_ENV_VARS.MONGO_PASSWORD);
-  });
-});
 
 describe('createMongooseConnectionFromEnv', () => {
   test.each(Object.getOwnPropertyNames(MONGO_ENV_VARS))(

@@ -1,5 +1,4 @@
 import { FastifyInstance, HTTPMethods } from 'fastify';
-import { Connection } from 'mongoose';
 
 import { HTTP_METHODS } from '../services/fastify';
 
@@ -30,11 +29,4 @@ export function testDisallowedMethods(
     expect(response).toHaveProperty('statusCode', 204);
     expect(response).toHaveProperty('headers.allow', allowedMethodsString);
   });
-}
-
-export function mockFastifyMongoose(
-  fastify: FastifyInstance,
-  mockMongooseConnection: Connection,
-): any {
-  fastify.decorate('mongoose', mockMongooseConnection);
 }

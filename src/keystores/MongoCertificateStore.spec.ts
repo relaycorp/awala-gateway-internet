@@ -52,11 +52,11 @@ describe('saveData', () => {
     await store.save(validCertificationPath, subjectPrivateAddress);
 
     const certificateStored = await certificateModel.findOne({ subjectPrivateAddress }).exec();
-    expect(certificateStored).toMatchObject<Partial<CertificationPathModel>>({
-      expiryDate: validCertificate.expiryDate,
-      issuerPrivateAddress: subjectPrivateAddress,
-      pathSerialized: Buffer.from(validCertificationPath.serialize()),
-    });
+    expect(certificateStored?.expiryDate).toEqual(validCertificate.expiryDate);
+    expect(certificateStored?.issuerPrivateAddress).toEqual(subjectPrivateAddress);
+    expect(Buffer.from(certificateStored!.pathSerialized)).toEqual(
+      Buffer.from(validCertificationPath.serialize()),
+    );
   });
 
   test('The same subject should be allowed to have multiple certificates', async () => {
@@ -72,14 +72,14 @@ describe('saveData', () => {
 
     const certificateRecords = await certificateModel.find({ subjectPrivateAddress }).exec();
     expect(certificateRecords).toHaveLength(2);
-    expect(certificateRecords[0]).toMatchObject<Partial<CertificationPathModel>>({
-      expiryDate: validCertificate.expiryDate,
-      pathSerialized: Buffer.from(validCertificationPath.serialize()),
-    });
-    expect(certificateRecords[1]).toMatchObject<Partial<CertificationPathModel>>({
-      expiryDate: certificate2.expiryDate,
-      pathSerialized: Buffer.from(certificationPath2.serialize()),
-    });
+    expect(certificateRecords[0]?.expiryDate).toEqual(validCertificate.expiryDate);
+    expect(Buffer.from(certificateRecords[0]!.pathSerialized)).toEqual(
+      Buffer.from(validCertificationPath.serialize()),
+    );
+    expect(certificateRecords[1]?.expiryDate).toEqual(certificate2.expiryDate);
+    expect(Buffer.from(certificateRecords[1]!.pathSerialized)).toEqual(
+      Buffer.from(certificationPath2.serialize()),
+    );
   });
 
   test('Certificates with the same subject and expiry should be deduped within same scope', async () => {
@@ -95,10 +95,10 @@ describe('saveData', () => {
 
     const certificateRecords = await certificateModel.find({ subjectPrivateAddress }).exec();
     expect(certificateRecords).toHaveLength(1);
-    expect(certificateRecords[0]).toMatchObject<Partial<CertificationPathModel>>({
-      expiryDate: certificate2.expiryDate,
-      pathSerialized: Buffer.from(certificationPath2.serialize()),
-    });
+    expect(certificateRecords[0]?.expiryDate).toEqual(certificate2.expiryDate);
+    expect(Buffer.from(certificateRecords[0]!.pathSerialized)).toEqual(
+      Buffer.from(certificationPath2.serialize()),
+    );
   });
 
   test('Certificates with the same subject and expiry should not be deduped across scopes', async () => {

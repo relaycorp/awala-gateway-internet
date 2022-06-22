@@ -56,7 +56,7 @@ export async function runServer(logger?: Logger): Promise<void> {
   server.addService(grpcHealthCheck.service, healthCheckService as any);
 
   const certificate = await selfIssueCertificate();
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     server.bindAsync(NETLOC, ServerCredentials.createSsl(null, [certificate]), (error) => {
       if (error) {
         reject(error);

@@ -1,14 +1,19 @@
-import { generateRSAKeyPair, issueEndpointCertificate, Parcel } from '@relaycorp/relaynet-core';
-import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
-import { Message, Stan } from 'node-nats-streaming';
-
-import { GW_POHTTP_URL } from './services';
 import {
-  connectToNatsStreaming,
-  createAndRegisterPrivateGateway,
-  OBJECT_STORAGE_BUCKET,
-  OBJECT_STORAGE_CLIENT,
-} from './utils';
+  generateRSAKeyPair,
+  issueEndpointCertificate,
+  Parcel,
+  ParcelCollectionHandshakeSigner,
+  StreamingMode,
+} from '@relaycorp/relaynet-core';
+import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
+import { PoWebClient } from '@relaycorp/relaynet-poweb';
+import pipe from 'it-pipe';
+import { Stan } from 'node-nats-streaming';
+
+import { expectBuffersToEqual } from '../testUtils/buffers';
+import { asyncIterableToArray } from '../testUtils/iter';
+import { GW_POHTTP_URL, GW_POWEB_LOCAL_PORT } from './services';
+import { connectToNatsStreaming, createAndRegisterPrivateGateway } from './utils';
 
 describe('PoHTTP server', () => {
   let stanConnection: Stan;
@@ -18,7 +23,7 @@ describe('PoHTTP server', () => {
     await new Promise((resolve) => stanConnection.once('close', resolve));
   });
 
-  test('Valid parcel should be accepted', async (cb) => {
+  test('Valid parcel should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
     const parcel = new Parcel(
       await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
@@ -32,20 +37,23 @@ describe('PoHTTP server', () => {
     await deliverParcel(GW_POHTTP_URL, parcelSerialized);
 
     // The parcel should've been safely stored
-    // TODO: Use the PoWebSockets interface instead once it's available
-    const subscription = stanConnection.subscribe(
-      `pdc-parcel.${await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
-      'functional-tests',
-      stanConnection.subscriptionOptions().setDeliverAllAvailable(),
+    const poWebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const signer = new ParcelCollectionHandshakeSigner(
+      pdaChain.privateGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
     );
-    subscription.on('error', cb);
-    subscription.on('message', async (message: Message) => {
-      const objectKey = message.getData() as string;
-      await expect(
-        OBJECT_STORAGE_CLIENT.getObject(objectKey, OBJECT_STORAGE_BUCKET),
-      ).resolves.toMatchObject({ body: Buffer.from(parcelSerialized) });
-      cb();
-    });
+    const incomingParcels = await pipe(
+      poWebClient.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
+      async function* (collections): AsyncIterable<ArrayBuffer> {
+        for await (const collection of collections) {
+          yield await collection.parcelSerialized;
+          await collection.ack();
+        }
+      },
+      asyncIterableToArray,
+    );
+    expect(incomingParcels).toHaveLength(1);
+    expectBuffersToEqual(parcelSerialized, incomingParcels[0]);
   });
 
   test('Unauthorized parcel should be refused', async () => {

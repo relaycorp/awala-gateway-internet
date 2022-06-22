@@ -1,6 +1,5 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
-import AbortController from 'abort-controller';
 import { EnvVarError } from 'env-var';
 import pipe from 'it-pipe';
 import { Connection } from 'mongoose';

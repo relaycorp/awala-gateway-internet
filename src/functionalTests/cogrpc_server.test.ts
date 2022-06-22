@@ -131,8 +131,9 @@ describe('Cargo collection', () => {
     );
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
 
-    const error = await getPromiseRejection<CogRPCError>(
+    const error = await getPromiseRejection(
       asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+      CogRPCError,
     );
 
     expect(error.cause()).toHaveProperty('code', grpc.status.UNAUTHENTICATED);
@@ -150,8 +151,9 @@ describe('Cargo collection', () => {
     );
     await expect(asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized))).toResolve();
 
-    const error = await getPromiseRejection<CogRPCError>(
+    const error = await getPromiseRejection(
       asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+      CogRPCError,
     );
 
     expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
@@ -175,7 +177,7 @@ async function getLastQueueMessage(): Promise<Buffer | undefined> {
     const timeout = setTimeout(() => {
       subscription.close();
       stanConnection.close();
-      resolve();
+      reject(new Error('Could not get NATS Streaming message on time'));
     }, 3_000);
     subscription.on('error', (error) => {
       clearTimeout(timeout);

@@ -9,7 +9,6 @@ import {
   StreamingMode,
 } from '@relaycorp/relaynet-core';
 import { CloseFrame, createMockWebSocketStream, MockClient } from '@relaycorp/ws-mock';
-import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addSeconds } from 'date-fns';
 import { EventEmitter } from 'events';
@@ -374,7 +373,6 @@ describe('Keep alive', () => {
   test('Connection should be kept alive indefinitely if Keep-Alive is on', async () => {
     const reqId = 'the-request-id';
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE, undefined, reqId);
-    const abortController = new AbortController();
 
     await client.useWithHandshake(async () => {
       await sleep(500);
@@ -385,7 +383,7 @@ describe('Keep alive', () => {
     expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalledWith(
       peerGatewayAddress,
       MOCK_NATS_STREAMING_CLIENT,
-      abortController.signal,
+      expect.anything(),
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
     expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);

@@ -1,11 +1,11 @@
 export async function getPromiseRejection<E extends Error>(
   promise: Promise<any>,
-  expectedErrorClass?: new (...args: readonly any[]) => E,
+  expectedErrorClass: new (...args: readonly any[]) => E,
 ): Promise<E> {
   try {
     await promise;
   } catch (error) {
-    if (expectedErrorClass && !(error instanceof expectedErrorClass)) {
+    if (!(error instanceof expectedErrorClass)) {
       throw new Error(`"${error}" does not extend ${expectedErrorClass.name}`);
     }
     return error;
@@ -34,7 +34,7 @@ export function mockSpy<T, Y extends any[]>(
 
 export function useFakeTimers(): void {
   beforeEach(() => {
-    jest.useFakeTimers('modern');
+    jest.useFakeTimers();
   });
 
   afterEach(() => {

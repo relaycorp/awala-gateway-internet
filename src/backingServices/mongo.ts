@@ -1,9 +1,9 @@
 import { get as getEnvVar } from 'env-var';
-import { Connection, ConnectionOptions, createConnection } from 'mongoose';
+import { Connection, ConnectOptions, createConnection } from 'mongoose';
 
 export function getMongooseConnectionArgsFromEnv(): {
   readonly uri: string;
-  readonly options: ConnectionOptions;
+  readonly options: ConnectOptions;
 } {
   const mongoUri = getEnvVar('MONGO_URI').required().asString();
   const mongoDb = getEnvVar('MONGO_DB').required().asString();
@@ -13,9 +13,6 @@ export function getMongooseConnectionArgsFromEnv(): {
     options: {
       dbName: mongoDb,
       pass: mongoPassword,
-      useCreateIndex: true,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       user: mongoUser,
     },
     uri: mongoUri,
@@ -24,5 +21,5 @@ export function getMongooseConnectionArgsFromEnv(): {
 
 export async function createMongooseConnectionFromEnv(): Promise<Connection> {
   const connectionArgs = getMongooseConnectionArgsFromEnv();
-  return createConnection(connectionArgs.uri, connectionArgs.options);
+  return createConnection(connectionArgs.uri, connectionArgs.options).asPromise();
 }

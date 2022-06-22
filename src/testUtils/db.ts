@@ -1,5 +1,5 @@
 import { deleteModelWithClass } from '@typegoose/typegoose';
-import { Connection, createConnection } from 'mongoose';
+import { Connection, ConnectOptions, createConnection } from 'mongoose';
 
 import * as models from '../models';
 
@@ -15,13 +15,9 @@ const MODEL_CLASSES = Object.values(models).filter((m) => typeof m === 'function
 export function setUpTestDBConnection(): () => Connection {
   let connection: Connection;
 
+  const connectionOptions: ConnectOptions = { bufferCommands: false };
   const connect = () =>
-    createConnection((global as any).__MONGO_URI__, {
-      bufferCommands: false,
-      useCreateIndex: true,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    createConnection((global as any).__MONGO_URI__, connectionOptions).asPromise();
 
   beforeAll(async () => {
     connection = await connect();

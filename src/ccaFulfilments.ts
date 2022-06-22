@@ -9,10 +9,11 @@ export async function wasCCAFulfilled(
   connection: Connection,
 ): Promise<boolean> {
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
-  return fulfillmentModel.exists({
+  const fulfillment = await fulfillmentModel.exists({
     ccaId: cca.id,
     peerPrivateAddress: await cca.senderCertificate.calculateSubjectPrivateAddress(),
   });
+  return !!fulfillment;
 }
 
 export async function recordCCAFulfillment(

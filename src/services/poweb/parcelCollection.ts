@@ -51,7 +51,7 @@ export default async function (
 ): Promise<void> {
   const fastifyTypeless = fastify as any;
   makeWebSocketServer(
-    fastifyTypeless.mongo.db,
+    fastifyTypeless.mongoose,
     fastifyTypeless.initialConfig.requestIdHeader,
     fastify.log as Logger,
     fastify.server,

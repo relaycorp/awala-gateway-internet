@@ -161,7 +161,9 @@ beforeAll(async () => {
 
 describe('CCA validation', () => {
   test('UNAUTHENTICATED should be returned if Authorization is missing', async () => {
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     const errorMessage = 'Authorization metadata should be specified exactly once';
     expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
@@ -175,7 +177,9 @@ describe('CCA validation', () => {
     CALL.metadata.add('Authorization', 'Bearer s3cr3t');
     CALL.metadata.add('Authorization', 'Bearer s3cr3t');
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     const errorMessage = 'Authorization metadata should be specified exactly once';
     expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
@@ -188,7 +192,9 @@ describe('CCA validation', () => {
   test('UNAUTHENTICATED should be returned if Authorization type is invalid', async () => {
     CALL.metadata.add('Authorization', 'Bearer s3cr3t');
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     const errorMessage = 'Authorization type should be Relaynet-CCA';
     expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
@@ -201,7 +207,9 @@ describe('CCA validation', () => {
   test('UNAUTHENTICATED should be returned if Authorization value is missing', async () => {
     CALL.metadata.add('Authorization', 'Relaynet-CCA');
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     const errorMessage = 'Authorization value should be set to the CCA';
     expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
@@ -215,7 +223,9 @@ describe('CCA validation', () => {
     const invalidCCASerialized = Buffer.from('I am not really a RAMF message');
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     const errorMessage = 'CCA is malformed';
     expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
@@ -232,7 +242,9 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(invalidCCRLog('CMSError'));
     expect(error).toEqual({
@@ -253,7 +265,9 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(invalidCCRLog(UnknownKeyError.name));
     expect(error).toEqual({
@@ -273,7 +287,9 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(invalidCCRLog(InvalidMessageError.name));
     expect(error).toEqual({
@@ -293,7 +309,9 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Refusing invalid CCA', {
@@ -320,7 +338,9 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Refusing CCA bound for another gateway', {
@@ -346,7 +366,9 @@ describe('CCA validation', () => {
     const invalidCCASerialized = await invalidCCA.serialize(keyPairSet.pdaGrantee.privateKey);
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Refusing invalid CCA', {
@@ -366,7 +388,9 @@ describe('CCA validation', () => {
     await recordCCAFulfillment(cca, getMongooseConnection());
     CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
 
-    const error = catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Refusing CCA that was already fulfilled', {

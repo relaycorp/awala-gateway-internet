@@ -1,5 +1,5 @@
 import { getPinoOptions } from '@relaycorp/pino-cloud';
-import { EnvVarError } from 'env-var';
+import envVar from 'env-var';
 import pino from 'pino';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
@@ -45,7 +45,7 @@ describe('makeLogger', () => {
   test('GATEWAY_VERSION env var should be required', () => {
     mockEnvVars({ ...REQUIRED_ENV_VARS, GATEWAY_VERSION: undefined });
 
-    expect(() => makeLogger()).toThrowWithMessage(EnvVarError, /GATEWAY_VERSION/);
+    expect(() => makeLogger()).toThrowWithMessage(envVar.EnvVarError, /GATEWAY_VERSION/);
   });
 
   test('Cloud logging options should be used', () => {

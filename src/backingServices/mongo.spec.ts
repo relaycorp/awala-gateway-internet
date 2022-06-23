@@ -1,11 +1,13 @@
-import { EnvVarError } from 'env-var';
-import mongoose, { Connection } from 'mongoose';
+import envVar from 'env-var';
+import mongoose from 'mongoose';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { mockSpy } from '../testUtils/jest';
 import { createMongooseConnectionFromEnv } from './mongo';
 
-const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
+const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = {
+  model: { bind: mockSpy(jest.fn()) },
+} as any;
 const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
   jest.spyOn(mongoose, 'createConnection'),
   jest.fn().mockReturnValue({ asPromise: () => MOCK_MONGOOSE_CONNECTION }),
@@ -25,7 +27,7 @@ describe('createMongooseConnectionFromEnv', () => {
     async (envVarName) => {
       mockEnvVars({ ...MONGO_ENV_VARS, [envVarName]: undefined });
 
-      await expect(createMongooseConnectionFromEnv()).rejects.toBeInstanceOf(EnvVarError);
+      await expect(createMongooseConnectionFromEnv()).rejects.toBeInstanceOf(envVar.EnvVarError);
     },
   );
 

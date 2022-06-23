@@ -1,5 +1,5 @@
 import { initObjectStoreClient } from '@relaycorp/object-storage';
-import { EnvVarError } from 'env-var';
+import envVar from 'env-var';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { initObjectStoreFromEnv } from './objectStorage';
@@ -18,7 +18,10 @@ describe('initFromEnv', () => {
   test('OBJECT_STORE_BACKEND should be required', () => {
     mockEnvVars({});
 
-    expect(() => initObjectStoreFromEnv()).toThrowWithMessage(EnvVarError, /OBJECT_STORE_BACKEND/);
+    expect(() => initObjectStoreFromEnv()).toThrowWithMessage(
+      envVar.EnvVarError,
+      /OBJECT_STORE_BACKEND/,
+    );
   });
 
   test('OBJECT_STORE_ENDPOINT should be optional', () => {

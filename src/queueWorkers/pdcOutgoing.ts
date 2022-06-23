@@ -4,7 +4,7 @@ import {
   PoHTTPError,
   PoHTTPInvalidParcelError,
 } from '@relaycorp/relaynet-pohttp';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
 
@@ -13,6 +13,8 @@ import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
+
+const { get: getEnvVar } = envVar;
 
 const MAX_DELIVERY_ATTEMPTS = 3;
 

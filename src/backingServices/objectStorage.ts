@@ -1,5 +1,7 @@
 import { AdapterType, initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
+
+const { get: getEnvVar } = envVar;
 
 export function initObjectStoreFromEnv(): ObjectStoreClient {
   const backend = getEnvVar('OBJECT_STORE_BACKEND').required().asString();

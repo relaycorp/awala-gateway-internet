@@ -1,13 +1,15 @@
 import { CargoMessageStream, Parcel, ParcelCollectionAck } from '@relaycorp/relaynet-core';
-import { getModelForClass } from '@typegoose/typegoose';
-import { Connection } from 'mongoose';
+import typegoose from '@typegoose/typegoose';
+import mongoose from 'mongoose';
 
 import { ParcelCollection } from './models';
+
+const { getModelForClass } = typegoose;
 
 export async function wasParcelCollected(
   parcel: Parcel,
   peerGatewayPrivateAddress: string,
-  connection: Connection,
+  connection: mongoose.Connection,
 ): Promise<boolean> {
   const collectionModel = getModelForClass(ParcelCollection, { existingConnection: connection });
   const collection = await collectionModel.exists({
@@ -22,7 +24,7 @@ export async function wasParcelCollected(
 export async function recordParcelCollection(
   parcel: Parcel,
   peerGatewayPrivateAddress: string,
-  connection: Connection,
+  connection: mongoose.Connection,
 ): Promise<void> {
   const collectionModel = getModelForClass(ParcelCollection, { existingConnection: connection });
   const baseFields: Partial<ParcelCollection> = {
@@ -39,7 +41,7 @@ export async function recordParcelCollection(
 
 export async function* generatePCAs(
   peerGatewayPrivateAddress: string,
-  connection: Connection,
+  connection: mongoose.Connection,
 ): CargoMessageStream {
   const collectionModel = getModelForClass(ParcelCollection, { existingConnection: connection });
 

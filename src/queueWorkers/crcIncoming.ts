@@ -8,9 +8,9 @@ import {
   ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 
@@ -23,6 +23,8 @@ import { PublicGatewayManager } from '../node/PublicGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
+
+const { get: getEnvVar } = envVar;
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
@@ -76,7 +78,7 @@ async function processCargo(
   gateway: PublicGateway,
   logger: Logger,
   parcelStore: ParcelStore,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   natsStreamingClient: NatsStreamingClient,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
@@ -135,7 +137,7 @@ async function processParcel(
   parcelSerialized: Buffer,
   peerGatewayAddress: string,
   parcelStore: ParcelStore,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   natsStreamingClient: NatsStreamingClient,
   parcelAwareLogger: Logger,
 ): Promise<void> {

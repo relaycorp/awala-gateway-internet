@@ -6,7 +6,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
@@ -98,7 +98,7 @@ export default async function registerRoutes(
 async function verifyCountersignature(
   parcelSerialized: ArrayBuffer,
   authorizationHeader: string | undefined,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   logger: FastifyLoggerInstance,
 ): Promise<Certificate | null> {
   const [authorizationType, countersignatureBase64] = (authorizationHeader || '').split(' ', 2);

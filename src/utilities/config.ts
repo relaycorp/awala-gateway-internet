@@ -1,16 +1,18 @@
-import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
+import typegoose from '@typegoose/typegoose';
+import mongoose from 'mongoose';
 
-import { Connection } from 'mongoose';
 import { ConfigItem } from '../models';
+
+const { getModelForClass } = typegoose;
 
 export enum ConfigKey {
   CURRENT_PRIVATE_ADDRESS = 'current_private_address',
 }
 
 export class Config {
-  private readonly configItemModel: ReturnModelType<typeof ConfigItem>;
+  private readonly configItemModel: typegoose.ReturnModelType<typeof ConfigItem>;
 
-  constructor(connection: Connection) {
+  constructor(connection: mongoose.Connection) {
     this.configItemModel = getModelForClass(ConfigItem, { existingConnection: connection });
   }
 

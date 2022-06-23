@@ -1,8 +1,8 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
@@ -14,6 +14,8 @@ import { retrieveOwnCertificates } from './pki';
 import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';
+
+const { get: getEnvVar } = envVar;
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
@@ -162,7 +164,7 @@ export class ParcelStore {
     parcel: Parcel,
     parcelSerialized: Buffer,
     peerGatewayAddress: string,
-    mongooseConnection: Connection,
+    mongooseConnection: mongoose.Connection,
     natsStreamingConnection: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {
@@ -198,7 +200,7 @@ export class ParcelStore {
   public async storeGatewayBoundParcel(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    mongooseConnection: Connection,
+    mongooseConnection: mongoose.Connection,
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string> {
@@ -284,7 +286,7 @@ export class ParcelStore {
     parcel: Parcel,
     parcelSerialized: Buffer,
     peerGatewayAddress: string,
-    mongooseConnection: Connection,
+    mongooseConnection: mongoose.Connection,
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {

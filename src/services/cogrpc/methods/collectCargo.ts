@@ -13,7 +13,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
@@ -28,7 +28,7 @@ import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 
 export default async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   ownPublicAddress: string,
   parcelStore: ParcelStore,
   vaultKeyStore: VaultPrivateKeyStore,
@@ -193,7 +193,7 @@ async function* generateCargoMessageStream(
   cca: CargoCollectionAuthorization,
   peerGatewayAddress: string,
   parcelStore: ParcelStore,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   publicGatewayPrivateKey: CryptoKey,
   publicGatewayCertificate: Certificate,
   ccaAwareLogger: Logger,

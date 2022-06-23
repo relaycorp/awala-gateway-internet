@@ -1,6 +1,8 @@
 import { getPinoOptions, LoggingTarget } from '@relaycorp/pino-cloud';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import pino, { Level, Logger } from 'pino';
+
+const { get: getEnvVar } = envVar;
 
 const DEFAULT_APP_NAME = 'relaynet-internet-gateway';
 

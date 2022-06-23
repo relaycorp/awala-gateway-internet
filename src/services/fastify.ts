@@ -1,4 +1,4 @@
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import {
   fastify,
   FastifyInstance,
@@ -13,6 +13,8 @@ import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 import fastifyMongoose from './fastifyMongoose';
+
+const { get: getEnvVar } = envVar;
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
 const SERVER_PORT = 8080;

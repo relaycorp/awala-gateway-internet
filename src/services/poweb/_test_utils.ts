@@ -1,5 +1,5 @@
 import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import * as vault from '../../backingServices/vault';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
@@ -12,7 +12,7 @@ import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
 
 export interface FixtureSet extends PdaChain {
-  readonly getMongooseConnection: () => Connection;
+  readonly getMongooseConnection: () => mongoose.Connection;
   readonly parcelStore: ParcelStore;
   readonly privateKeyStore: MockPrivateKeyStore;
 }

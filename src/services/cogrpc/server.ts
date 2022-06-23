@@ -1,6 +1,6 @@
 import { KeyCertPair, Server, ServerCredentials } from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
@@ -10,6 +10,8 @@ import { configureExitHandling } from '../../utilities/exitHandling';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import { makeLogger } from '../../utilities/logging';
 import { makeServiceImplementation } from './service';
+
+const { get: getEnvVar } = envVar;
 
 const NETLOC = '0.0.0.0:8080';
 

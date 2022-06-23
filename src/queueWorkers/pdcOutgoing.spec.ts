@@ -1,6 +1,6 @@
 import * as pohttp from '@relaycorp/relaynet-pohttp';
 import { addDays } from 'date-fns';
-import { EnvVarError } from 'env-var';
+import envVar from 'env-var';
 import { Message } from 'node-nats-streaming';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
@@ -102,13 +102,16 @@ describe('processInternetBoundParcels', () => {
     );
   });
 
-  test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
-    mockEnvVars({ ...ENV_VARS, [envVar]: undefined });
+  test.each(Object.keys(ENV_VARS))(
+    'Environment variable %s should be present',
+    async (envVarName) => {
+      mockEnvVars({ ...ENV_VARS, [envVarName]: undefined });
 
-    await expect(
-      processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS),
-    ).rejects.toBeInstanceOf(EnvVarError);
-  });
+      await expect(
+        processInternetBoundParcels(WORKER_NAME, OWN_POHTTP_ADDRESS),
+      ).rejects.toBeInstanceOf(envVar.EnvVarError);
+    },
+  );
 
   test('Expired parcels should be skipped and deleted from store', async () => {
     const aSecondAgo = new Date();

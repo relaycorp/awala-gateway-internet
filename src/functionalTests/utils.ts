@@ -8,12 +8,14 @@ import {
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
 import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../testUtils/pki';
 import { GW_POWEB_LOCAL_PORT } from './services';
+
+const { get: getEnvVar } = envVar;
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 

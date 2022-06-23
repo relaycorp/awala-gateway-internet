@@ -1,6 +1,6 @@
 import { generateRSAKeyPair, Parcel, ParcelCollectionAck } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { ParcelCollection } from './models';
 import { generatePCAs, recordParcelCollection, wasParcelCollected } from './parcelCollection';
@@ -10,7 +10,7 @@ import { generateStubEndpointCertificate } from './testUtils/pki';
 
 const PEER_GATEWAY_PRIVATE_ADDRESS = '0deadbeef';
 
-const MOCK_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
+const MOCK_CONNECTION: mongoose.Connection = { what: 'the-stub-connection' } as any;
 const MOCK_GET_MODEL_FOR_CLASS = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 
 let PARCEL: Parcel;

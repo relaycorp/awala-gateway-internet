@@ -3,7 +3,7 @@ import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
 import { Cargo } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Logger } from 'pino';
 import uuid from 'uuid-random';
 
@@ -13,7 +13,7 @@ import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 
 export default async function deliverCargo(
   call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   natsServerUrl: string,
   natsClusterId: string,
   baseLogger: Logger,

@@ -1,5 +1,5 @@
 import { deleteModelWithClass } from '@typegoose/typegoose';
-import { Connection, ConnectOptions, createConnection } from 'mongoose';
+import mongoose from 'mongoose';
 import * as mongoUtils from '../backingServices/mongo';
 
 import * as models from '../models';
@@ -7,14 +7,14 @@ import { mockSpy } from './jest';
 
 const MODEL_CLASSES = Object.values(models).filter((m) => typeof m === 'function');
 
-export function setUpTestDBConnection(): () => Connection {
-  let connection: Connection;
+export function setUpTestDBConnection(): () => mongoose.Connection {
+  let connection: mongoose.Connection;
 
   mockSpy(jest.spyOn(mongoUtils, 'createMongooseConnectionFromEnv'), () => connection);
 
-  const connectionOptions: ConnectOptions = { bufferCommands: false };
+  const connectionOptions: mongoose.ConnectOptions = { bufferCommands: false };
   const connect = () =>
-    createConnection((global as any).__MONGO_URI__, connectionOptions).asPromise();
+    mongoose.createConnection((global as any).__MONGO_URI__, connectionOptions).asPromise();
 
   beforeAll(async () => {
     connection = await connect();

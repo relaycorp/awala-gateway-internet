@@ -1,5 +1,7 @@
 import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
-import { get as getEnvVar } from 'env-var';
+import envVar from 'env-var';
+
+const { get: getEnvVar } = envVar;
 
 export function initVaultKeyStore(): VaultPrivateKeyStore {
   const vaultUrl = getEnvVar('VAULT_URL').required().asString();

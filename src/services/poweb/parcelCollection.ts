@@ -9,7 +9,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Logger } from 'pino';
 import { duplex } from 'stream-to-it';
 import uuid from 'uuid-random';
@@ -60,7 +60,7 @@ export default async function (
 }
 
 export function makeWebSocketServer(
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   requestIdHeader: string,
   baseLogger: Logger,
   httpServer?: HTTPServer,
@@ -81,7 +81,7 @@ export function makeWebSocketServer(
 }
 
 function makeConnectionHandler(
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   requestIdHeader: string,
   baseLogger: Logger,
 ): (ws: WebSocket, request: IncomingMessage) => void {
@@ -156,7 +156,7 @@ function makeAbortController(wsConnection: WebSocket, logger: Logger): AbortCont
 
 async function doHandshake(
   wsConnection: WebSocket,
-  mongooseConnection: Connection,
+  mongooseConnection: mongoose.Connection,
   logger: Logger,
 ): Promise<string | null> {
   const nonce = bufferToArray(uuid.bin() as Buffer);

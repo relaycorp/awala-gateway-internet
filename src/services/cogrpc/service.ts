@@ -1,6 +1,6 @@
 import { ServerDuplexStream } from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Logger } from 'pino';
 
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
@@ -11,7 +11,7 @@ import deliverCargo from './methods/deliverCargo';
 
 export interface ServiceImplementationOptions {
   readonly baseLogger: Logger;
-  readonly getMongooseConnection: () => Promise<Connection>;
+  readonly getMongooseConnection: () => Promise<mongoose.Connection>;
   readonly parcelStoreBucket: string;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;

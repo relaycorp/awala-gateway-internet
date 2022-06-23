@@ -1,8 +1,8 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
-import { EnvVarError } from 'env-var';
+import envVar from 'env-var';
 import pipe from 'it-pipe';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { Message } from 'node-nats-streaming';
 
 import * as natsStreaming from './backingServices/natsStreaming';
@@ -49,7 +49,7 @@ const MOCK_NATS_CLIENT: natsStreaming.NatsStreamingClient = {
   publishMessage: mockSpy(jest.fn()),
 } as any;
 
-const MOCK_MONGOOSE_CONNECTION: Connection = mockSpy(jest.fn()) as any;
+const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = mockSpy(jest.fn()) as any;
 
 const MOCK_OBJECT_STORE_CLIENT: ObjectStoreClient = {
   deleteObject: mockSpy(jest.fn(), async () => null),
@@ -836,7 +836,10 @@ describe('initFromEnv', () => {
   test('OBJECT_STORE_BUCKET should be required', () => {
     mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });
 
-    expect(() => ParcelStore.initFromEnv()).toThrowWithMessage(EnvVarError, /OBJECT_STORE_BUCKET/);
+    expect(() => ParcelStore.initFromEnv()).toThrowWithMessage(
+      envVar.EnvVarError,
+      /OBJECT_STORE_BUCKET/,
+    );
   });
 
   test('Parcel store should be returned', () => {

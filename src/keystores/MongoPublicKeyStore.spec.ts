@@ -8,13 +8,13 @@ import {
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { PeerPublicKeyData } from '../models';
 import { mockSpy } from '../testUtils/jest';
 import { MongoPublicKeyStore } from './MongoPublicKeyStore';
 
-const STUB_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
+const STUB_CONNECTION: mongoose.Connection = { what: 'the-stub-connection' } as any;
 
 let peerPublicKeyData: PeerPublicKeyData;
 let peerPublicKey: CryptoKey;

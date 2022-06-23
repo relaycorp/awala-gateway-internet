@@ -1,4 +1,4 @@
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
@@ -13,7 +13,7 @@ const NATS_SERVER_URL = 'nats://example.com';
 const NATS_CLUSTER_ID = 'nats-cluster-id';
 
 interface Fixture {
-  readonly getMongooseConnection: () => Connection;
+  readonly getMongooseConnection: () => mongoose.Connection;
   readonly getSvcImplOptions: () => ServiceImplementationOptions;
   readonly getMockLogs: () => readonly object[];
 }

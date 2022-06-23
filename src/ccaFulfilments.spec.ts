@@ -4,13 +4,13 @@ import {
   issueGatewayCertificate,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from './ccaFulfilments';
 import { CCAFulfillment } from './models';
 import { mockSpy } from './testUtils/jest';
 
-const MOCK_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
+const MOCK_CONNECTION: mongoose.Connection = { what: 'the-stub-connection' } as any;
 const MOCK_GET_MODEL_FOR_CLASS = mockSpy(jest.spyOn(typegoose, 'getModelForClass'));
 
 let CCA: CargoCollectionAuthorization;

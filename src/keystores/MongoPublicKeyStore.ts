@@ -1,13 +1,15 @@
 import { PublicKeyStore, SessionPublicKeyData } from '@relaycorp/relaynet-core';
-import { getModelForClass } from '@typegoose/typegoose';
-import { Connection, Model } from 'mongoose';
+import typegoose from '@typegoose/typegoose';
+import mongoose from 'mongoose';
 
 import { PeerPublicKeyData } from '../models';
 
-export class MongoPublicKeyStore extends PublicKeyStore {
-  protected readonly keyDataModel: Model<any>;
+const { getModelForClass } = typegoose;
 
-  constructor(connection: Connection) {
+export class MongoPublicKeyStore extends PublicKeyStore {
+  protected readonly keyDataModel: mongoose.Model<any>;
+
+  constructor(connection: mongoose.Connection) {
     super();
 
     this.keyDataModel = getModelForClass(PeerPublicKeyData, {

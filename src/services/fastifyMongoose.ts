@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 export interface FastifyMongooseOptions {
-  readonly connection: Connection;
+  readonly connection: mongoose.Connection;
 }
 
 async function fastifyMongoose(

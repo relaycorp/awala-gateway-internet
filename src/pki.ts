@@ -5,7 +5,7 @@ import {
   issueGatewayCertificate,
 } from '@relaycorp/relaynet-core';
 import { addDays, subHours } from 'date-fns';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 import { initVaultKeyStore } from './backingServices/vault';
 
 import { MongoCertificateStore } from './keystores/MongoCertificateStore';
@@ -24,7 +24,7 @@ const MIN_CERTIFICATE_TTL_DAYS = 180;
 export const CERTIFICATE_TTL_DAYS = 360;
 
 export async function retrieveOwnCertificates(
-  connection: Connection,
+  connection: mongoose.Connection,
 ): Promise<readonly Certificate[]> {
   const store = new MongoCertificateStore(connection);
   const config = new Config(connection);
@@ -34,7 +34,9 @@ export async function retrieveOwnCertificates(
   return allCertificationPaths.map((p) => p.leafCertificate);
 }
 
-export async function rotateOwnCertificate(connection: Connection): Promise<Certificate | null> {
+export async function rotateOwnCertificate(
+  connection: mongoose.Connection,
+): Promise<Certificate | null> {
   const store = new MongoCertificateStore(connection);
   const config = new Config(connection);
   const now = new Date();

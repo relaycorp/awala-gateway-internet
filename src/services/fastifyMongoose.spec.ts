@@ -1,11 +1,11 @@
 import fastify from 'fastify';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { mockSpy } from '../testUtils/jest';
 
 import fastifyMongoose from './fastifyMongoose';
 
-const MOCK_MONGOOSE_CONNECTION = { close: mockSpy(jest.fn()) } as any as Connection;
+const MOCK_MONGOOSE_CONNECTION: mongoose.Connection = { close: mockSpy(jest.fn()) } as any;
 
 test('Plugin registration should fail if connection is missing', async () => {
   const app = fastify();

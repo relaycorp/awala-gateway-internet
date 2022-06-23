@@ -1,12 +1,14 @@
 import { CargoCollectionAuthorization } from '@relaycorp/relaynet-core';
-import { getModelForClass } from '@typegoose/typegoose';
-import { Connection } from 'mongoose';
+import typegoose from '@typegoose/typegoose';
+import mongoose from 'mongoose';
 
 import { CCAFulfillment } from './models';
 
+const { getModelForClass } = typegoose;
+
 export async function wasCCAFulfilled(
   cca: CargoCollectionAuthorization,
-  connection: Connection,
+  connection: mongoose.Connection,
 ): Promise<boolean> {
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
   const fulfillment = await fulfillmentModel.exists({
@@ -18,7 +20,7 @@ export async function wasCCAFulfilled(
 
 export async function recordCCAFulfillment(
   cca: CargoCollectionAuthorization,
-  connection: Connection,
+  connection: mongoose.Connection,
 ): Promise<void> {
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
 

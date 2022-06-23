@@ -1,14 +1,16 @@
 import { CertificateStore } from '@relaycorp/relaynet-core';
-import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
+import typegoose from '@typegoose/typegoose';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { Connection } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { CertificationPath } from '../models';
 
-export class MongoCertificateStore extends CertificateStore {
-  private readonly certificateModel: ReturnModelType<typeof CertificationPath>;
+const { getModelForClass } = typegoose;
 
-  constructor(connection: Connection) {
+export class MongoCertificateStore extends CertificateStore {
+  private readonly certificateModel: typegoose.ReturnModelType<typeof CertificationPath>;
+
+  constructor(connection: mongoose.Connection) {
     super();
 
     this.certificateModel = getModelForClass(CertificationPath, { existingConnection: connection });

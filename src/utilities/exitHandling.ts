@@ -1,12 +1,9 @@
-import pino, { Logger } from 'pino';
+import { Logger } from 'pino';
 
 export function configureExitHandling(logger: Logger): void {
-  process.on(
-    'uncaughtException',
-    pino.final(logger, (err, finalLogger) => {
-      finalLogger.fatal({ err }, 'uncaughtException');
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'uncaughtException');
 
-      process.exit(1);
-    }),
-  );
+    process.exit(1);
+  });
 }

@@ -1,6 +1,6 @@
 // tslint:disable:max-classes-per-file
 
-import { source as makeSourceAbortable } from 'abortable-iterator';
+import { abortableSource } from 'abortable-iterator';
 import envVar from 'env-var';
 import pipe from 'it-pipe';
 import { connect, Message, Stan } from 'node-nats-streaming';
@@ -100,7 +100,7 @@ export class NatsStreamingClient {
 
     const messagesIterable = streamToIt.source(messagesStream);
     const messages = abortSignal
-      ? makeSourceAbortable(messagesIterable, abortSignal, { returnOnAbort: true })
+      ? abortableSource(messagesIterable, abortSignal, { returnOnAbort: true })
       : messagesIterable;
     try {
       for await (const msg of messages) {

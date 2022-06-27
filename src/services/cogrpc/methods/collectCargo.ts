@@ -12,9 +12,9 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
@@ -146,7 +146,7 @@ export default async function collectCargo(
     ccaAwareLogger,
   );
   try {
-    await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
+    await pipeline(() => cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
     ccaAwareLogger.error({ err }, 'Failed to send cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
@@ -198,8 +198,8 @@ async function* generateCargoMessageStream(
   publicGatewayCertificate: Certificate,
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
-  const activeParcels = pipe(
-    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+  const activeParcels = pipeline(
+    () => parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
     convertParcelsToCargoMessageStream,
   );
   yield* await concatMessageStreams(

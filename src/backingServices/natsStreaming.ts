@@ -2,10 +2,9 @@
 
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
-import pipe from 'it-pipe';
 import { connect, Message, Stan } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
-import * as streamToIt from 'stream-to-it';
+import { pipeline } from 'streaming-iterables';
 import { promisify } from 'util';
 
 import { PublicGatewayError } from '../errors';
@@ -58,7 +57,10 @@ export class NatsStreamingClient {
     channel: string,
     clientIdSuffix?: string,
   ): Promise<void> {
-    await pipe([{ data: messageData }], this.makePublisher(channel, clientIdSuffix), drainIterable);
+    async function* source(): AsyncIterable<any> {
+      yield { data: messageData };
+    }
+    await pipeline(source, this.makePublisher(channel, clientIdSuffix), drainIterable);
   }
 
   /**
@@ -96,10 +98,9 @@ export class NatsStreamingClient {
     );
     subscription.on('message', (msg) => messagesStream.write(msg));
 
-    const messagesIterable = streamToIt.source(messagesStream);
     const messages = abortSignal
-      ? makeSourceAbortable(messagesIterable, abortSignal, { returnOnAbort: true })
-      : messagesIterable;
+      ? makeSourceAbortable(messagesStream, abortSignal, { returnOnAbort: true })
+      : messagesStream;
     try {
       for await (const msg of messages) {
         yield msg;

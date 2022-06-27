@@ -2,9 +2,9 @@ import { ServerDuplexStream } from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
 import { Cargo } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { NatsStreamingClient, PublisherMessage } from '../../../backingServices/natsStreaming';
@@ -61,7 +61,7 @@ export default async function deliverCargo(
   }
 
   try {
-    await pipe(call, validateDelivery, natsPublisher, ackDelivery);
+    await pipeline(() => call, validateDelivery, natsPublisher, ackDelivery);
   } catch (err) {
     logger.error({ err }, 'Failed to store cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call

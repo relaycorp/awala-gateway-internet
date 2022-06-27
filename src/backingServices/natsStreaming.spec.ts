@@ -1,8 +1,8 @@
 /* tslint:disable:max-classes-per-file */
 
 import { EventEmitter } from 'events';
-import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
+import { pipeline } from 'streaming-iterables';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
@@ -444,8 +444,8 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipe(
-        consumer,
+      const outputMessages = pipeline(
+        () => consumer,
         async function* (messages: AsyncIterable<Message>): AsyncIterable<Message> {
           for await (const message of messages) {
             yield message;
@@ -469,7 +469,7 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipe(consumer, iterableTake(1));
+      const outputMessages = pipeline(() => consumer, iterableTake(1));
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockSubscription.close).toBeCalled();

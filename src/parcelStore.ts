@@ -1,10 +1,10 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
@@ -95,8 +95,8 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipe(
-      parcelMessages,
+    yield* await pipeline(
+      () => parcelMessages,
       buildParcelObjectMetadataFromNATSMessage,
       this.makeActiveParcelRetriever(peerAwareLogger),
       buildStream,
@@ -118,7 +118,7 @@ export class ParcelStore {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
     async function* buildStream(
-      parcelObjects: AsyncIterable<ParcelObject<Message>>,
+      parcelObjects: AsyncIterable<ParcelObject<null>>,
     ): AsyncIterable<ParcelStreamMessage> {
       for await (const { key, body } of parcelObjects) {
         yield {
@@ -133,8 +133,8 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipe(
-      this.retrieveActiveParcelsForGateway(peerGatewayAddress, logger),
+    yield* await pipeline(
+      () => this.retrieveActiveParcelsForGateway(peerGatewayAddress, logger),
       buildStream,
     );
   }
@@ -151,8 +151,8 @@ export class ParcelStore {
     logger: Logger,
   ): AsyncIterable<ParcelObject<null>> {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${peerGatewayAddress}/`;
-    yield* await pipe(
-      this.objectStoreClient.listObjectKeys(prefix, this.bucket),
+    yield* await pipeline(
+      () => this.objectStoreClient.listObjectKeys(prefix, this.bucket),
       buildParcelObjectMetadataFromString,
       this.makeActiveParcelRetriever(logger),
     );
@@ -386,7 +386,7 @@ export class ParcelStore {
     }
 
     return (parcelObjectsMetadata) =>
-      pipe(parcelObjectsMetadata, retrieveObjects, filterActiveParcels);
+      pipeline(() => parcelObjectsMetadata, retrieveObjects, filterActiveParcels);
   }
 }
 

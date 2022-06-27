@@ -7,8 +7,8 @@ import {
 } from '@relaycorp/relaynet-core';
 import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import pipe from 'it-pipe';
 import { Stan } from 'node-nats-streaming';
+import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray } from '../testUtils/iter';
@@ -42,8 +42,8 @@ describe('PoHTTP server', () => {
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    const incomingParcels = await pipe(
-      poWebClient.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
+    const incomingParcels = await pipeline(
+      () => poWebClient.collectParcels([signer], StreamingMode.CLOSE_UPON_COMPLETION),
       async function* (collections): AsyncIterable<ArrayBuffer> {
         for await (const collection of collections) {
           yield await collection.parcelSerialized;

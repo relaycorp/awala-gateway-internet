@@ -1,4 +1,4 @@
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
+import { VaultPrivateKeyStore } from '@relaycorp/awala-keystore-cloud';
 import envVar from 'env-var';
 
 const { get: getEnvVar } = envVar;

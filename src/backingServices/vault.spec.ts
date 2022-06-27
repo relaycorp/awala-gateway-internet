@@ -1,9 +1,9 @@
-import * as vaultKeyStore from '@relaycorp/keystore-vault';
+import * as cloudKeyStore from '@relaycorp/awala-keystore-cloud';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { initVaultKeyStore } from './vault';
 
-jest.mock('@relaycorp/keystore-vault');
+jest.mock('@relaycorp/awala-keystore-cloud');
 
 const BASE_ENV_VARS = {
   VAULT_KV_PREFIX: 'kv-prefix',
@@ -25,8 +25,8 @@ describe('initVaultKeyStore', () => {
   test('Key store should be returned if env vars are present', () => {
     const keyStore = initVaultKeyStore();
 
-    expect(keyStore).toBeInstanceOf(vaultKeyStore.VaultPrivateKeyStore);
-    expect(vaultKeyStore.VaultPrivateKeyStore).toBeCalledWith(
+    expect(keyStore).toBeInstanceOf(cloudKeyStore.VaultPrivateKeyStore);
+    expect(cloudKeyStore.VaultPrivateKeyStore).toBeCalledWith(
       BASE_ENV_VARS.VAULT_URL,
       BASE_ENV_VARS.VAULT_TOKEN,
       BASE_ENV_VARS.VAULT_KV_PREFIX,

@@ -1,6 +1,6 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
+import { VaultPrivateKeyStore } from '@relaycorp/awala-keystore-cloud';
 import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,

@@ -67,7 +67,7 @@
     "@relaycorp/awala-keystore-cloud": "^1.3.3",
     "@relaycorp/cogrpc": "^1.3.53",
     "@relaycorp/object-storage": "^1.4.9",
-    "@relaycorp/pino-cloud": "^1.0.9",
+    "@relaycorp/pino-cloud": "^1.0.18",
     "@relaycorp/relaynet-core": "^1.80.2",
     "@relaycorp/relaynet-pohttp": "^1.7.40",
     "@typegoose/typegoose": "^9.9.0",

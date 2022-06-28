@@ -1,9 +1,9 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { EnvVarError } from 'env-var';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
+import { pipeline } from 'streaming-iterables';
 
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
@@ -83,13 +83,14 @@ describe('liveStreamActiveParcelsForGateway', () => {
   test('Active parcels should be streamed', async () => {
     setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
-    const activeParcels = pipe(
-      STORE.liveStreamActiveParcelsForGateway(
-        peerGatewayAddress,
-        MOCK_NATS_CLIENT,
-        abortController.signal,
-        mockLogging.logger,
-      ),
+    const activeParcels = pipeline(
+      () =>
+        STORE.liveStreamActiveParcelsForGateway(
+          peerGatewayAddress,
+          MOCK_NATS_CLIENT,
+          abortController.signal,
+          mockLogging.logger,
+        ),
       iterableTake(1),
     );
 
@@ -107,13 +108,14 @@ describe('liveStreamActiveParcelsForGateway', () => {
       'prefix/expired.parcel',
     );
 
-    const activeParcels = pipe(
-      STORE.liveStreamActiveParcelsForGateway(
-        peerGatewayAddress,
-        MOCK_NATS_CLIENT,
-        abortController.signal,
-        mockLogging.logger,
-      ),
+    const activeParcels = pipeline(
+      () =>
+        STORE.liveStreamActiveParcelsForGateway(
+          peerGatewayAddress,
+          MOCK_NATS_CLIENT,
+          abortController.signal,
+          mockLogging.logger,
+        ),
       iterableTake(1),
     );
 
@@ -144,13 +146,14 @@ describe('liveStreamActiveParcelsForGateway', () => {
     test('NATS Streaming ack callback should be called', async () => {
       const stanMessage = setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
-      const [activeParcel] = await pipe(
-        STORE.liveStreamActiveParcelsForGateway(
-          peerGatewayAddress,
-          MOCK_NATS_CLIENT,
-          abortController.signal,
-          mockLogging.logger,
-        ),
+      const [activeParcel] = await pipeline(
+        () =>
+          STORE.liveStreamActiveParcelsForGateway(
+            peerGatewayAddress,
+            MOCK_NATS_CLIENT,
+            abortController.signal,
+            mockLogging.logger,
+          ),
         iterableTake(1),
         asyncIterableToArray,
       );
@@ -163,13 +166,14 @@ describe('liveStreamActiveParcelsForGateway', () => {
     test('Parcel should be deleted from store', async () => {
       setMockParcelObjectStore(activeParcelObject, activeParcelKey);
 
-      const [activeParcel] = await pipe(
-        STORE.liveStreamActiveParcelsForGateway(
-          peerGatewayAddress,
-          MOCK_NATS_CLIENT,
-          abortController.signal,
-          mockLogging.logger,
-        ),
+      const [activeParcel] = await pipeline(
+        () =>
+          STORE.liveStreamActiveParcelsForGateway(
+            peerGatewayAddress,
+            MOCK_NATS_CLIENT,
+            abortController.signal,
+            mockLogging.logger,
+          ),
         iterableTake(1),
         asyncIterableToArray,
       );
@@ -864,8 +868,8 @@ describe('makeActiveParcelRetriever', () => {
     });
 
     await expect(
-      pipe(
-        [parcelObjectMetadata],
+      pipeline(
+        () => arrayToAsyncIterable([parcelObjectMetadata]),
         store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
@@ -886,8 +890,8 @@ describe('makeActiveParcelRetriever', () => {
     });
 
     await expect(
-      pipe(
-        [parcelObjectMetadata],
+      pipeline(
+        () => arrayToAsyncIterable([parcelObjectMetadata]),
         store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
@@ -914,8 +918,8 @@ describe('makeActiveParcelRetriever', () => {
     });
 
     await expect(
-      pipe(
-        [parcelObjectMetadata],
+      pipeline(
+        () => arrayToAsyncIterable([parcelObjectMetadata]),
         store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
@@ -941,8 +945,8 @@ describe('makeActiveParcelRetriever', () => {
     });
 
     await expect(
-      pipe(
-        [parcelObjectMetadata],
+      pipeline(
+        () => arrayToAsyncIterable([parcelObjectMetadata]),
         store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),
@@ -963,8 +967,8 @@ describe('makeActiveParcelRetriever', () => {
     getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
 
     await expect(
-      pipe(
-        [parcelObjectMetadata],
+      pipeline(
+        () => arrayToAsyncIterable([parcelObjectMetadata]),
         store.makeActiveParcelRetriever(mockLogging.logger),
         asyncIterableToArray,
       ),

@@ -15,7 +15,7 @@ import {
   RefusedParcelError,
   ServerError,
 } from '@relaycorp/relaynet-poweb';
-import pipe from 'it-pipe';
+import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
@@ -85,8 +85,8 @@ describe('PoWeb server', () => {
         ],
         StreamingMode.CLOSE_UPON_COMPLETION,
       );
-      const incomingParcels = await pipe(
-        parcelCollection,
+      const incomingParcels = await pipeline(
+        () => parcelCollection,
         async function* (collections): AsyncIterable<ArrayBuffer> {
           for await (const collection of collections) {
             yield await collection.parcelSerialized;
@@ -114,16 +114,17 @@ describe('PoWeb server', () => {
         ),
       );
 
-      const incomingParcels = await pipe(
-        client.collectParcels(
-          [
-            new ParcelCollectionHandshakeSigner(
-              recipientChain.privateGatewayCert,
-              recipientChain.privateGatewayPrivateKey,
-            ),
-          ],
-          StreamingMode.KEEP_ALIVE,
-        ),
+      const incomingParcels = await pipeline(
+        () =>
+          client.collectParcels(
+            [
+              new ParcelCollectionHandshakeSigner(
+                recipientChain.privateGatewayCert,
+                recipientChain.privateGatewayPrivateKey,
+              ),
+            ],
+            StreamingMode.KEEP_ALIVE,
+          ),
         async function* (collections): AsyncIterable<ArrayBuffer> {
           for await (const collection of collections) {
             yield await collection.parcelSerialized;

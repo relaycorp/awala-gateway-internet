@@ -18,7 +18,7 @@ import {
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as httpGet } from 'http';
-import pipe from 'it-pipe';
+import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
@@ -52,16 +52,17 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   );
 
   // Collect the pong message once it's been received
-  const incomingParcels = await pipe(
-    powebClient.collectParcels(
-      [
-        new ParcelCollectionHandshakeSigner(
-          pdaChain.privateGatewayCert,
-          pdaChain.privateGatewayPrivateKey,
-        ),
-      ],
-      StreamingMode.KEEP_ALIVE,
-    ),
+  const incomingParcels = await pipeline(
+    () =>
+      powebClient.collectParcels(
+        [
+          new ParcelCollectionHandshakeSigner(
+            pdaChain.privateGatewayCert,
+            pdaChain.privateGatewayPrivateKey,
+          ),
+        ],
+        StreamingMode.KEEP_ALIVE,
+      ),
     async function* (collections): AsyncIterable<ArrayBuffer> {
       for await (const collection of collections) {
         yield collection.parcelSerialized;

@@ -7,7 +7,7 @@
     "pdcQueue",
     "mongo",
     "nats",
-    "vault"
+    "keystore"
   ],
   "properties": {
     "logging": {
@@ -164,25 +164,65 @@
         }
       }
     },
-    "vault": {
+    "keystore": {
       "type": "object",
-      "required": [
-        "serverUrl",
-        "token",
-        "kvPrefix"
-      ],
-      "properties": {
-        "serverUrl": {
-          "type": "string",
-          "format": "uri"
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "location",
+            "kmsKeyring",
+            "kmsIdKey",
+            "kmsSessionEncryptionKey",
+            "datastoreNamespace"
+          ],
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "const": "gcp"
+            },
+            "location": {
+              "type": "string"
+            },
+            "kmsKeyring": {
+              "type": "string"
+            },
+            "kmsIdKey": {
+              "type": "string"
+            },
+            "kmsSessionEncryptionKey": {
+              "type": "string"
+            },
+            "datastoreNamespace": {
+              "type": "string"
+            }
+          }
         },
-        "token": {
-          "type": "string"
-        },
-        "kvPrefix": {
-          "type": "string"
+        {
+          "type": "object",
+          "required": [
+            "serverUrl",
+            "token",
+            "kvPrefix"
+          ],
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "const": "vault"
+            },
+            "serverUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "token": {
+              "type": "string"
+            },
+            "kvPrefix": {
+              "type": "string"
+            }
+          }
         }
-      }
+      ]
     }
   }
 }

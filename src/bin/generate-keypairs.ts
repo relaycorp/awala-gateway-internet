@@ -2,7 +2,7 @@ import { CertificationPath, issueGatewayCertificate } from '@relaycorp/relaynet-
 import { addDays } from 'date-fns';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
-import { initVaultKeyStore } from '../backingServices/vault';
+import { initPrivateKeyStore } from '../backingServices/keystore';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { CERTIFICATE_TTL_DAYS } from '../pki';
 import { Config, ConfigKey } from '../utilities/config';
@@ -12,7 +12,7 @@ import { makeLogger } from '../utilities/logging';
 const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
 
-const privateKeyStore = initVaultKeyStore();
+const privateKeyStore = initPrivateKeyStore();
 
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();

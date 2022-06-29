@@ -17,6 +17,8 @@ spec:
         global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
         mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
         global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
+        keystore-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
+        keystore-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
       labels:
         {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "certrotator") .) | nindent 8 }}
     spec:
@@ -42,5 +44,9 @@ spec:
                     name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
                 - secretRef:
                     name: {{ include "relaynet-internet-gateway.fullname" . }}
+                - configMapRef:
+                    name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+                - secretRef:
+                    name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
               resources:
                 {{- toYaml .Values.crcQueue.resources | nindent 16 }}

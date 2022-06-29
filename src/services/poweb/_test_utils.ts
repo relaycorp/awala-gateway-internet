@@ -1,7 +1,7 @@
 import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import * as vault from '../../backingServices/vault';
+import * as vault from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
 import { setUpTestDBConnection } from '../../testUtils/db';
@@ -56,7 +56,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
       certificatePath.publicGatewayPrivateKey,
     );
   });
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+  mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
 
   beforeEach(async () => {
     const connection = getMongooseConnection();

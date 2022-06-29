@@ -9,7 +9,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { addDays, addMinutes, addSeconds, setMilliseconds, subHours, subSeconds } from 'date-fns';
 
-import * as vault from './backingServices/vault';
+import * as vault from './backingServices/keystore';
 import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import {
   CERTIFICATE_TTL_DAYS,
@@ -92,7 +92,7 @@ describe('rotateOwnCertificate', () => {
   afterEach(() => {
     mockPrivateKeyStore.clear();
   });
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+  mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
 
   test('New certificate should be created if there are none', async () => {
     await expect(

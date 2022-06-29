@@ -8,7 +8,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { initVaultKeyStore } from '../../backingServices/vault';
+import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
@@ -27,7 +27,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  const privateKeyStore = initVaultKeyStore();
+  const privateKeyStore = initPrivateKeyStore();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],

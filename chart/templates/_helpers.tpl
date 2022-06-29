@@ -103,3 +103,29 @@ Generate digest of a rendered resource template
 {{- /* Truncate the digest to avoid making it easy to derive secret values */ -}}
 {{- include (print $.Template.BasePath "/" .fileName) . | sha256sum | trunc 5 | quote }}
 {{- end }}
+
+{{/*
+Keystore-related, non-secret environment variables.
+*/}}
+{{- define "relaynet-internet-gateway.keystoreNonSecretEnvVars" -}}
+KEYSTORE_ADAPTER: {{ .Values.keystore.adapter }}
+{{- if eq .Values.keystore.adapter "gcp" }}
+KS_GCP_LOCATION: {{ .Values.keystore.location }}
+KS_KMS_KEYRING: {{ .Values.keystore.kmsKeyring }}
+KS_KMS_ID_KEY: {{ .Values.keystore.kmsIdKey }}
+KS_KMS_SESSION_ENC_KEY: {{ .Values.keystore.kmsSessionEncryptionKey }}
+KS_DATASTORE_NS: {{ .Values.keystore.datastoreNamespace }}
+{{- else if eq .Values.keystore.adapter "vault" }}
+KS_VAULT_URL: {{ .Values.keystore.serverUrl }}
+KS_VAULT_KV_PREFIX: {{ .Values.keystore.kvPrefix }}
+{{- end }}
+{{- end }}
+
+{{/*
+Keystore-related, secret environment variables.
+*/}}
+{{- define "relaynet-internet-gateway.keystoreSecretEnvVars" -}}
+{{- if eq .Values.keystore.adapter "vault" }}
+KS_VAULT_TOKEN: {{ .Values.keystore.token | b64enc }}
+{{- end }}
+{{- end }}

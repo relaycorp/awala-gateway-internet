@@ -11,7 +11,6 @@ import {
   generateRSAKeyPair,
   InvalidMessageError,
   issueEndpointCertificate,
-  MockPrivateKeyStore,
   Parcel,
   ParcelCollectionAck,
   RecipientAddressType,
@@ -30,7 +29,6 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 
-import * as vault from '../../../backingServices/vault';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../../parcelCollection';
@@ -67,27 +65,26 @@ beforeAll(async () => {
   privateGatewayPrivateAddress = await pdaChain.privateGateway.calculateSubjectPrivateAddress();
 });
 
-const { getMongooseConnection, getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
+const { getMongooseConnection, getSvcImplOptions, getMockLogs, getPrivateKeystore } =
+  setUpTestEnvironment();
 
-const PRIVATE_KEY_STORE = new MockPrivateKeyStore();
 let publicGatewaySessionKeyPair: SessionKeyPair;
 beforeAll(async () => {
   publicGatewaySessionKeyPair = await SessionKeyPair.generate();
 });
 beforeEach(async () => {
-  PRIVATE_KEY_STORE.clear();
-  await PRIVATE_KEY_STORE.saveIdentityKey(
+  const privateKeyStore = getPrivateKeystore();
+  await privateKeyStore.saveIdentityKey(
     publicGatewayPrivateAddress,
     keyPairSet.publicGateway.privateKey,
   );
-  await PRIVATE_KEY_STORE.saveSessionKey(
+  await privateKeyStore.saveSessionKey(
     publicGatewaySessionKeyPair.privateKey,
     publicGatewaySessionKeyPair.sessionKey.keyId,
     publicGatewayPrivateAddress,
     privateGatewayPrivateAddress,
   );
 });
-mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
 
 beforeEach(async () => {
   const connection = getMongooseConnection();

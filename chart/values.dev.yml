@@ -38,6 +38,7 @@ objectStore:
   secretKey: test-secret
   tlsEnabled: false
 
-vault:
+keystore:
+  adapter: vault
   serverUrl: http://dev-backing-services-vault:8200
   token: root

@@ -19,9 +19,8 @@ data:
   LOG_ENV_NAME: {{ .Values.logging.envName }}
   {{- end }}
 
-  VAULT_URL: {{ .Values.vault.serverUrl }}
-  VAULT_KV_PREFIX: {{ .Values.vault.kvPrefix }}
-
   MONGO_URI: {{ .Values.mongo.uri }}
   MONGO_DB: {{ .Values.mongo.db }}
   MONGO_USER: {{ .Values.mongo.user }}
+
+  {{- include "relaynet-internet-gateway.keystoreNonSecretEnvVars" . | nindent 2 }}

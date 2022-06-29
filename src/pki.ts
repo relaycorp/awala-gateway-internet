@@ -6,7 +6,7 @@ import {
 } from '@relaycorp/relaynet-core';
 import { addDays, subHours } from 'date-fns';
 import { Connection } from 'mongoose';
-import { initVaultKeyStore } from './backingServices/vault';
+import { initPrivateKeyStore } from './backingServices/keystore';
 
 import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import { Config, ConfigKey } from './utilities/config';
@@ -48,7 +48,7 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
     return null;
   }
 
-  const privateKeyStore = initVaultKeyStore();
+  const privateKeyStore = initPrivateKeyStore();
   const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
   const newCertificate = await issueGatewayCertificate({
     issuerPrivateKey: privateKey!,

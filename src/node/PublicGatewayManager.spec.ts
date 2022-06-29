@@ -1,7 +1,7 @@
 import { KeyStoreSet, MockKeyStoreSet } from '@relaycorp/relaynet-core';
 import { addDays, addSeconds } from 'date-fns';
 
-import * as vault from '../backingServices/vault';
+import * as vault from '../backingServices/keystore';
 import { PublicGatewayError } from '../errors';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 describe('init', () => {
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => keyStoreSet.privateKeyStore);
+  mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => keyStoreSet.privateKeyStore);
 
   test('Manager should be output', async () => {
     await expect(PublicGatewayManager.init(getMongoConnection())).resolves.toBeInstanceOf(

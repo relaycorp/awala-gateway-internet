@@ -1,14 +1,14 @@
-import { EnvVarError } from 'env-var';
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
-import { MONGO_ENV_VARS } from '../testUtils/db';
+import { setUpTestDBConnection } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { configureFastify, runFastify } from './fastify';
+import fastifyMongoose from './fastifyMongoose';
 
 const mockFastify: FastifyInstance = {
   listen: mockSpy(jest.fn()),
@@ -23,13 +23,15 @@ afterAll(() => {
   jest.restoreAllMocks();
 });
 
-const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
+const mockEnvVars = configureMockEnvVars();
 
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'));
 
 const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
 
 const dummyRoutes: FastifyPluginCallback = () => null;
+
+const getConnection = setUpTestDBConnection();
 
 describe('configureFastify', () => {
   test('Logger should be enabled by default', () => {
@@ -63,7 +65,7 @@ describe('configureFastify', () => {
 
   test('Custom request id header can be set via REQUEST_ID_HEADER variable', () => {
     const requestIdHeader = 'X-Id';
-    mockEnvVars({ ...MONGO_ENV_VARS, REQUEST_ID_HEADER: requestIdHeader });
+    mockEnvVars({ REQUEST_ID_HEADER: requestIdHeader });
 
     configureFastify([dummyRoutes]);
 
@@ -110,23 +112,10 @@ describe('configureFastify', () => {
     expect(mockFastify.register).toBeCalledWith(dummyRoutes, options);
   });
 
-  test('MongoDB connection arguments should be set', async () => {
-    mockEnvVars({ MONGO_URI: undefined });
-
-    await expect(configureFastify([dummyRoutes])).rejects.toBeInstanceOf(EnvVarError);
-  });
-
   test('The fastify-mongoose plugin should be configured', async () => {
     await configureFastify([dummyRoutes]);
 
-    expect(mockFastify.register).toBeCalledWith(
-      require('fastify-mongoose'),
-      expect.objectContaining({
-        dbName: MONGO_ENV_VARS.MONGO_DB,
-        uri: MONGO_ENV_VARS.MONGO_URI,
-        user: MONGO_ENV_VARS.MONGO_USER,
-      }),
-    );
+    expect(mockFastify.register).toBeCalledWith(fastifyMongoose, { connection: getConnection() });
   });
 
   test('It should wait for the Fastify server to be ready', async () => {

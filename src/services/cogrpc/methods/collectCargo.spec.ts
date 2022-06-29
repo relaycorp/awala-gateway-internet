@@ -11,7 +11,6 @@ import {
   generateRSAKeyPair,
   InvalidMessageError,
   issueEndpointCertificate,
-  MockPrivateKeyStore,
   Parcel,
   ParcelCollectionAck,
   RecipientAddressType,
@@ -30,13 +29,13 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 
-import * as vault from '../../../backingServices/vault';
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
 import { arrayBufferFrom } from '../../../testUtils/buffers';
 import { UUID4_REGEX } from '../../../testUtils/crypto';
+import { catchErrorEvent } from '../../../testUtils/errors';
 import { MockGrpcBidiCall } from '../../../testUtils/grpc';
 import { arrayToAsyncIterable } from '../../../testUtils/iter';
 import { mockSpy } from '../../../testUtils/jest';
@@ -66,27 +65,26 @@ beforeAll(async () => {
   privateGatewayPrivateAddress = await pdaChain.privateGateway.calculateSubjectPrivateAddress();
 });
 
-const { getMongooseConnection, getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
+const { getMongooseConnection, getSvcImplOptions, getMockLogs, getPrivateKeystore } =
+  setUpTestEnvironment();
 
-const PRIVATE_KEY_STORE = new MockPrivateKeyStore();
 let publicGatewaySessionKeyPair: SessionKeyPair;
 beforeAll(async () => {
   publicGatewaySessionKeyPair = await SessionKeyPair.generate();
 });
 beforeEach(async () => {
-  PRIVATE_KEY_STORE.clear();
-  await PRIVATE_KEY_STORE.saveIdentityKey(
+  const privateKeyStore = getPrivateKeystore();
+  await privateKeyStore.saveIdentityKey(
     publicGatewayPrivateAddress,
     keyPairSet.publicGateway.privateKey,
   );
-  await PRIVATE_KEY_STORE.saveSessionKey(
+  await privateKeyStore.saveSessionKey(
     publicGatewaySessionKeyPair.privateKey,
     publicGatewaySessionKeyPair.sessionKey.keyId,
     publicGatewayPrivateAddress,
     privateGatewayPrivateAddress,
   );
 });
-mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => PRIVATE_KEY_STORE);
 
 beforeEach(async () => {
   const connection = getMongooseConnection();
@@ -159,121 +157,100 @@ beforeAll(async () => {
 });
 
 describe('CCA validation', () => {
-  test('UNAUTHENTICATED should be returned if Authorization is missing', async (cb) => {
-    CALL.on('error', (error) => {
-      const errorMessage = 'Authorization metadata should be specified exactly once';
-      expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: errorMessage,
-      });
+  test('UNAUTHENTICATED should be returned if Authorization is missing', async () => {
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
-      cb();
+    const errorMessage = 'Authorization metadata should be specified exactly once';
+    expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: errorMessage,
     });
-
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
 
-  test('UNAUTHENTICATED should be returned if Authorization is duplicated', async (cb) => {
-    CALL.on('error', (error) => {
-      const errorMessage = 'Authorization metadata should be specified exactly once';
-      expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: errorMessage,
-      });
+  test('UNAUTHENTICATED should be returned if Authorization is duplicated', async () => {
+    CALL.metadata.add('Authorization', 'Bearer s3cr3t');
+    CALL.metadata.add('Authorization', 'Bearer s3cr3t');
 
-      cb();
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    const errorMessage = 'Authorization metadata should be specified exactly once';
+    expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: errorMessage,
     });
-
-    CALL.metadata.add('Authorization', 'Bearer s3cr3t');
-    CALL.metadata.add('Authorization', 'Bearer s3cr3t');
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
 
-  test('UNAUTHENTICATED should be returned if Authorization type is invalid', async (cb) => {
-    CALL.on('error', (error) => {
-      const errorMessage = 'Authorization type should be Relaynet-CCA';
-      expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: errorMessage,
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if Authorization type is invalid', async () => {
     CALL.metadata.add('Authorization', 'Bearer s3cr3t');
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    const errorMessage = 'Authorization type should be Relaynet-CCA';
+    expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: errorMessage,
+    });
   });
 
-  test('UNAUTHENTICATED should be returned if Authorization value is missing', async (cb) => {
-    CALL.on('error', (error) => {
-      const errorMessage = 'Authorization value should be set to the CCA';
-      expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: errorMessage,
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if Authorization value is missing', async () => {
     CALL.metadata.add('Authorization', 'Relaynet-CCA');
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    const errorMessage = 'Authorization value should be set to the CCA';
+    expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: errorMessage,
+    });
   });
 
-  test('UNAUTHENTICATED should be returned if CCA is malformed', async (cb) => {
-    CALL.on('error', (error) => {
-      const errorMessage = 'CCA is malformed';
-      expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: errorMessage,
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if CCA is malformed', async () => {
     const invalidCCASerialized = Buffer.from('I am not really a RAMF message');
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    const errorMessage = 'CCA is malformed';
+    expect(getMockLogs()).toContainEqual(invalidCCALog(errorMessage));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: errorMessage,
+    });
   });
 
-  test('UNAUTHENTICATED should be returned if payload is not an EnvelopedData value', async (cb) => {
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(invalidCCRLog('CMSError'));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: 'Invalid CCA',
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if payload is not an EnvelopedData value', async () => {
     const invalidCCASerialized = await generateCCAForPayload(
       STUB_PUBLIC_ADDRESS_URL,
       new ArrayBuffer(0),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(invalidCCRLog('CMSError'));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'Invalid CCA',
+    });
   });
 
-  test('UNAUTHENTICATED should be returned if EnvelopedData cannot be decrypted', async (cb) => {
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(invalidCCRLog(UnknownKeyError.name));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: 'Invalid CCA',
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if EnvelopedData cannot be decrypted', async () => {
     const unknownSessionKey = (await SessionKeyPair.generate()).sessionKey;
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       new ArrayBuffer(0),
@@ -285,20 +262,18 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(invalidCCRLog(UnknownKeyError.name));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'Invalid CCA',
+    });
   });
 
-  test('UNAUTHENTICATED should be returned if CCR is malformed', async (cb) => {
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(invalidCCRLog(InvalidMessageError.name));
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: 'Invalid CCA',
-      });
-
-      cb();
-    });
-
+  test('UNAUTHENTICATED should be returned if CCR is malformed', async () => {
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       arrayBufferFrom('not a valid CCR'),
       publicGatewaySessionKeyPair.sessionKey,
@@ -309,124 +284,122 @@ describe('CCA validation', () => {
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(invalidCCRLog(InvalidMessageError.name));
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'Invalid CCA',
+    });
   });
 
-  test('INVALID_ARGUMENT should be returned if CCA recipient address is private', async (cb) => {
+  test('INVALID_ARGUMENT should be returned if CCA recipient address is private', async () => {
     const malformedCCA = new CargoCollectionAuthorization(
       '0deadbeef',
       pdaChain.privateGateway,
       Buffer.from([]),
     );
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('info', 'Refusing invalid CCA', {
-          ccaRecipientAddress: malformedCCA.recipientAddress,
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayPrivateAddress,
-        }),
-      );
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: 'CCA is invalid',
-      });
-
-      cb();
-    });
-
     const invalidCCASerialized = Buffer.from(
       await malformedCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('info', 'Refusing invalid CCA', {
+        ccaRecipientAddress: malformedCCA.recipientAddress,
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayPrivateAddress,
+      }),
+    );
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'CCA is invalid',
+    });
   });
 
-  test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async (cb) => {
+  test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async () => {
     const invalidCCA = new CargoCollectionAuthorization(
       `https://different-${STUB_PUBLIC_ADDRESS}`,
       pdaChain.privateGateway,
       Buffer.from([]),
     );
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('info', 'Refusing CCA bound for another gateway', {
-          ccaRecipientAddress: invalidCCA.recipientAddress,
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayPrivateAddress,
-        }),
-      );
-      expect(error).toEqual({
-        code: grpc.status.INVALID_ARGUMENT,
-        message: 'CCA recipient is a different gateway',
-      });
-
-      cb();
-    });
-
     const invalidCCASerialized = Buffer.from(
       await invalidCCA.serialize(keyPairSet.privateGateway.privateKey),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('info', 'Refusing CCA bound for another gateway', {
+        ccaRecipientAddress: invalidCCA.recipientAddress,
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayPrivateAddress,
+      }),
+    );
+    expect(error).toEqual({
+      code: grpc.status.INVALID_ARGUMENT,
+      message: 'CCA recipient is a different gateway',
+    });
   });
 
-  test('PERMISSION_DENIED should be returned if CCA sender is unauthorized', async (cb) => {
+  test('PERMISSION_DENIED should be returned if CCA sender is unauthorized', async () => {
     const ccaSenderCertificate = pdaChain.pdaGrantee;
     const invalidCCA = new CargoCollectionAuthorization(
       STUB_PUBLIC_ADDRESS_URL,
       ccaSenderCertificate,
       Buffer.from([]),
     );
-
-    CALL.on('error', async (error) => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('info', 'Refusing invalid CCA', {
-          err: expect.objectContaining({ type: InvalidMessageError.name }),
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'collectCargo',
-          peerGatewayAddress: await ccaSenderCertificate.calculateSubjectPrivateAddress(),
-        }),
-      );
-      expect(error).toEqual({
-        code: grpc.status.UNAUTHENTICATED,
-        message: 'CCA is invalid',
-      });
-
-      cb();
-    });
-
     const invalidCCASerialized = await invalidCCA.serialize(keyPairSet.pdaGrantee.privateKey);
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('info', 'Refusing invalid CCA', {
+        err: expect.objectContaining({ type: InvalidMessageError.name }),
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: await ccaSenderCertificate.calculateSubjectPrivateAddress(),
+      }),
+    );
+    expect(error).toEqual({
+      code: grpc.status.UNAUTHENTICATED,
+      message: 'CCA is invalid',
+    });
   });
 
-  test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async (cb) => {
+  test('PERMISSION_DENIED should be returned if CCA was already fulfilled', async () => {
     await recordCCAFulfillment(cca, getMongooseConnection());
-
-    CALL.on('error', (error) => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayPrivateAddress,
-        }),
-      );
-      expect(error).toEqual({
-        code: grpc.status.PERMISSION_DENIED,
-        message: 'CCA was already fulfilled',
-      });
-
-      cb();
-    });
-
     CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
 
-    await SERVICE.collectCargo(CALL.convertToGrpcStream());
+    const error = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
+
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayPrivateAddress,
+      }),
+    );
+    expect(error).toEqual({
+      code: grpc.status.PERMISSION_DENIED,
+      message: 'CCA was already fulfilled',
+    });
   });
 
   function invalidCCALog(errorMessage: string): ReturnType<typeof partialPinoLog> {
@@ -703,42 +676,34 @@ describe('Errors while generating cargo', () => {
     CALL.metadata.add('Authorization', serializeAuthzMetadata(ccaSerialized));
   });
 
-  test('Error should be logged and end the call', async (cb) => {
-    CALL.on('error', async () => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('error', 'Failed to send cargo', {
-          err: expect.objectContaining({ message: err.message }),
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'collectCargo',
-          peerGatewayAddress: privateGatewayPrivateAddress,
-        }),
-      );
-      cb();
-    });
+  test('Error should be logged and end the call', async () => {
+    await catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
 
-    SERVICE.collectCargo(CALL.convertToGrpcStream());
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('error', 'Failed to send cargo', {
+        err: expect.objectContaining({ message: err.message }),
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'collectCargo',
+        peerGatewayAddress: privateGatewayPrivateAddress,
+      }),
+    );
   });
 
-  test('Call should end with an error for the client', async (cb) => {
-    CALL.on('error', (callError) => {
-      expect(callError).toEqual({
-        code: grpc.status.UNAVAILABLE,
-        message: 'Internal server error; please try again later',
-      });
+  test('Call should end with an error for the client', async () => {
+    const callError = await catchErrorEvent(CALL, () =>
+      SERVICE.collectCargo(CALL.convertToGrpcStream()),
+    );
 
-      cb();
+    expect(callError).toEqual({
+      code: grpc.status.UNAVAILABLE,
+      message: 'Internal server error; please try again later',
     });
-
-    SERVICE.collectCargo(CALL.convertToGrpcStream());
   });
 
-  test('CCA should not be marked as fulfilled', async (cb) => {
-    CALL.on('error', async () => {
-      await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeFalse();
-      cb();
-    });
+  test('CCA should not be marked as fulfilled', async () => {
+    await catchErrorEvent(CALL, () => SERVICE.collectCargo(CALL.convertToGrpcStream()));
 
-    SERVICE.collectCargo(CALL.convertToGrpcStream());
+    await expect(wasCCAFulfilled(cca, getMongooseConnection())).resolves.toBeFalse();
   });
 });
 

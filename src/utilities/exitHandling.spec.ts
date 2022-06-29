@@ -1,5 +1,3 @@
-import pino from 'pino';
-
 import { getMockContext, mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { configureExitHandling } from './exitHandling';
@@ -7,19 +5,12 @@ import { configureExitHandling } from './exitHandling';
 const ERROR = new Error('Oh noes');
 
 let mockLogging: MockLogging;
-let mockFinalLogging: MockLogging;
 beforeEach(() => {
   mockLogging = makeMockLogging();
-  mockFinalLogging = makeMockLogging();
 });
 
 const mockProcessOn = mockSpy(jest.spyOn(process, 'on'));
 const mockProcessExit = mockSpy(jest.spyOn(process, 'exit'));
-
-mockSpy(
-  jest.spyOn(pino, 'final'),
-  (_, handler) => (err: Error) => handler(err, mockFinalLogging.logger),
-);
 
 describe('configureExitHandling', () => {
   beforeEach(() => {
@@ -33,8 +24,7 @@ describe('configureExitHandling', () => {
 
       handler(ERROR);
 
-      expect(mockLogging.logs).toBeEmpty();
-      expect(mockFinalLogging.logs).toContainEqual(
+      expect(mockLogging.logs).toContainEqual(
         partialPinoLog('fatal', 'uncaughtException', {
           err: expect.objectContaining({ message: ERROR.message }),
         }),

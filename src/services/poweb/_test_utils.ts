@@ -1,12 +1,11 @@
 import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import * as vault from '../../backingServices/vault';
+import * as vault from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
-import { MONGO_ENV_VARS, setUpTestDBConnection } from '../../testUtils/db';
+import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
-import { mockFastifyMongoose } from '../../testUtils/fastify';
 import { arrayToAsyncIterable } from '../../testUtils/iter';
 import { mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
@@ -20,7 +19,6 @@ export interface FixtureSet extends PdaChain {
 
 export function setUpCommonFixtures(): () => FixtureSet {
   const getMongooseConnection = setUpTestDBConnection();
-  mockFastifyMongoose(() => ({ db: getMongooseConnection() }));
 
   const mockParcelStore: ParcelStore = {
     liveStreamActiveParcelsForGateway: mockSpy(
@@ -58,7 +56,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
       certificatePath.publicGatewayPrivateKey,
     );
   });
-  mockSpy(jest.spyOn(vault, 'initVaultKeyStore'), () => mockPrivateKeyStore);
+  mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
 
   beforeEach(async () => {
     const connection = getMongooseConnection();
@@ -73,10 +71,9 @@ export function setUpCommonFixtures(): () => FixtureSet {
     await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
   });
 
-  const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
+  const mockEnvVars = configureMockEnvVars();
   beforeEach(() => {
     mockEnvVars({
-      ...MONGO_ENV_VARS,
       GATEWAY_VERSION: '1.0.2',
     });
   });

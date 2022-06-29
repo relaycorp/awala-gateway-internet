@@ -9,10 +9,10 @@ import {
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
@@ -38,7 +38,7 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     undefined,
     '-consumer',
   );
-  await pipe(queueConsumer, makeCargoProcessor(natsStreamingClient, logger));
+  await pipeline(() => queueConsumer, makeCargoProcessor(natsStreamingClient, logger));
 }
 
 function makeCargoProcessor(

@@ -1,6 +1,5 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
-import { VaultPrivateKeyStore } from '@relaycorp/keystore-vault';
 import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
@@ -8,13 +7,14 @@ import {
   Certificate,
   CertificateRotation,
   CertificationPath,
+  PrivateKeyStore,
   RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
+import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
@@ -31,7 +31,7 @@ export default async function collectCargo(
   mongooseConnection: Connection,
   ownPublicAddress: string,
   parcelStore: ParcelStore,
-  vaultKeyStore: VaultPrivateKeyStore,
+  privateKeyStore: PrivateKeyStore,
   baseLogger: Logger,
 ): Promise<void> {
   const logger = baseLogger.child({
@@ -56,7 +56,7 @@ export default async function collectCargo(
 
   const config = new Config(mongooseConnection);
   const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
-  const publicGatewayPrivateKey = await vaultKeyStore.retrieveIdentityKey(
+  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(
     publicGatewayPrivateAddress,
   );
   const certificateStore = new MongoCertificateStore(mongooseConnection);
@@ -146,7 +146,7 @@ export default async function collectCargo(
     ccaAwareLogger,
   );
   try {
-    await pipe(cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
+    await pipeline(() => cargoMessageStream, encapsulateMessagesInCargo, sendCargoes);
   } catch (err) {
     ccaAwareLogger.error({ err }, 'Failed to send cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call
@@ -198,8 +198,8 @@ async function* generateCargoMessageStream(
   publicGatewayCertificate: Certificate,
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
-  const activeParcels = pipe(
-    parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+  const activeParcels = pipeline(
+    () => parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
     convertParcelsToCargoMessageStream,
   );
   yield* await concatMessageStreams(

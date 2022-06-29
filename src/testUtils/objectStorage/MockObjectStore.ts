@@ -11,7 +11,7 @@ import {
 
 export class MockObjectStore implements ObjectStoreClient {
   // tslint:disable-next-line:readonly-array
-  constructor(private callQueue: Array<MockMethodCall<any, any>>) {}
+  constructor(private callQueue: MockMethodCall<any, any>[]) {}
 
   public get callsRemaining(): number {
     return this.callQueue.length;

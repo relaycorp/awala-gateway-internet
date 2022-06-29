@@ -10,12 +10,13 @@ export async function wasParcelCollected(
   connection: Connection,
 ): Promise<boolean> {
   const collectionModel = getModelForClass(ParcelCollection, { existingConnection: connection });
-  return collectionModel.exists({
+  const collection = await collectionModel.exists({
     parcelId: parcel.id,
     peerGatewayPrivateAddress,
     recipientEndpointAddress: parcel.recipientAddress,
     senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
   });
+  return !!collection;
 }
 
 export async function recordParcelCollection(

@@ -5,14 +5,12 @@ import {
   ParcelCollectionHandshakeVerifier,
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
-import AbortController from 'abort-controller';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';
-import pipe from 'it-pipe';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
-import { duplex } from 'stream-to-it';
+import { pipeline, writeToStream } from 'streaming-iterables';
 import uuid from 'uuid-random';
 import WebSocket, {
   createWebSocketStream,
@@ -52,7 +50,7 @@ export default async function (
 ): Promise<void> {
   const fastifyTypeless = fastify as any;
   makeWebSocketServer(
-    fastifyTypeless.mongo.db,
+    fastifyTypeless.mongoose,
     fastifyTypeless.initialConfig.requestIdHeader,
     fastify.log as Logger,
     fastify.server,
@@ -125,20 +123,26 @@ function makeConnectionHandler(
 
     const tracker = new CollectionTracker();
 
-    await pipe(
-      streamActiveParcels(
-        parcelStore,
-        peerGatewayAddress,
-        peerAwareLogger,
-        reqId,
-        request.headers,
-        abortController.signal,
-        tracker,
-      ),
+    const wsStream = createWebSocketStream(wsConnection);
+    const outgoingPipeline = pipeline(
+      () =>
+        streamActiveParcels(
+          parcelStore,
+          peerGatewayAddress,
+          peerAwareLogger,
+          reqId,
+          request.headers,
+          abortController.signal,
+          tracker,
+        ),
       makeDeliveryStream(wsConnection, tracker, peerAwareLogger),
-      duplex(createWebSocketStream(wsConnection)),
+      writeToStream(wsStream),
+    );
+    const incomingPipeline = pipeline(
+      () => wsStream,
       makeACKProcessor(wsConnection, tracker, peerAwareLogger),
     );
+    await Promise.all([outgoingPipeline, incomingPipeline]);
   };
 }
 

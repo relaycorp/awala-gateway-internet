@@ -5,8 +5,8 @@ import {
   PoHTTPInvalidParcelError,
 } from '@relaycorp/relaynet-pohttp';
 import { get as getEnvVar } from 'env-var';
-import pipe from 'it-pipe';
 import * as stan from 'node-nats-streaming';
+import { pipeline } from 'streaming-iterables';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
@@ -107,7 +107,7 @@ export async function processInternetBoundParcels(
     'worker',
     'worker',
   );
-  await pipe(queueConsumer, parseMessages, deliverParcels);
+  await pipeline(() => queueConsumer, parseMessages, deliverParcels);
 }
 
 async function addParcelBackToQueue(

@@ -1,7 +1,7 @@
 import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
-import { initVaultKeyStore } from '../../backingServices/vault';
+import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { Config, ConfigKey } from '../../utilities/config';
 
 import { registerDisallowedMethods } from '../fastify';
@@ -13,7 +13,7 @@ const SHA256_HEX_DIGEST_LENGTH = 64;
 export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
-  const privateKeyStore = initVaultKeyStore();
+  const privateKeyStore = initPrivateKeyStore();
 
   fastify.route<{ readonly Body: string }>({
     method: 'POST',
@@ -28,7 +28,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
         return reply.code(400).send({ message: 'Payload is not a SHA-256 digest' });
       }
 
-      const config = new Config((fastify as any).mongo.db);
+      const config = new Config((fastify as any).mongoose);
       const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
       const authorizationSerialized = await generateAuthorization(

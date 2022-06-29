@@ -1,53 +1,23 @@
 import { EnvVarError } from 'env-var';
 import mongoose, { Connection } from 'mongoose';
 
-import { MONGO_ENV_VARS } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { mockSpy } from '../testUtils/jest';
-import { createMongooseConnectionFromEnv, getMongooseConnectionArgsFromEnv } from './mongo';
+import { createMongooseConnectionFromEnv } from './mongo';
 
 const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
 const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
   jest.spyOn(mongoose, 'createConnection'),
-  jest.fn().mockResolvedValue(MOCK_MONGOOSE_CONNECTION),
+  jest.fn().mockReturnValue({ asPromise: () => MOCK_MONGOOSE_CONNECTION }),
 );
 
+const MONGO_ENV_VARS = {
+  MONGO_DB: 'the_db',
+  MONGO_PASSWORD: 'letmein',
+  MONGO_URI: 'mongodb://example.com',
+  MONGO_USER: 'alicia',
+};
 const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
-
-describe('getMongooseConnectionArgsFromEnv', () => {
-  test.each(Object.getOwnPropertyNames(MONGO_ENV_VARS))(
-    'Environment variable %s should be present',
-    (envVarName) => {
-      mockEnvVars({ ...MONGO_ENV_VARS, [envVarName]: undefined });
-
-      expect(getMongooseConnectionArgsFromEnv).toThrow(EnvVarError);
-    },
-  );
-
-  test('Connection should use MONGO_URI', () => {
-    expect(getMongooseConnectionArgsFromEnv().uri).toEqual(MONGO_ENV_VARS.MONGO_URI);
-  });
-
-  test('Connection should use MONGO_DB', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.dbName).toEqual(MONGO_ENV_VARS.MONGO_DB);
-  });
-
-  test('Connection should use MONGO_USER', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.user).toEqual(MONGO_ENV_VARS.MONGO_USER);
-  });
-
-  test('Connection should use MONGO_PASSWORD', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.pass).toEqual(MONGO_ENV_VARS.MONGO_PASSWORD);
-  });
-
-  test('Connection should be created with new URL parser', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.useNewUrlParser).toBeTrue();
-  });
-
-  test('Connection should use unified topology', () => {
-    expect(getMongooseConnectionArgsFromEnv().options.useUnifiedTopology).toBeTrue();
-  });
-});
 
 describe('createMongooseConnectionFromEnv', () => {
   test.each(Object.getOwnPropertyNames(MONGO_ENV_VARS))(
@@ -99,23 +69,5 @@ describe('createMongooseConnectionFromEnv', () => {
     const connection = await createMongooseConnectionFromEnv();
 
     expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
-  });
-
-  test('Connection should be created with new URL parser', async () => {
-    await createMongooseConnectionFromEnv();
-
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
-      expect.anything(),
-      expect.objectContaining({ useNewUrlParser: true }),
-    );
-  });
-
-  test('Connection should use unified topology', async () => {
-    await createMongooseConnectionFromEnv();
-
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
-      expect.anything(),
-      expect.objectContaining({ useUnifiedTopology: true }),
-    );
   });
 });

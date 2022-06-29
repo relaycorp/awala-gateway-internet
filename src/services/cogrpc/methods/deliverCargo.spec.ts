@@ -1,8 +1,10 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
+
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
+import { catchErrorEvent } from '../../../testUtils/errors';
 import { MockGrpcBidiCall } from '../../../testUtils/grpc';
 import { getMockInstance, mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
@@ -186,7 +188,7 @@ describe('Cargo processing', () => {
     expect(CALL.end).toBeCalledWith();
   });
 
-  test('Errors while processing cargo should be logged and end the call', async (cb) => {
+  test('Errors while processing cargo should be logged and end the call', async () => {
     const error = new Error('Denied');
 
     async function* failToPublishMessage(
@@ -201,29 +203,27 @@ describe('Cargo processing', () => {
       id: DELIVERY_ID,
     });
 
-    CALL.on('error', async (callError) => {
-      expect(getMockLogs()).toContainEqual(
-        partialPinoLog('error', 'Failed to store cargo', {
-          err: expect.objectContaining({ message: error.message }),
-          grpcClient: CALL.getPeer(),
-          grpcMethod: 'deliverCargo',
-        }),
-      );
+    const callError = await catchErrorEvent(CALL, () =>
+      SERVICE.deliverCargo(CALL.convertToGrpcStream()),
+    );
 
-      expect(callError).toEqual({
-        code: grpc.status.UNAVAILABLE,
-        message: 'Internal server error; please try again later',
-      });
+    expect(getMockLogs()).toContainEqual(
+      partialPinoLog('error', 'Failed to store cargo', {
+        err: expect.objectContaining({ message: error.message }),
+        grpcClient: CALL.getPeer(),
+        grpcMethod: 'deliverCargo',
+      }),
+    );
 
-      expect(CALL.end).toBeCalledWith();
-
-      cb();
+    expect(callError).toEqual({
+      code: grpc.status.UNAVAILABLE,
+      message: 'Internal server error; please try again later',
     });
 
-    await SERVICE.deliverCargo(CALL.convertToGrpcStream());
+    expect(CALL.end).toBeCalledWith();
   });
 
-  test('No ACK should be sent if a valid cargo cannot be queued', async (cb) => {
+  test('No ACK should be sent if a valid cargo cannot be queued', async () => {
     // Receive two deliveries. The first succeeds but the second fails.
 
     async function* publishFirstMessageThenFail(
@@ -253,14 +253,10 @@ describe('Cargo processing', () => {
       },
     );
 
-    CALL.on('error', async () => {
-      expect(CALL.write).toBeCalledTimes(1);
-      expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
+    await catchErrorEvent(CALL, () => SERVICE.deliverCargo(CALL.convertToGrpcStream()));
 
-      cb();
-    });
-
-    await SERVICE.deliverCargo(CALL.convertToGrpcStream());
+    expect(CALL.write).toBeCalledTimes(1);
+    expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
   });
 
   test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {

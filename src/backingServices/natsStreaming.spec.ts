@@ -1,9 +1,8 @@
 /* tslint:disable:max-classes-per-file */
 
-import AbortController from 'abort-controller';
 import { EventEmitter } from 'events';
-import pipe from 'it-pipe';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
+import { pipeline } from 'streaming-iterables';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
@@ -118,7 +117,7 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Publishing should only be done once the connection has been established', async (done) => {
+    test('Publishing should only be done once the connection has been established', (done) => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => {
         // "connect" event was never emitted, so no message should've been published
@@ -129,7 +128,7 @@ describe('NatsStreamingClient', () => {
         done();
       });
 
-      await publisher([STUB_MESSAGE_1]);
+      publisher([STUB_MESSAGE_1]);
     });
 
     test('Messages should be published to the specified channel', async () => {
@@ -445,8 +444,8 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipe(
-        consumer,
+      const outputMessages = pipeline(
+        () => consumer,
         async function* (messages: AsyncIterable<Message>): AsyncIterable<Message> {
           for await (const message of messages) {
             yield message;
@@ -470,7 +469,7 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipe(consumer, iterableTake(1));
+      const outputMessages = pipeline(() => consumer, iterableTake(1));
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockSubscription.close).toBeCalled();

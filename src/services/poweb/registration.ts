@@ -8,7 +8,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { initVaultKeyStore } from '../../backingServices/vault';
+import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
@@ -27,7 +27,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  const privateKeyStore = initVaultKeyStore();
+  const privateKeyStore = initPrivateKeyStore();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -49,7 +49,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
           .send({ message: 'Payload is not a valid Private Node Registration Request' });
       }
 
-      const mongooseConnection = (fastify as any).mongo.db;
+      const mongooseConnection = (fastify as any).mongoose;
       const config = new Config(mongooseConnection);
       const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);

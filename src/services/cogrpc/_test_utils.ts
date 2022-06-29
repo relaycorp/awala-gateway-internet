@@ -1,7 +1,10 @@
+import { MockPrivateKeyStore } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
+import * as keystore from '../../backingServices/keystore';
 
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
+import { mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
 import { ServiceImplementationOptions } from './service';
 import SpyInstance = jest.SpyInstance;
@@ -16,6 +19,7 @@ interface Fixture {
   readonly getMongooseConnection: () => Connection;
   readonly getSvcImplOptions: () => ServiceImplementationOptions;
   readonly getMockLogs: () => readonly object[];
+  readonly getPrivateKeystore: () => MockPrivateKeyStore;
 }
 
 export function setUpTestEnvironment(): Fixture {
@@ -26,9 +30,6 @@ export function setUpTestEnvironment(): Fixture {
     OBJECT_STORE_BACKEND: 'minio',
     OBJECT_STORE_ENDPOINT: 'http://localhost.example',
     OBJECT_STORE_SECRET_KEY: 's3cr3t',
-    VAULT_KV_PREFIX: 'prefix',
-    VAULT_TOKEN: 'token',
-    VAULT_URL: 'http://vault.example',
   });
 
   let mockLogging: MockLogging;
@@ -36,6 +37,12 @@ export function setUpTestEnvironment(): Fixture {
   beforeEach(() => {
     mockLogging = makeMockLogging();
     mockGetMongooseConnection = jest.fn().mockImplementation(getMongooseConnection);
+  });
+
+  const privateKeyStore = new MockPrivateKeyStore();
+  mockSpy(jest.spyOn(keystore, 'initPrivateKeyStore'), () => privateKeyStore);
+  beforeEach(() => {
+    privateKeyStore.clear();
   });
 
   return {
@@ -49,5 +56,6 @@ export function setUpTestEnvironment(): Fixture {
       parcelStoreBucket: STUB_OBJECT_STORE_BUCKET,
       publicAddress: STUB_PUBLIC_ADDRESS,
     }),
+    getPrivateKeystore: () => privateKeyStore,
   };
 }

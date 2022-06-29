@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
+
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
 import { catchErrorEvent } from '../../../testUtils/errors';

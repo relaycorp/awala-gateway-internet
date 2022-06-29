@@ -1,6 +1,5 @@
 import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
-import { VaultPrivateKeyStore } from '@relaycorp/awala-keystore-cloud';
 import {
   CargoCollectionAuthorization,
   CargoCollectionRequest,
@@ -8,6 +7,7 @@ import {
   Certificate,
   CertificateRotation,
   CertificationPath,
+  PrivateKeyStore,
   RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -31,7 +31,7 @@ export default async function collectCargo(
   mongooseConnection: Connection,
   ownPublicAddress: string,
   parcelStore: ParcelStore,
-  vaultKeyStore: VaultPrivateKeyStore,
+  privateKeyStore: PrivateKeyStore,
   baseLogger: Logger,
 ): Promise<void> {
   const logger = baseLogger.child({
@@ -56,7 +56,7 @@ export default async function collectCargo(
 
   const config = new Config(mongooseConnection);
   const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
-  const publicGatewayPrivateKey = await vaultKeyStore.retrieveIdentityKey(
+  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(
     publicGatewayPrivateAddress,
   );
   const certificateStore = new MongoCertificateStore(mongooseConnection);

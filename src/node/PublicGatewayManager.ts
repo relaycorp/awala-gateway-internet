@@ -1,7 +1,7 @@
 import { GatewayManager, KeyStoreSet } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
-import { initVaultKeyStore } from '../backingServices/vault';
+import { initPrivateKeyStore } from '../backingServices/keystore';
 import { PublicGatewayError } from '../errors';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
@@ -12,7 +12,7 @@ export class PublicGatewayManager extends GatewayManager<PublicGateway> {
   public static async init(mongoConnection: Connection): Promise<PublicGatewayManager> {
     const certificateStore = new MongoCertificateStore(mongoConnection);
     const publicKeyStore = new MongoPublicKeyStore(mongoConnection);
-    const privateKeyStore = await initVaultKeyStore();
+    const privateKeyStore = await initPrivateKeyStore();
     return new PublicGatewayManager(mongoConnection, {
       certificateStore,
       privateKeyStore,

@@ -4,7 +4,7 @@ import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 
 import { initObjectStoreFromEnv } from '../../backingServices/objectStorage';
-import { initVaultKeyStore } from '../../backingServices/vault';
+import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { ParcelStore } from '../../parcelStore';
 import collectCargo from './methods/collectCargo';
 import deliverCargo from './methods/deliverCargo';
@@ -24,7 +24,7 @@ export async function makeServiceImplementation(
   const objectStoreClient = initObjectStoreFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
-  const vaultKeyStore = initVaultKeyStore();
+  const vaultKeyStore = initPrivateKeyStore();
 
   const mongooseConnection = await options.getMongooseConnection();
   mongooseConnection.on('error', (err) =>

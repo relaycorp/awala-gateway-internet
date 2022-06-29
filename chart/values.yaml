@@ -89,5 +89,6 @@ nats: {}
 objectStore:
   tlsEnabled: true
 
-vault:
+keystore:
+  # For Vault:
   kvPrefix: gw-keys

@@ -107,6 +107,23 @@ Each gateway component has the following options:
 | `objectStore.accessKeyId` | string | | Access key id to the object store |
 | `objectStore.secretKey` | string | | Secret key to the object store |
 | `objectStore.tlsEnabled` | boolean | `true` | Whether TLS is enabled and required |
-| `vault.serverUrl` | string | | URL to the HashiCorp Vault server |
-| `vault.token` | string | | Token to the HashiCorp Vault server |
-| `vault.kvPrefix` | string | `gw-keys` | The path prefix for the Vault secret engine |
+
+#### Key store
+
+When using the GCP adapter (`keystore.adapter=gcp`):
+
+| Option | Type | Default | Description |
+| --- | --- | --- |  --- |
+| `keystore.location` | string | | GCP location (e.g., `europe-west3`) |
+| `keystore.kmsKeyring` | string | | The KMS keyring holding all the keys to be used |
+| `keystore.kmsIdKey` | string | | The name of the KMS key whose versions will back Awala identity keys |
+| `keystore.kmsSessionEncryptionKey` | string | | The name of the KMS key used to encrypt Awala session keys |
+| `keystore.datastoreNamespace` | string | | The Datastore namespace to host all the key-related data |
+
+When using the Vault adapter (`keystore.adapter=vault`):
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `keystore.serverUrl` | string | | URL to the HashiCorp Vault server |
+| `keystore.token` | string | | Token to the HashiCorp Vault server |
+| `keystore.kvPrefix` | string | `gw-keys` | The path prefix for the Vault secret engine |

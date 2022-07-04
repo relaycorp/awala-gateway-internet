@@ -21,7 +21,7 @@
     "node": ">=16"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-poweb": "^1.6.28",
+    "@relaycorp/relaynet-poweb": "^1.6.29",
     "@relaycorp/relaynet-testing": "^2.2.19",
     "@relaycorp/shared-config": "^1.6.1",
     "@relaycorp/ws-mock": "^5.2.2",

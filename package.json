@@ -25,7 +25,7 @@
     "@relaycorp/relaynet-testing": "^2.2.19",
     "@relaycorp/shared-config": "^1.6.1",
     "@relaycorp/ws-mock": "^5.2.2",
-    "@shelf/jest-mongodb": "^3.0.1",
+    "@shelf/jest-mongodb": "^3.0.2",
     "@types/jest": "^28.1.4",
     "@types/mongoose": "^5.10.5",
     "@types/split2": "^3.2.1",

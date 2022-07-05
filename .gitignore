@@ -12,6 +12,3 @@ docs/vendor
 
 chart/dev-backing-services/charts
 chart/dev-backing-services/tmpcharts
-
-# Work around https://github.com/shelfio/jest-mongodb/issues/214
-/globalConfig.json

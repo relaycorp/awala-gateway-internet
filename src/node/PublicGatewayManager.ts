@@ -12,7 +12,7 @@ export class PublicGatewayManager extends GatewayManager<PublicGateway> {
   public static async init(mongoConnection: Connection): Promise<PublicGatewayManager> {
     const certificateStore = new MongoCertificateStore(mongoConnection);
     const publicKeyStore = new MongoPublicKeyStore(mongoConnection);
-    const privateKeyStore = await initPrivateKeyStore();
+    const privateKeyStore = await initPrivateKeyStore(mongoConnection);
     return new PublicGatewayManager(mongoConnection, {
       certificateStore,
       privateKeyStore,

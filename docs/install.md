@@ -61,7 +61,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `ingress.annotations` | object | `{}` | Annotations for the ingress |
 | `ingress.enableTls` | boolean | `true` | Whether the ingress should use TLS. You still have to configure TLS through your cloud provider; see [GKE documentation](https://cloud.google.com/kubernetes-engine/docs/concepts/ingress), for example. |
 | `objectStore.backend` | string | | The type of object store used. Any value supported by [`@relaycorp/object-storage`](https://github.com/relaycorp/object-storage-js) (e.g., `s3`). |
-| `logging.level` | string | `info` | The [log level](./instrumentation.md). |
+| `logging.level` | string | `info` | The [log level](instrumentation.md). |
 | `logging.target` | string | | Any target supported by [@relaycorp/pino-cloud](https://www.npmjs.com/package/@relaycorp/pino-cloud); e.g., `gcp`. |
 | `logging.envName` | string | `relaynet-internet-gateway` | A unique name for this instance of the gateway. Used by the `gcp` target as the _service name_ when pushing errors to Google Error Reporting, for example. |
 
@@ -118,7 +118,6 @@ When using the GCP adapter (`keystore.adapter=gcp`):
 | `keystore.kmsKeyring` | string | | The KMS keyring holding all the keys to be used |
 | `keystore.kmsIdKey` | string | | The name of the KMS key whose versions will back Awala identity keys |
 | `keystore.kmsSessionEncryptionKey` | string | | The name of the KMS key used to encrypt Awala session keys |
-| `keystore.datastoreNamespace` | string | | The Datastore namespace to host all the key-related data |
 
 When using the Vault adapter (`keystore.adapter=vault`):
 

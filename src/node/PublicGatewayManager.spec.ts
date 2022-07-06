@@ -55,6 +55,7 @@ describe('init', () => {
 
     expect(MongoCertificateStore).toBeCalledWith(mongoConnection);
     expect(MongoPublicKeyStore).toBeCalledWith(mongoConnection);
+    expect(vault.initPrivateKeyStore).toBeCalledWith(mongoConnection);
   });
 });
 

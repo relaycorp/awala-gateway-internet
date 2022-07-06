@@ -27,7 +27,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  const privateKeyStore = initPrivateKeyStore();
+  const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],

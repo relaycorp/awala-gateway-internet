@@ -173,8 +173,7 @@
             "location",
             "kmsKeyring",
             "kmsIdKey",
-            "kmsSessionEncryptionKey",
-            "datastoreNamespace"
+            "kmsSessionEncryptionKey"
           ],
           "properties": {
             "adapter": {
@@ -191,9 +190,6 @@
               "type": "string"
             },
             "kmsSessionEncryptionKey": {
-              "type": "string"
-            },
-            "datastoreNamespace": {
               "type": "string"
             }
           }

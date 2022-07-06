@@ -48,7 +48,7 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
     return null;
   }
 
-  const privateKeyStore = initPrivateKeyStore();
+  const privateKeyStore = initPrivateKeyStore(connection);
   const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
   const newCertificate = await issueGatewayCertificate({
     issuerPrivateKey: privateKey!,

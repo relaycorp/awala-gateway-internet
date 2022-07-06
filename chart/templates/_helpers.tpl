@@ -114,7 +114,6 @@ KS_GCP_LOCATION: {{ .Values.keystore.location }}
 KS_KMS_KEYRING: {{ .Values.keystore.kmsKeyring }}
 KS_KMS_ID_KEY: {{ .Values.keystore.kmsIdKey }}
 KS_KMS_SESSION_ENC_KEY: {{ .Values.keystore.kmsSessionEncryptionKey }}
-KS_DATASTORE_NS: {{ .Values.keystore.datastoreNamespace }}
 {{- else if eq .Values.keystore.adapter "vault" }}
 KS_VAULT_URL: {{ .Values.keystore.serverUrl }}
 KS_VAULT_KV_PREFIX: {{ .Values.keystore.kvPrefix }}

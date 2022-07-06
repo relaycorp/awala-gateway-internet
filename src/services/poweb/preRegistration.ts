@@ -13,7 +13,7 @@ const SHA256_HEX_DIGEST_LENGTH = 64;
 export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
-  const privateKeyStore = initPrivateKeyStore();
+  const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
 
   fastify.route<{ readonly Body: string }>({
     method: 'POST',

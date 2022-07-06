@@ -1,5 +1,6 @@
 import { CertificationPath, issueGatewayCertificate } from '@relaycorp/relaynet-core';
 import { addDays } from 'date-fns';
+import { Connection } from 'mongoose';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { initPrivateKeyStore } from '../backingServices/keystore';
@@ -12,8 +13,6 @@ import { makeLogger } from '../utilities/logging';
 const LOGGER = makeLogger();
 configureExitHandling(LOGGER);
 
-const privateKeyStore = initPrivateKeyStore();
-
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();
   try {
@@ -24,7 +23,7 @@ async function main(): Promise<void> {
     if (currentPrivateAddress) {
       LOGGER.info({ privateAddress: currentPrivateAddress }, `Gateway key pair already exists`);
     } else {
-      await generateKeyPair(certificateStore, config);
+      await generateKeyPair(certificateStore, config, connection);
     }
   } finally {
     await connection.close();
@@ -34,7 +33,9 @@ async function main(): Promise<void> {
 async function generateKeyPair(
   certificateStore: MongoCertificateStore,
   config: Config,
+  connection: Connection,
 ): Promise<void> {
+  const privateKeyStore = initPrivateKeyStore(connection);
   const { privateAddress, privateKey, publicKey } = await privateKeyStore.generateIdentityKeyPair();
 
   const gatewayCertificate = await issueGatewayCertificate({

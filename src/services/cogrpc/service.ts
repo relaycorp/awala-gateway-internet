@@ -24,12 +24,12 @@ export async function makeServiceImplementation(
   const objectStoreClient = initObjectStoreFromEnv();
   const parcelStore = new ParcelStore(objectStoreClient, options.parcelStoreBucket);
 
-  const vaultKeyStore = initPrivateKeyStore();
-
   const mongooseConnection = await options.getMongooseConnection();
   mongooseConnection.on('error', (err) =>
     options.baseLogger.error({ err }, 'Mongoose connection error'),
   );
+
+  const privateKeyStore = initPrivateKeyStore(mongooseConnection);
 
   return {
     async deliverCargo(call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>): Promise<void> {
@@ -47,7 +47,7 @@ export async function makeServiceImplementation(
         mongooseConnection,
         options.publicAddress,
         parcelStore,
-        vaultKeyStore,
+        privateKeyStore,
         options.baseLogger,
       );
     },

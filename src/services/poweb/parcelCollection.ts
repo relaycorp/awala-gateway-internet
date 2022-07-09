@@ -238,7 +238,7 @@ async function* streamActiveParcels(
       );
     } catch (err) {
       if (err instanceof NatsStreamingSubscriptionError) {
-        logger.warn({ err }, 'Failed to subscribe to NATS queue to live stream active parcels');
+        logger.error({ err }, 'Failed to subscribe to NATS queue to live stream active parcels');
       } else {
         logger.error({ err }, 'Failed to live stream parcels');
       }

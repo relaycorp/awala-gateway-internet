@@ -414,7 +414,7 @@ describe('Keep alive', () => {
     });
 
     expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('error', 'Failed to subscribe to NATS queue to live stream active parcels', {
+      partialPinoLog('warn', 'Failed to subscribe to NATS queue to live stream active parcels', {
         err: expect.objectContaining({ message: error.message }),
         peerGatewayAddress,
         reqId: UUID4_REGEX,

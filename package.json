@@ -31,7 +31,7 @@
     "fastify": "^4.2.0",
     "fastify-plugin": "^3.0.1",
     "grpc-js-health-check": "^1.0.2",
-    "mongoose": "^6.3.9",
+    "mongoose": "^6.4.4",
     "node-nats-streaming": "^0.3.2",
     "pino": "^8.1.0",
     "selfsigned": "^2.0.1",
@@ -45,7 +45,7 @@
     "utf-8-validate": "^5.0.9"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-poweb": "^1.6.29",
+    "@relaycorp/relaynet-poweb": "^1.6.30",
     "@relaycorp/relaynet-testing": "^2.2.19",
     "@relaycorp/shared-config": "^1.6.1",
     "@relaycorp/ws-mock": "^5.2.2",

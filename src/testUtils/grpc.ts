@@ -39,9 +39,10 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     callback();
   }
 
-  public override end(cb?: () => void): void {
+  public override end(cb?: () => void): this {
     super.end(cb);
     this.emit('end');
+    return this;
   }
 
   public getPeer(): string {

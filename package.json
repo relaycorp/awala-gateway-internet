@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.5.5",
-    "@relaycorp/awala-keystore-cloud": "^2.0.7",
+    "@relaycorp/awala-keystore-cloud": "^2.0.8",
     "@relaycorp/cogrpc": "^1.3.57",
     "@relaycorp/object-storage": "^1.4.40",
     "@relaycorp/pino-cloud": "^1.0.18",
@@ -45,9 +45,9 @@
     "utf-8-validate": "^5.0.9"
   },
   "devDependencies": {
-    "@relaycorp/relaynet-poweb": "^1.6.30",
+    "@relaycorp/relaynet-poweb": "^1.6.31",
     "@relaycorp/relaynet-testing": "^2.2.19",
-    "@relaycorp/shared-config": "^1.6.1",
+    "@relaycorp/shared-config": "^1.9.1",
     "@relaycorp/ws-mock": "^5.2.2",
     "@shelf/jest-mongodb": "^3.0.2",
     "@types/jest": "^28.1.6",

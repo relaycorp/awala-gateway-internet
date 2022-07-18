@@ -23,7 +23,7 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     jest.spyOn(this, 'write' as any);
   }
 
-  public _read(_size: number): void {
+  public override _read(_size: number): void {
     while (this.output.length) {
       const canPushAgain = this.push(this.output.shift());
       if (!canPushAgain) {
@@ -34,12 +34,12 @@ export class MockGrpcBidiCall<Input, Output> extends Duplex {
     this.push(null);
   }
 
-  public _write(value: Input, _encoding: string, callback: (error?: Error) => void): void {
+  public override _write(value: Input, _encoding: string, callback: (error?: Error) => void): void {
     this.input.push(value);
     callback();
   }
 
-  public end(cb?: () => void): this {
+  public override end(cb?: () => void): this {
     super.end(cb);
     this.emit('end');
     return this;

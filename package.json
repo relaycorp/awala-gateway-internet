@@ -23,7 +23,7 @@
     "@relaycorp/pino-cloud": "^1.0.20",
     "@relaycorp/relaynet-core": "^1.81.6",
     "@relaycorp/relaynet-pohttp": "^1.7.43",
-    "@typegoose/typegoose": "^9.10.1",
+    "@typegoose/typegoose": "^9.11.0",
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "date-fns": "^2.29.1",

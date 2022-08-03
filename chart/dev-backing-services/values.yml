@@ -48,7 +48,7 @@ stan:
 relaynet-pong:
   fullnameOverride: relaynet-pong
   pohttp_tls_required: false
-  public_endpoint_address: relaynet-pong-pohttp.default
+  internet_address: relaynet-pong-pohttp.default
   vault:
     host: dev-backing-services-vault
     token: root

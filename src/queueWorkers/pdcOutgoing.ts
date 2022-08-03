@@ -19,10 +19,7 @@ interface ActiveParcelData extends QueuedInternetBoundParcelMessage {
   readonly ack: () => void;
 }
 
-export async function processInternetBoundParcels(
-  workerName: string,
-  ownPohttpAddress: string,
-): Promise<void> {
+export async function processInternetBoundParcels(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
   configureExitHandling(logger);
   logger.info('Starting queue worker');
@@ -68,9 +65,7 @@ export async function processInternetBoundParcels(
 
       const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
       try {
-        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {
-          gatewayAddress: ownPohttpAddress,
-        });
+        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized);
         parcelAwareLogger.debug('Parcel was successfully delivered');
       } catch (err) {
         if (!(err instanceof PoHTTPError)) {

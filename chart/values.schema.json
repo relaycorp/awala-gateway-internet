@@ -98,9 +98,6 @@
       "properties": {
         "replicas": {
           "type": "number"
-        },
-        "pohttpAddress": {
-          "type": "string"
         }
       }
     },

@@ -6,7 +6,7 @@ import { Message } from 'node-nats-streaming';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
-import { GATEWAY_INTERNET_ADDRESS, PEER_INTERNET_ADDRESS } from '../testUtils/awala';
+import { GATEWAY_INTERNET_ADDRESS } from '../testUtils/awala';
 import { configureMockEnvVars } from '../testUtils/envVars';
 import { arrayToAsyncIterable } from '../testUtils/iter';
 import { getMockInstance, mockSpy } from '../testUtils/jest';
@@ -77,7 +77,7 @@ describe('processInternetBoundParcels', () => {
   test('Logger should be configured', async () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(mockMakeLogger).toBeCalledWith();
   });
@@ -85,7 +85,7 @@ describe('processInternetBoundParcels', () => {
   test('Exit handler should be configured as the very first step', async () => {
     mockEnvVars({});
 
-    await expect(processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS)).toReject();
+    await expect(processInternetBoundParcels(WORKER_NAME)).toReject();
 
     expect(mockExitHandler).toBeCalledWith(
       expect.toSatisfy((logger) => logger.bindings().worker === WORKER_NAME),
@@ -95,7 +95,7 @@ describe('processInternetBoundParcels', () => {
   test('Start of the queue should be logged', async () => {
     mockEnvVars({});
 
-    await expect(processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS)).toReject();
+    await expect(processInternetBoundParcels(WORKER_NAME)).toReject();
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Starting queue worker', { worker: WORKER_NAME }),
@@ -105,9 +105,7 @@ describe('processInternetBoundParcels', () => {
   test.each(Object.keys(ENV_VARS))('Environment variable %s should be present', async (envVar) => {
     mockEnvVars({ ...ENV_VARS, [envVar]: undefined });
 
-    await expect(
-      processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS),
-    ).rejects.toBeInstanceOf(EnvVarError);
+    await expect(processInternetBoundParcels(WORKER_NAME)).rejects.toBeInstanceOf(EnvVarError);
   });
 
   test('Expired parcels should be skipped and deleted from store', async () => {
@@ -122,7 +120,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(Buffer.from(JSON.stringify(messageData)));
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(message.ack).toBeCalledTimes(1);
     expect(pohttp.deliverParcel).not.toBeCalled();
@@ -136,7 +134,7 @@ describe('processInternetBoundParcels', () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([stanMessage]));
     MOCK_RETRIEVE_INTERNET_PARCEL.mockResolvedValue(null);
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(pohttp.deliverParcel).not.toBeCalled();
     expect(stanMessage.ack).toBeCalled();
@@ -153,13 +151,12 @@ describe('processInternetBoundParcels', () => {
       arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
     );
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(pohttp.deliverParcel).toBeCalledTimes(1);
     expect(pohttp.deliverParcel).toBeCalledWith(
       QUEUE_MESSAGE_DATA.parcelRecipientAddress,
       PARCEL_SERIALIZED,
-      expect.anything(),
     );
   });
 
@@ -168,7 +165,7 @@ describe('processInternetBoundParcels', () => {
       arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
     );
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(MOCK_RETRIEVE_INTERNET_PARCEL.mock.instances[0]).toHaveProperty(
       'bucket',
@@ -176,27 +173,11 @@ describe('processInternetBoundParcels', () => {
     );
   });
 
-  test('Gateway address should be specified when delivering parcel', async () => {
-    MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
-      arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
-    );
-
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
-
-    expect(pohttp.deliverParcel).toBeCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        gatewayAddress: PEER_INTERNET_ADDRESS,
-      }),
-    );
-  });
-
   test('Parcel should be deleted and taken off queue when successfully delivered', async () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was successfully delivered', {
@@ -212,7 +193,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
@@ -230,7 +211,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
@@ -248,7 +229,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Failed to deliver parcel; will try again later', {
@@ -278,7 +259,7 @@ describe('processInternetBoundParcels', () => {
     );
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Failed to deliver parcel again; will now give up', {
@@ -302,7 +283,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(Buffer.from(JSON.stringify(messageData)));
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+    await processInternetBoundParcels(WORKER_NAME);
 
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       expect.toSatisfy((a) => JSON.parse(a).deliveryAttempts === 1),
@@ -317,9 +298,7 @@ describe('processInternetBoundParcels', () => {
     const message = mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED);
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
-    await expect(processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS)).rejects.toEqual(
-      err,
-    );
+    await expect(processInternetBoundParcels(WORKER_NAME)).rejects.toEqual(err);
 
     expect(message.ack).not.toBeCalled();
     expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
@@ -330,7 +309,7 @@ describe('processInternetBoundParcels', () => {
     test('NAT Streaming client id should match worker name', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
-      await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+      await processInternetBoundParcels(WORKER_NAME);
 
       expect(MOCK_NATS_CLIENT_INIT).toBeCalledWith(WORKER_NAME);
     });
@@ -340,7 +319,7 @@ describe('processInternetBoundParcels', () => {
     test('Channel should be "internet-parcels"', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
-      await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+      await processInternetBoundParcels(WORKER_NAME);
 
       expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
         'internet-parcels',
@@ -352,7 +331,7 @@ describe('processInternetBoundParcels', () => {
     test('Queue should be "worker"', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
-      await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+      await processInternetBoundParcels(WORKER_NAME);
 
       expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
         expect.anything(),
@@ -364,7 +343,7 @@ describe('processInternetBoundParcels', () => {
     test('Durable name should be "worker"', async () => {
       MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([]));
 
-      await processInternetBoundParcels(WORKER_NAME, PEER_INTERNET_ADDRESS);
+      await processInternetBoundParcels(WORKER_NAME);
 
       expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
         expect.anything(),

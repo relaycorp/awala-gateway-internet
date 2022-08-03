@@ -22,7 +22,7 @@
     "@relaycorp/object-storage": "^1.4.40",
     "@relaycorp/pino-cloud": "^1.0.19",
     "@relaycorp/relaynet-core": "^1.81.10",
-    "@relaycorp/relaynet-pohttp": "^1.7.43",
+    "@relaycorp/relaynet-pohttp": "^1.7.50",
     "@typegoose/typegoose": "^9.10.1",
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",

@@ -62,13 +62,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Generate own public address URI
-*/}}
-{{- define "relaynet-internet-gateway.publicAddressUri" -}}
-http{{ ternary "s" "" (and .Values.ingress.enabled .Values.ingress.enableTls) }}://{{ .Values.publicAddress }}
-{{- end }}
-
-{{/*
 Generate PoWeb host name
 */}}
 {{- define "relaynet-internet-gateway.powebHost" -}}

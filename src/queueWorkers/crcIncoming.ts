@@ -8,7 +8,6 @@ import {
   ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
@@ -16,7 +15,6 @@ import { pipeline } from 'streaming-iterables';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { PublicGatewayError } from '../errors';
 import { PublicGateway } from '../node/PublicGateway';
 import { PublicGatewayManager } from '../node/PublicGatewayManager';
@@ -50,9 +48,7 @@ function makeCargoProcessor(
     const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
     const gateway = await gatewayManager.getCurrent();
 
-    const objectStoreClient = initObjectStoreFromEnv();
-    const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-    const parcelStore = new ParcelStore(objectStoreClient, parcelStoreBucket);
+    const parcelStore = ParcelStore.initFromEnv();
 
     try {
       for await (const message of messages) {
@@ -80,7 +76,7 @@ async function processCargo(
   natsStreamingClient: NatsStreamingClient,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
-  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
+  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectId();
 
   const cargoAwareLogger = logger.child({ cargoId: cargo.id, peerGatewayAddress });
 
@@ -115,10 +111,10 @@ async function processCargo(
         cargoAwareLogger.child({ parcelId: item.id }),
       );
     } else if (item instanceof ParcelCollectionAck) {
-      await parcelStore.deleteGatewayBoundParcel(
+      await parcelStore.deleteParcelForPrivatePeer(
         item.parcelId,
-        item.senderEndpointPrivateAddress,
-        item.recipientEndpointAddress,
+        item.senderEndpointId,
+        item.recipientEndpointId,
         peerGatewayAddress,
       );
     } else {
@@ -141,7 +137,7 @@ async function processParcel(
 ): Promise<void> {
   let parcelObjectKey: string | null;
   try {
-    parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(
+    parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
       parcel,
       parcelSerialized,
       peerGatewayAddress,
@@ -161,7 +157,7 @@ async function processParcel(
   parcelAwareLogger.debug(
     {
       parcelObjectKey,
-      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectId(),
     },
     parcelObjectKey ? 'Parcel was stored' : 'Ignoring previously processed parcel',
   );

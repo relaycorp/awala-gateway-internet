@@ -50,7 +50,7 @@ test('Invalid request Content-Type should be refused with an HTTP 415 response',
   const response = await postParcel(Buffer.from([]), fastify, undefined, 'text/plain');
 
   expect(response).toHaveProperty('statusCode', 415);
-  expect(getFixtures().parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+  expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
 });
 
 describe('Authorization errors', () => {
@@ -60,7 +60,7 @@ describe('Authorization errors', () => {
     const response = await postParcel(Buffer.from([]), fastify);
 
     expectResponseToRequireAuthentication(response);
-    expect(getFixtures().parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+    expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Requests with the wrong Authorization type should result in HTTP 401', async () => {
@@ -69,7 +69,7 @@ describe('Authorization errors', () => {
     const response = await postParcel(Buffer.from([]), fastify, 'Bearer 123');
 
     expectResponseToRequireAuthentication(response);
-    expect(getFixtures().parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+    expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Requests with missing Authorization value should result in HTTP 401', async () => {
@@ -78,7 +78,7 @@ describe('Authorization errors', () => {
     const response = await postParcel(Buffer.from([]), fastify, 'Relaynet-Countersignature ');
 
     expectResponseToRequireAuthentication(response);
-    expect(getFixtures().parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+    expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Malformed base64-encoded countersignatures should result in HTTP 401', async () => {
@@ -87,7 +87,7 @@ describe('Authorization errors', () => {
     const response = await postParcel(Buffer.from([]), fastify, 'Relaynet-Countersignature .');
 
     expectResponseToRequireAuthentication(response);
-    expect(getFixtures().parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+    expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Invalid parcel delivery countersignatures should result in HTTP 401', async () => {
@@ -110,7 +110,7 @@ describe('Authorization errors', () => {
     expect(logging.logs).toContainEqual(
       partialPinoLog('debug', 'Invalid countersignature', { err: expect.anything() }),
     );
-    expect(fixtures.parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+    expect(fixtures.parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   function expectResponseToRequireAuthentication(response: LightMyRequest.Response): void {
@@ -141,7 +141,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 
   expect(response).toHaveProperty('statusCode', 400);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Parcel is malformed');
-  expect(fixtures.parcelStore.storeParcelFromPeerGateway).not.toBeCalled();
+  expect(fixtures.parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
 });
 
 test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
@@ -154,7 +154,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
   );
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
   const error = new InvalidMessageError('Whoops');
-  getMockInstance(fixtures.parcelStore.storeParcelFromPeerGateway).mockRejectedValue(error);
+  getMockInstance(fixtures.parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
 
   const response = await postParcel(
     PARCEL_SERIALIZED,
@@ -167,7 +167,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
   expect(logging.logs).toContainEqual(
     partialPinoLog('info', 'Invalid parcel', {
       err: expect.objectContaining({ message: error.message }),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
@@ -189,10 +189,10 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   );
 
   expect(response).toHaveProperty('statusCode', 202);
-  expect(fixtures.parcelStore.storeParcelFromPeerGateway).toBeCalledWith(
+  expect(fixtures.parcelStore.storeParcelFromPrivatePeer).toBeCalledWith(
     expect.objectContaining({ id: PARCEL.id }),
     Buffer.from(PARCEL_SERIALIZED),
-    await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+    await fixtures.privateGatewayCert.calculateSubjectId(),
     fixtures.getMongooseConnection(),
     mockNatsStreamingConnection,
     expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
@@ -200,14 +200,14 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   expect(logging.logs).toContainEqual(
     partialPinoLog('debug', 'Parcel is well-formed', {
       parcelId: PARCEL.id,
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
   expect(logging.logs).toContainEqual(
     partialPinoLog('info', 'Parcel was successfully stored', {
       parcelId: PARCEL.id,
       parcelObjectKey: expect.stringContaining(PARCEL.id),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
@@ -222,7 +222,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
   );
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
   const error = new Error('Whoops');
-  getMockInstance(fixtures.parcelStore.storeParcelFromPeerGateway).mockRejectedValue(error);
+  getMockInstance(fixtures.parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
 
   const response = await postParcel(
     PARCEL_SERIALIZED,
@@ -238,7 +238,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
   expect(logging.logs).toContainEqual(
     partialPinoLog('error', 'Failed to save parcel', {
       err: expect.objectContaining({ message: error.message }),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });

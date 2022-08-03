@@ -13,8 +13,8 @@ export async function wasParcelCollected(
   const collection = await collectionModel.exists({
     parcelId: parcel.id,
     peerGatewayPrivateAddress,
-    recipientEndpointAddress: parcel.recipientAddress,
-    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+    recipientEndpointAddress: parcel.recipient.id,
+    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectId(),
   });
   return !!collection;
 }
@@ -28,8 +28,8 @@ export async function recordParcelCollection(
   const baseFields: Partial<ParcelCollection> = {
     parcelId: parcel.id,
     peerGatewayPrivateAddress,
-    recipientEndpointAddress: parcel.recipientAddress,
-    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+    recipientEndpointAddress: parcel.recipient.id,
+    senderEndpointPrivateAddress: await parcel.senderCertificate.calculateSubjectId(),
   };
   await collectionModel
     .replaceOne(baseFields, { ...baseFields, parcelExpiryDate: parcel.expiryDate })

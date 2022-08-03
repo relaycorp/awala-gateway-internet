@@ -51,7 +51,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
       const mongooseConnection = (fastify as any).mongoose;
       const config = new Config(mongooseConnection);
-      const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+      const privateAddress = await config.get(ConfigKey.CURRENT_ID);
       const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
@@ -94,7 +94,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
         sessionKeyPair.privateKey,
         sessionKeyPair.sessionKey.keyId,
         privateAddress!,
-        await privateGatewayCertificate.calculateSubjectPrivateAddress(),
+        await privateGatewayCertificate.calculateSubjectId(),
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,

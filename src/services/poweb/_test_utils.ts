@@ -22,20 +22,20 @@ export function setUpCommonFixtures(): () => FixtureSet {
 
   const mockParcelStore: ParcelStore = {
     liveStreamActiveParcelsForGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'liveStreamActiveParcelsForGateway'),
+      jest.spyOn(ParcelStore.prototype, 'liveStreamParcelsForPrivatePeer'),
       async function* (): AsyncIterable<any> {
         // tslint:disable-next-line:no-unused-expression
         await new Promise(() => 'A promise that never resolves');
       },
     ),
     storeParcelFromPeerGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),
+      jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
       async (parcel: Parcel) => {
         return `parcels/${parcel.id}`;
       },
     ),
     streamActiveParcelsForGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'streamActiveParcelsForGateway'),
+      jest.spyOn(ParcelStore.prototype, 'streamParcelsForPrivatePeer'),
       () => arrayToAsyncIterable([]),
     ),
   } as any;
@@ -45,7 +45,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
   let certificatePath: PdaChain;
   beforeAll(async () => {
     certificatePath = await generatePdaChain();
-    privateAddress = await certificatePath.publicGatewayCert.calculateSubjectPrivateAddress();
+    privateAddress = await certificatePath.publicGatewayCert.calculateSubjectId();
   });
 
   let mockPrivateKeyStore: MockPrivateKeyStore;
@@ -68,7 +68,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     );
 
     const config = new Config(connection);
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, privateAddress);
   });
 
   const mockEnvVars = configureMockEnvVars();

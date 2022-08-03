@@ -4,7 +4,7 @@ import {
   derSerializePublicKey,
   generateECDHKeyPair,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
@@ -21,7 +21,7 @@ let peerPublicKey: CryptoKey;
 let peerPrivateAddress: string;
 beforeAll(async () => {
   const keyPair = await generateRSAKeyPair();
-  peerPrivateAddress = await getPrivateAddressFromIdentityKey(keyPair.publicKey);
+  peerPrivateAddress = await getIdFromIdentityKey(keyPair.publicKey);
 
   const sessionKeyPair = await generateECDHKeyPair();
   peerPublicKey = sessionKeyPair.publicKey;

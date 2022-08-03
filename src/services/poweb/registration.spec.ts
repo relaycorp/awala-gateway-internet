@@ -217,7 +217,7 @@ describe('Successful registration', () => {
     const keyData =
       fixtures.privateKeyStore.sessionKeys[registration.sessionKey!!.keyId.toString('hex')];
     expect(keyData).toMatchObject<Partial<SessionPrivateKeyData>>({
-      peerPrivateAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerPrivateAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
     });
   });
 

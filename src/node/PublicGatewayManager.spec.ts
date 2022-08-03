@@ -32,9 +32,9 @@ describe('init', () => {
     const manager = await PublicGatewayManager.init(getMongoConnection());
 
     // We can't simply read some attributes on the manager, so we have to actually use the stores
-    const { privateAddress } = await keyStoreSet.privateKeyStore.generateIdentityKeyPair();
+    const { id } = await keyStoreSet.privateKeyStore.generateIdentityKeyPair();
     const gatewayConstructorSpy = jest.fn();
-    await manager.get(privateAddress, gatewayConstructorSpy);
+    await manager.get(id, gatewayConstructorSpy);
     // tslint:disable-next-line:readonly-array
     expect(gatewayConstructorSpy).toBeCalledWith<[any, any, KeyStoreSet, any]>(
       expect.anything(),
@@ -74,7 +74,7 @@ describe('getCurrent', () => {
     const manager = new PublicGatewayManager(connection, keyStoreSet);
     const privateAddress = 'does not exist';
     const config = new Config(connection);
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, privateAddress);
 
     await expect(manager.getCurrent()).rejects.toThrowWithMessage(
       PublicGatewayError,
@@ -85,12 +85,12 @@ describe('getCurrent', () => {
   test('Current gateway should be returned if address is set', async () => {
     const mongoConnection = getMongoConnection();
     const manager = new PublicGatewayManager(mongoConnection, keyStoreSet);
-    const { privateAddress } = await keyStoreSet.privateKeyStore.generateIdentityKeyPair();
+    const { id } = await keyStoreSet.privateKeyStore.generateIdentityKeyPair();
     const config = new Config(mongoConnection);
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, id);
 
     const gateway = await manager.getCurrent();
 
-    expect(gateway.privateAddress).toEqual(privateAddress);
+    expect(gateway.id).toEqual(id);
   });
 });

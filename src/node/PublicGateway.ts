@@ -1,4 +1,4 @@
-import { Certificate, Gateway, getPrivateAddressFromIdentityKey } from '@relaycorp/relaynet-core';
+import { Certificate, Gateway, getIdFromIdentityKey } from '@relaycorp/relaynet-core';
 
 import { PublicGatewayChannel } from './PublicGatewayChannel';
 
@@ -7,9 +7,7 @@ export class PublicGateway extends Gateway {
     pda: Certificate,
     privateGatewayPublicKey: CryptoKey,
   ): Promise<PublicGatewayChannel> {
-    const privateGatewayPrivateAddress = await getPrivateAddressFromIdentityKey(
-      privateGatewayPublicKey,
-    );
+    const privateGatewayPrivateAddress = await getIdFromIdentityKey(privateGatewayPublicKey);
     return new PublicGatewayChannel(
       this.identityPrivateKey,
       pda,

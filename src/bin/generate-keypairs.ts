@@ -19,9 +19,9 @@ async function main(): Promise<void> {
     const certificateStore = new MongoCertificateStore(connection);
 
     const config = new Config(connection);
-    const currentPrivateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-    if (currentPrivateAddress) {
-      LOGGER.info({ privateAddress: currentPrivateAddress }, `Gateway key pair already exists`);
+    const currentId = await config.get(ConfigKey.CURRENT_ID);
+    if (currentId) {
+      LOGGER.info({ id: currentId }, `Gateway key pair already exists`);
     } else {
       await generateKeyPair(certificateStore, config, connection);
     }
@@ -36,18 +36,18 @@ async function generateKeyPair(
   connection: Connection,
 ): Promise<void> {
   const privateKeyStore = initPrivateKeyStore(connection);
-  const { privateAddress, privateKey, publicKey } = await privateKeyStore.generateIdentityKeyPair();
+  const { id, privateKey, publicKey } = await privateKeyStore.generateIdentityKeyPair();
 
   const gatewayCertificate = await issueGatewayCertificate({
     issuerPrivateKey: privateKey,
     subjectPublicKey: publicKey,
     validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
   });
-  await certificateStore.save(new CertificationPath(gatewayCertificate, []), privateAddress);
+  await certificateStore.save(new CertificationPath(gatewayCertificate, []), id);
 
-  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+  await config.set(ConfigKey.CURRENT_ID, id);
 
-  LOGGER.info({ privateAddress }, 'Identity key pair was successfully generated');
+  LOGGER.info({ id }, 'Identity key pair was successfully generated');
 }
 
 main();

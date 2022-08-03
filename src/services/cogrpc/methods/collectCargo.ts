@@ -8,7 +8,6 @@ import {
   CertificateRotation,
   CertificationPath,
   PrivateKeyStore,
-  RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
@@ -51,11 +50,11 @@ export default async function collectCargo(
   }
 
   const cca = ccaOrError;
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectId();
   const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
   const config = new Config(mongooseConnection);
-  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
+  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_ID))!!;
   const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(
     publicGatewayPrivateAddress,
   );
@@ -66,9 +65,9 @@ export default async function collectCargo(
   );
   const allCertificates = allCertificationPaths.map((p) => p.leafCertificate);
   try {
-    await cca.validate(RecipientAddressType.PUBLIC, allCertificates);
+    await cca.validate(allCertificates);
   } catch (err) {
-    ccaAwareLogger.info({ ccaRecipientAddress: cca.recipientAddress, err }, 'Refusing invalid CCA');
+    ccaAwareLogger.info({ ccaRecipient: cca.recipient, err }, 'Refusing invalid CCA');
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
       message: 'CCA is invalid',
@@ -76,12 +75,8 @@ export default async function collectCargo(
     return;
   }
 
-  const ccaRecipientURL = new URL(cca.recipientAddress);
-  if (ccaRecipientURL.hostname !== ownPublicAddress) {
-    ccaAwareLogger.info(
-      { ccaRecipientAddress: cca.recipientAddress },
-      'Refusing CCA bound for another gateway',
-    );
+  if (cca.recipient.internetAddress !== ownPublicAddress) {
+    ccaAwareLogger.info({ ccaRecipient: cca.recipient }, 'Refusing CCA bound for another gateway');
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
       message: 'CCA recipient is a different gateway',
@@ -199,7 +194,7 @@ async function* generateCargoMessageStream(
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
   const activeParcels = pipeline(
-    () => parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+    () => parcelStore.retrieveParcelsForPrivatePeer(peerGatewayAddress, ccaAwareLogger),
     convertParcelsToCargoMessageStream,
   );
   yield* await concatMessageStreams(

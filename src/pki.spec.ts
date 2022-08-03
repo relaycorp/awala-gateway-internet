@@ -3,7 +3,7 @@ import {
   CertificationPath,
   derSerializePublicKey,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   issueGatewayCertificate,
   MockPrivateKeyStore,
 } from '@relaycorp/relaynet-core';
@@ -28,7 +28,7 @@ let identityKeyPair: CryptoKeyPair;
 let privateAddress: string;
 beforeAll(async () => {
   identityKeyPair = await generateRSAKeyPair();
-  privateAddress = await getPrivateAddressFromIdentityKey(identityKeyPair.publicKey);
+  privateAddress = await getIdFromIdentityKey(identityKeyPair.publicKey);
 });
 
 let certificateStore: MongoCertificateStore;
@@ -38,7 +38,7 @@ beforeEach(async () => {
   certificateStore = new MongoCertificateStore(connection);
 
   const config = new Config(connection);
-  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+  await config.set(ConfigKey.CURRENT_ID, privateAddress);
 });
 
 describe('retrieveOwnCertificates', () => {
@@ -160,7 +160,7 @@ describe('rotateOwnCertificate', () => {
     await rotateOwnCertificate(getMongooseConnection());
 
     const certificationPath = await certificateStore.retrieveLatest(privateAddress, privateAddress);
-    expect(certificationPath!.leafCertificate.getIssuerPrivateAddress()).toEqual(privateAddress);
+    expect(certificationPath!.leafCertificate.getIssuerId()).toEqual(privateAddress);
   });
 
   test('New certificate should use existing key pair', async () => {

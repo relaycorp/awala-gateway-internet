@@ -55,7 +55,7 @@ beforeEach(() => {
 let peerGatewayAddress: string;
 beforeAll(async () => {
   const fixtures = getFixtures();
-  peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectPrivateAddress();
+  peerGatewayAddress = await fixtures.privateGatewayCert.calculateSubjectId();
 });
 
 const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
@@ -340,7 +340,7 @@ describe('Keep alive', () => {
     });
 
     expect(client.popOldestPeerMessage()).toBeUndefined();
-    expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).toBeCalledWith(
+    expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).toBeCalledWith(
       peerGatewayAddress,
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
@@ -351,13 +351,13 @@ describe('Keep alive', () => {
       }),
     );
 
-    expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).not.toBeCalled();
+    expect(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).not.toBeCalled();
     expect(NatsStreamingClient.initFromEnv).not.toBeCalled();
   });
 
   test('Connection should be closed upon completion if Keep-Alive is off', async () => {
     const client = new MockPoWebClient(mockWSServer);
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
 
@@ -380,14 +380,14 @@ describe('Keep alive', () => {
       expect(client.didPeerCloseConnection).toBeFalse();
     });
 
-    expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalledWith(
+    expect(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).toBeCalledWith(
       peerGatewayAddress,
       MOCK_NATS_STREAMING_CLIENT,
       expect.anything(),
       partialPinoLogger({ peerGatewayAddress, reqId: expect.anything() }),
     );
     expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
-    expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
+    expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).not.toBeCalled();
   });
 
   test('Connection should be kept alive indefinitely if Keep-Alive value is invalid', async () => {
@@ -395,14 +395,14 @@ describe('Keep alive', () => {
 
     await client.useWithHandshake(async () => {
       await sleep(500);
-      expect(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).toBeCalled();
-      expect(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).not.toBeCalled();
+      expect(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).toBeCalled();
+      expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).not.toBeCalled();
     });
   });
 
   test('Connection should be closed if NATS subscription failed', async () => {
     const error = new NatsStreamingSubscriptionError('too many subscribers');
-    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
       appendErrorToAsyncIterable(error, []),
     );
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
@@ -424,7 +424,7 @@ describe('Keep alive', () => {
 
   test('Non-NATS-related failure should close connection and be logged as error', async () => {
     const error = new Error('this has nothing to do with NATS');
-    getMockInstance(MOCK_PARCEL_STORE.liveStreamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
       appendErrorToAsyncIterable(error, []),
     );
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
@@ -447,7 +447,7 @@ describe('Keep alive', () => {
 
 test('Server should send parcel to client', async () => {
   const client = new MockPoWebClient(mockWSServer);
-  getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+  getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
     arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
   );
 
@@ -469,7 +469,7 @@ test('Server should send parcel to client', async () => {
 describe('Acknowledgements', () => {
   test('Server should send parcel to client even if a previous one is unacknowledged', async () => {
     const client = new MockPoWebClient(mockWSServer);
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([
         mockParcelStreamMessage(parcelSerialization),
         mockParcelStreamMessage(parcelSerialization),
@@ -493,7 +493,7 @@ describe('Acknowledgements', () => {
 
   test('Parcel should be acknowledged in store when client acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([parcelStreamMessage]),
     );
     const client = new MockPoWebClient(mockWSServer);
@@ -515,7 +515,7 @@ describe('Acknowledgements', () => {
 
   test('Parcel should not be deleted if client never acknowledges it', async () => {
     const parcelStreamMessage = mockParcelStreamMessage(parcelSerialization);
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([parcelStreamMessage]),
     );
     const client = new MockPoWebClient(mockWSServer);
@@ -531,7 +531,7 @@ describe('Acknowledgements', () => {
   });
 
   test('Connection should be closed with an error if client sends unknown ACK', async () => {
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
     const client = new MockPoWebClient(mockWSServer);
@@ -556,7 +556,7 @@ describe('Acknowledgements', () => {
   });
 
   test('Connection should be closed with an error if client sends a binary ACK', async () => {
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockReturnValue(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockReturnValue(
       arrayToAsyncIterable([mockParcelStreamMessage(parcelSerialization)]),
     );
     const client = new MockPoWebClient(mockWSServer);
@@ -586,7 +586,7 @@ describe('Acknowledgements', () => {
     // in-flight.
 
     const ackAlert = new EventEmitter();
-    getMockInstance(MOCK_PARCEL_STORE.streamActiveParcelsForGateway).mockImplementation(
+    getMockInstance(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).mockImplementation(
       async function* (): AsyncIterable<ParcelStreamMessage> {
         // parcel1
         yield mockParcelStreamMessage(parcelSerialization, () => ackAlert.emit('ackProcessed'));

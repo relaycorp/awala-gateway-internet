@@ -2,7 +2,7 @@ import {
   Certificate,
   CertificationPath,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   issueGatewayCertificate,
 } from '@relaycorp/relaynet-core';
 import { getModelForClass, ReturnModelType } from '@typegoose/typegoose';
@@ -29,7 +29,7 @@ let expiredCertificate: Certificate;
 let expiredCertificationPath: CertificationPath;
 beforeAll(async () => {
   identityKeyPair = await generateRSAKeyPair();
-  subjectPrivateAddress = await getPrivateAddressFromIdentityKey(identityKeyPair.publicKey);
+  subjectPrivateAddress = await getIdFromIdentityKey(identityKeyPair.publicKey);
 
   validCertificate = await issueGatewayCertificate({
     issuerPrivateKey: identityKeyPair.privateKey,

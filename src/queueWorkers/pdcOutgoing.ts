@@ -50,7 +50,7 @@ export async function processInternetBoundParcels(
           ack: () => message.ack(),
         };
       } else {
-        await parcelStore.deleteEndpointBoundParcel(messageData.parcelObjectKey);
+        await parcelStore.deleteParcelForInternetPeer(messageData.parcelObjectKey);
         message.ack();
       }
     }
@@ -59,7 +59,7 @@ export async function processInternetBoundParcels(
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
     for await (const parcelData of activeParcels) {
       const parcelAwareLogger = logger.child({ parcelObjectKey: parcelData.parcelObjectKey });
-      const parcelSerialized = await parcelStore.retrieveEndpointBoundParcel(
+      const parcelSerialized = await parcelStore.retrieveParcelForInternetPeer(
         parcelData.parcelObjectKey,
       );
 
@@ -97,7 +97,7 @@ export async function processInternetBoundParcels(
         }
       }
 
-      await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+      await parcelStore.deleteParcelForInternetPeer(parcelData.parcelObjectKey);
       parcelData.ack();
     }
   }

@@ -1,7 +1,7 @@
-import { GatewayChannel } from '@relaycorp/relaynet-core';
+import { GatewayChannel, Recipient } from '@relaycorp/relaynet-core';
 
 export class PublicGatewayChannel extends GatewayChannel {
-  public getOutboundRAMFAddress(): string {
-    return this.peerPrivateAddress;
+  async getOutboundRAMFRecipient(): Promise<Recipient> {
+    return { id: this.peerId };
   }
 }

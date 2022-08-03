@@ -38,8 +38,8 @@ export default async function deliverCargo(
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
         cargoId = cargo.id;
-        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
-        await cargo.validate(undefined, trustedCerts);
+        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectId();
+        await cargo.validate(trustedCerts);
       } catch (err) {
         // Acknowledge that we got it, not that it was accepted and stored. See:
         // https://github.com/relaynet/specs/issues/38

@@ -206,7 +206,7 @@ async function doHandshake(
         return resolve(null);
       }
 
-      resolve(await peerGatewayCertificate.calculateSubjectPrivateAddress());
+      resolve(await peerGatewayCertificate.calculateSubjectId());
     });
 
     logger.debug('Sending handshake challenge');
@@ -230,7 +230,7 @@ async function* streamActiveParcels(
   if (keepAlive) {
     const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
     try {
-      yield* await parcelStore.liveStreamActiveParcelsForGateway(
+      yield* await parcelStore.liveStreamParcelsForPrivatePeer(
         peerGatewayAddress,
         natsStreamingClient,
         abortSignal,
@@ -245,7 +245,7 @@ async function* streamActiveParcels(
       tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
     }
   } else {
-    yield* await parcelStore.streamActiveParcelsForGateway(peerGatewayAddress, logger);
+    yield* await parcelStore.streamParcelsForPrivatePeer(peerGatewayAddress, logger);
   }
 }
 

@@ -30,7 +30,7 @@ beforeEach(async () => {
   const peerSessionKeyPair = await SessionKeyPair.generate();
   await KEY_STORES.publicKeyStore.saveSessionKey(
     peerSessionKeyPair.sessionKey,
-    await cdaChain.privateGateway.calculateSubjectPrivateAddress(),
+    await cdaChain.privateGateway.calculateSubjectId(),
     new Date(),
   );
 });
@@ -38,7 +38,7 @@ beforeEach(async () => {
 let publicGateway: PublicGateway;
 beforeAll(async () => {
   publicGateway = new PublicGateway(
-    await cdaChain.publicGateway.calculateSubjectPrivateAddress(),
+    await cdaChain.publicGateway.calculateSubjectId(),
     keyPairSet.publicGateway.privateKey,
     KEY_STORES,
     {},
@@ -58,9 +58,7 @@ describe('getChannel', () => {
       channel.generateCargoes(arrayToAsyncIterable([dummyCargoMessage])),
     );
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    await expect(cargo.senderCertificate.calculateSubjectPrivateAddress()).resolves.toEqual(
-      publicGateway.privateAddress,
-    );
+    await expect(cargo.senderCertificate.calculateSubjectId()).resolves.toEqual(publicGateway.id);
   });
 
   test('PDA for private gateway should be passed on', async () => {
@@ -78,9 +76,7 @@ describe('getChannel', () => {
       keyPairSet.privateGateway.publicKey,
     );
 
-    expect(channel.peerPrivateAddress).toEqual(
-      await cdaChain.privateGateway.calculateSubjectPrivateAddress(),
-    );
+    expect(channel.peerId).toEqual(await cdaChain.privateGateway.calculateSubjectId());
   });
 
   test('Private gateway public key should be set', async () => {

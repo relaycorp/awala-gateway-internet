@@ -17,11 +17,11 @@ describe('Config', () => {
     test('Item should be created if it does not already exist', async () => {
       const config = new Config(getConnection());
 
-      await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, PRIVATE_ADDRESS);
+      await config.set(ConfigKey.CURRENT_ID, PRIVATE_ADDRESS);
 
       await expect(
         configItemModel.countDocuments({
-          key: ConfigKey.CURRENT_PRIVATE_ADDRESS,
+          key: ConfigKey.CURRENT_ID,
           value: PRIVATE_ADDRESS,
         }),
       ).resolves.toEqual(1);
@@ -29,12 +29,12 @@ describe('Config', () => {
 
     test('Item should be updated if it already exists', async () => {
       const config = new Config(getConnection());
-      await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, PRIVATE_ADDRESS);
+      await config.set(ConfigKey.CURRENT_ID, PRIVATE_ADDRESS);
       const newValue = `new ${PRIVATE_ADDRESS}`;
-      await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, newValue);
+      await config.set(ConfigKey.CURRENT_ID, newValue);
 
       await expect(
-        configItemModel.countDocuments({ key: ConfigKey.CURRENT_PRIVATE_ADDRESS, value: newValue }),
+        configItemModel.countDocuments({ key: ConfigKey.CURRENT_ID, value: newValue }),
       ).resolves.toEqual(1);
     });
   });
@@ -43,14 +43,14 @@ describe('Config', () => {
     test('Null should be returned for non-existing item', async () => {
       const config = new Config(getConnection());
 
-      await expect(config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toBeNull();
+      await expect(config.get(ConfigKey.CURRENT_ID)).resolves.toBeNull();
     });
 
     test('Value should be returned if item exists', async () => {
       const config = new Config(getConnection());
-      await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, PRIVATE_ADDRESS);
+      await config.set(ConfigKey.CURRENT_ID, PRIVATE_ADDRESS);
 
-      await expect(config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS)).resolves.toEqual(PRIVATE_ADDRESS);
+      await expect(config.get(ConfigKey.CURRENT_ID)).resolves.toEqual(PRIVATE_ADDRESS);
     });
   });
 });

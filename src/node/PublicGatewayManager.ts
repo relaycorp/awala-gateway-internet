@@ -28,15 +28,13 @@ export class PublicGatewayManager extends GatewayManager<PublicGateway> {
 
   public async getCurrent(): Promise<PublicGateway> {
     const config = new Config(this.connection);
-    const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-    if (!privateAddress) {
+    const id = await config.get(ConfigKey.CURRENT_ID);
+    if (!id) {
       throw new PublicGatewayError('Current private address is unset');
     }
-    const gateway = await this.get(privateAddress);
+    const gateway = await this.get(id);
     if (!gateway) {
-      throw new PublicGatewayError(
-        `Public gateway does not exist (private address: ${privateAddress})`,
-      );
+      throw new PublicGatewayError(`Public gateway does not exist (private address: ${id})`);
     }
     return gateway;
   }

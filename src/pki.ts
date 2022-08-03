@@ -29,7 +29,7 @@ export async function retrieveOwnCertificates(
   const store = new MongoCertificateStore(connection);
   const config = new Config(connection);
 
-  const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+  const privateAddress = await config.get(ConfigKey.CURRENT_ID);
   const allCertificationPaths = await store.retrieveAll(privateAddress!, privateAddress!);
   return allCertificationPaths.map((p) => p.leafCertificate);
 }
@@ -39,7 +39,7 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
   const config = new Config(connection);
   const now = new Date();
 
-  const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
+  const privateAddress = await config.get(ConfigKey.CURRENT_ID);
 
   const latestCertificatePath = await store.retrieveLatest(privateAddress!, privateAddress!);
 

@@ -39,7 +39,6 @@ const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'
 const BASE_ENV_VARS = {
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
-  PUBLIC_ADDRESS: 'gateway.com',
   SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
@@ -55,7 +54,7 @@ describe('runServer', () => {
     expect(mockExitHandler).toBeCalledWith(mockLogger);
   });
 
-  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'PUBLIC_ADDRESS', 'SERVER_IP_ADDRESS'])(
+  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'SERVER_IP_ADDRESS'])(
     'Environment variable %s should be present',
     async (envVar) => {
       mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
@@ -126,7 +125,6 @@ describe('runServer', () => {
       getMongooseConnection: createMongooseConnectionFromEnv,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
-      internetAddress: BASE_ENV_VARS.PUBLIC_ADDRESS,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

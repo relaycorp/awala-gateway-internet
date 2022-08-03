@@ -6,7 +6,6 @@ import {
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   issueGatewayCertificate,
-  Recipient,
   SessionEnvelopedData,
   SessionKey,
 } from '@relaycorp/relaynet-core';
@@ -132,19 +131,22 @@ export interface GeneratedCCA {
 }
 
 export async function generateCCA(
-  publicGatewayRecipient: Recipient,
-  publicGatewaySessionKey: SessionKey,
-  publicGatewayCDA: Certificate,
+  internetGatewayInternetAddress: string,
+  internetGatewaySessionKey: SessionKey,
+  internetGatewayCDA: Certificate,
   privateGatewayCertificate: Certificate,
   privateGatewayPrivateKey: CryptoKey,
 ): Promise<GeneratedCCA> {
-  const ccr = new CargoCollectionRequest(publicGatewayCDA);
+  const ccr = new CargoCollectionRequest(internetGatewayCDA);
   const { envelopedData, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     ccr.serialize(),
-    publicGatewaySessionKey,
+    internetGatewaySessionKey,
   );
   const cca = new CargoCollectionAuthorization(
-    publicGatewayRecipient,
+    {
+      id: await internetGatewayCDA.calculateSubjectId(),
+      internetAddress: internetGatewayInternetAddress,
+    },
     privateGatewayCertificate,
     Buffer.from(envelopedData.serialize()),
   );

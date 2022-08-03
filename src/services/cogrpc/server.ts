@@ -24,7 +24,6 @@ export async function runServer(logger?: Logger): Promise<void> {
   const baseLogger = logger ?? makeLogger();
   configureExitHandling(baseLogger);
 
-  const publicAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
   const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
   const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
 
@@ -42,7 +41,6 @@ export async function runServer(logger?: Logger): Promise<void> {
     getMongooseConnection: createMongooseConnectionFromEnv,
     natsClusterId,
     natsServerUrl,
-    internetAddress: publicAddress,
   });
   server.addService(CargoRelayService, serviceImplementation as any);
 

@@ -55,7 +55,6 @@ export function setUpTestEnvironment(): Fixture {
       natsClusterId: NATS_CLUSTER_ID,
       natsServerUrl: NATS_SERVER_URL,
       parcelStoreBucket: STUB_OBJECT_STORE_BUCKET,
-      internetAddress: GATEWAY_INTERNET_ADDRESS,
     }),
     getPrivateKeystore: () => privateKeyStore,
   };

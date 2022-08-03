@@ -28,7 +28,6 @@ import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 export default async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongooseConnection: Connection,
-  ownPublicAddress: string,
   parcelStore: ParcelStore,
   privateKeyStore: PrivateKeyStore,
   baseLogger: Logger,
@@ -54,14 +53,12 @@ export default async function collectCargo(
   const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
   const config = new Config(mongooseConnection);
-  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_ID))!!;
-  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(
-    publicGatewayPrivateAddress,
-  );
+  const publicGatewayId = (await config.get(ConfigKey.CURRENT_ID))!!;
+  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(publicGatewayId);
   const certificateStore = new MongoCertificateStore(mongooseConnection);
   const allCertificationPaths = await certificateStore.retrieveAll(
-    publicGatewayPrivateAddress,
-    publicGatewayPrivateAddress,
+    publicGatewayId,
+    publicGatewayId,
   );
   const allCertificates = allCertificationPaths.map((p) => p.leafCertificate);
   try {
@@ -75,7 +72,7 @@ export default async function collectCargo(
     return;
   }
 
-  if (cca.recipient.internetAddress !== ownPublicAddress) {
+  if (cca.recipient.id !== publicGatewayId) {
     ccaAwareLogger.info({ ccaRecipient: cca.recipient }, 'Refusing CCA bound for another gateway');
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
@@ -134,10 +131,7 @@ export default async function collectCargo(
     parcelStore,
     mongooseConnection,
     publicGatewayPrivateKey!,
-    (await certificateStore.retrieveLatest(
-      publicGatewayPrivateAddress,
-      publicGatewayPrivateAddress,
-    ))!.leafCertificate,
+    (await certificateStore.retrieveLatest(publicGatewayId, publicGatewayId))!.leafCertificate,
     ccaAwareLogger,
   );
   try {

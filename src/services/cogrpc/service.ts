@@ -13,7 +13,6 @@ export interface ServiceOptions {
   readonly getMongooseConnection: () => Promise<Connection>;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
-  readonly internetAddress: string;
 }
 
 export async function makeService(options: ServiceOptions): Promise<CargoRelayServerMethodSet> {
@@ -40,7 +39,6 @@ export async function makeService(options: ServiceOptions): Promise<CargoRelaySe
       await collectCargo(
         call,
         mongooseConnection,
-        options.internetAddress,
         parcelStore,
         privateKeyStore,
         options.baseLogger,

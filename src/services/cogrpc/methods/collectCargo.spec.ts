@@ -51,13 +51,13 @@ let keyPairSet: NodeKeyPairSet;
 let pdaChain: PDACertPath;
 let cdaChain: CDACertPath;
 let publicGatewayId: string;
-let privateGatewayPrivateAddress: string;
+let privateGatewayId: string;
 beforeAll(async () => {
   keyPairSet = await generateIdentityKeyPairSet();
   pdaChain = await generatePDACertificationPath(keyPairSet, addDays(new Date(), 181));
   cdaChain = await generateCDACertificationPath(keyPairSet);
   publicGatewayId = await pdaChain.publicGateway.calculateSubjectId();
-  privateGatewayPrivateAddress = await pdaChain.privateGateway.calculateSubjectId();
+  privateGatewayId = await pdaChain.privateGateway.calculateSubjectId();
 });
 
 const { getMongooseConnection, getSvcImplOptions, getMockLogs, getPrivateKeystore } =
@@ -74,7 +74,7 @@ beforeEach(async () => {
     publicGatewaySessionKeyPair.privateKey,
     publicGatewaySessionKeyPair.sessionKey.keyId,
     publicGatewayId,
-    privateGatewayPrivateAddress,
+    privateGatewayId,
   );
 });
 
@@ -131,7 +131,7 @@ let ccaSerialized: Buffer;
 let privateGatewaySessionPrivateKey: CryptoKey;
 beforeAll(async () => {
   const generatedCCA = await generateCCA(
-    { id: publicGatewayId, internetAddress: GATEWAY_INTERNET_ADDRESS },
+    GATEWAY_INTERNET_ADDRESS,
     publicGatewaySessionKeyPair.sessionKey,
     cdaChain.publicGateway,
     pdaChain.privateGateway,
@@ -298,7 +298,7 @@ describe('CCA validation', () => {
         ccaRecipient: malformedCCA.recipient,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
+        peerGatewayAddress: privateGatewayId,
       }),
     );
     expect(error).toEqual({
@@ -309,12 +309,13 @@ describe('CCA validation', () => {
 
   test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async () => {
     const invalidCCA = new CargoCollectionAuthorization(
-      { id: publicGatewayId, internetAddress: `not-${GATEWAY_INTERNET_ADDRESS}` },
-      pdaChain.privateGateway,
+      { id: privateGatewayId }, // Valid CCA, but for a different recipient
+      pdaChain.privateEndpoint,
       Buffer.from([]),
+      { senderCaCertificateChain: [pdaChain.privateGateway] },
     );
     const invalidCCASerialized = Buffer.from(
-      await invalidCCA.serialize(keyPairSet.privateGateway.privateKey),
+      await invalidCCA.serialize(keyPairSet.privateEndpoint.privateKey),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
@@ -327,7 +328,6 @@ describe('CCA validation', () => {
         ccaRecipient: invalidCCA.recipient,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
       }),
     );
     expect(error).toEqual({
@@ -339,7 +339,7 @@ describe('CCA validation', () => {
   test('PERMISSION_DENIED should be returned if CCA sender is unauthorized', async () => {
     const ccaSenderCertificate = pdaChain.pdaGrantee;
     const invalidCCA = new CargoCollectionAuthorization(
-      { id: '0deadbeef', internetAddress: GATEWAY_INTERNET_ADDRESS },
+      { id: '0deadbeef' },
       ccaSenderCertificate,
       Buffer.from([]),
     );
@@ -376,7 +376,7 @@ describe('CCA validation', () => {
       partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
+        peerGatewayAddress: privateGatewayId,
       }),
     );
     expect(error).toEqual({
@@ -419,8 +419,8 @@ test('Parcels retrieved should be limited to sender of CCA', async () => {
   await SERVICE.collectCargo(CALL.convertToGrpcStream());
 
   expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
-    privateGatewayPrivateAddress,
-    partialPinoLogger({ peerGatewayAddress: privateGatewayPrivateAddress }) as any,
+    privateGatewayId,
+    partialPinoLogger({ peerGatewayAddress: privateGatewayId }) as any,
   );
 });
 
@@ -552,7 +552,7 @@ test('CCA fulfillment should be logged and end the call', async () => {
       cargoesCollected: 0,
       grpcClient: CALL.getPeer(),
       grpcMethod: 'collectCargo',
-      peerGatewayAddress: privateGatewayPrivateAddress,
+      peerGatewayAddress: privateGatewayId,
     }),
   );
   expect(CALL.end).toBeCalledWith();
@@ -588,7 +588,7 @@ describe('Private gateway certificate rotation', () => {
       subSeconds(cutoffDate, 1),
     );
     const { ccaSerialized: expiringCCA, sessionPrivateKey } = await generateCCA(
-      { id: publicGatewayId, internetAddress: GATEWAY_INTERNET_ADDRESS },
+      GATEWAY_INTERNET_ADDRESS,
       publicGatewaySessionKeyPair.sessionKey,
       cdaChain.publicGateway,
       expiringPDAChain.privateGateway,
@@ -617,7 +617,7 @@ describe('Private gateway certificate rotation', () => {
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Sending certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
+        peerGatewayAddress: privateGatewayId,
       }),
     );
   });
@@ -629,7 +629,7 @@ describe('Private gateway certificate rotation', () => {
       addSeconds(cutoffDate, 10),
     );
     const { ccaSerialized: expiringCCA } = await generateCCA(
-      { id: publicGatewayId, internetAddress: GATEWAY_INTERNET_ADDRESS },
+      GATEWAY_INTERNET_ADDRESS,
       publicGatewaySessionKeyPair.sessionKey,
       cdaChain.publicGateway,
       expiringPDAChain.privateGateway,
@@ -643,7 +643,7 @@ describe('Private gateway certificate rotation', () => {
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('debug', 'Skipping certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
+        peerGatewayAddress: privateGatewayId,
         peerGatewayCertificateExpiry: expiringPDAChain.privateGateway.expiryDate.toISOString(),
       }),
     );
@@ -667,7 +667,7 @@ describe('Errors while generating cargo', () => {
         err: expect.objectContaining({ message: err.message }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayPrivateAddress,
+        peerGatewayAddress: privateGatewayId,
       }),
     );
   });

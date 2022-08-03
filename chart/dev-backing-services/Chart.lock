@@ -4,7 +4,7 @@ dependencies:
   version: 8.0.3
 - name: vault
   repository: https://helm.releases.hashicorp.com
-  version: 0.10.0
+  version: 0.20.1
 - name: mongodb
   repository: https://charts.bitnami.com/bitnami
   version: 12.1.20
@@ -14,11 +14,11 @@ dependencies:
 - name: stan
   repository: https://nats-io.github.io/k8s/helm/charts
   version: 0.7.2
-- name: relaynet-pong
+- name: pong
   repository: https://h.cfcr.io/relaycorp/public
   version: 3.0.27
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 16.12.2
-digest: sha256:97b2ff7dee8a641ba01a41cca5e1dea8182289ba2bb43a9e2aeec0c15b0ba6ad
-generated: "2022-08-03T10:10:51.234384944+01:00"
+digest: sha256:c180827d676f97079ae49c6e19ca266a65927a20e1717ee56f7fb3d88876eb68
+generated: "2022-08-03T17:56:24.941672454+01:00"

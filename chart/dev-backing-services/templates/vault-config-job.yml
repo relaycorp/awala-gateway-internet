@@ -14,7 +14,7 @@ spec:
       shareProcessNamespace: true
       restartPolicy: OnFailure
       containers:
-        - name: vault-config
+        - name: gateway
           image: vault:1.5.4
           imagePullPolicy: IfNotPresent
           command:
@@ -22,6 +22,22 @@ spec:
             - secrets
             - enable
             - "-path={{ .Values.vault.kvPrefix }}"
+            - kv-v2
+          env:
+            - name: VAULT_ADDR
+              value: {{ .Values.vault.serverUrl }}
+          envFrom:
+            - secretRef:
+                name: vault-secret
+
+        - name: pong
+          image: vault:1.5.4
+          imagePullPolicy: IfNotPresent
+          command:
+            - vault
+            - secrets
+            - enable
+            - "-path={{ .Values.pong.vault.session_keys_mount_path }}"
             - kv-v2
           env:
             - name: VAULT_ADDR

@@ -71,6 +71,9 @@ export class ParcelCollection {
   @prop({ required: true })
   public senderEndpointPrivateAddress!: string;
 
+  /**
+   * Id (fka private/public address) of recipient endpoint.
+   */
   @prop({ required: true })
   public recipientEndpointAddress!: string;
 

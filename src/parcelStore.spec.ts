@@ -1,5 +1,5 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
-import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
+import { InvalidMessageError, Parcel, Recipient } from '@relaycorp/relaynet-core';
 import { EnvVarError } from 'env-var';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
@@ -15,6 +15,7 @@ import {
   QueuedInternetBoundParcelMessage,
 } from './parcelStore';
 import * as pki from './pki';
+import { GATEWAY_INTERNET_ADDRESS, PEER_INTERNET_ADDRESS } from './testUtils/awala';
 import { sha256Hex } from './testUtils/crypto';
 import { configureMockEnvVars } from './testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
@@ -26,17 +27,19 @@ import { mockStanMessage } from './testUtils/stan';
 const BUCKET = 'the-bucket-name';
 
 let pdaChain: PdaChain;
-let peerGatewayAddress: string;
+let parcelRecipient: Recipient;
+let privateGatewayId: string;
 beforeAll(async () => {
   pdaChain = await generatePdaChain();
-  peerGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  privateGatewayId = await pdaChain.privateGatewayCert.calculateSubjectId();
+  parcelRecipient = { id: await pdaChain.peerEndpointCert.calculateSubjectId() };
 });
 
 let parcel: Parcel;
 let parcelSerialized: Buffer;
 beforeAll(async () => {
   parcel = new Parcel(
-    await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    { ...parcelRecipient, internetAddress: PEER_INTERNET_ADDRESS },
     pdaChain.pdaCert,
     Buffer.from([]),
     { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
@@ -63,8 +66,8 @@ beforeEach(() => {
   mockLogging = makeMockLogging();
 });
 
-describe('liveStreamActiveParcelsForGateway', () => {
-  const STORE = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('liveStreamParcelsForPrivatePeer', () => {
+  const STORE = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   let abortController: AbortController;
   beforeEach(() => {
@@ -85,8 +88,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
 
     const activeParcels = pipeline(
       () =>
-        STORE.liveStreamActiveParcelsForGateway(
-          peerGatewayAddress,
+        STORE.liveStreamParcelsForPrivatePeer(
+          privateGatewayId,
           MOCK_NATS_CLIENT,
           abortController.signal,
           mockLogging.logger,
@@ -110,8 +113,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
 
     const activeParcels = pipeline(
       () =>
-        STORE.liveStreamActiveParcelsForGateway(
-          peerGatewayAddress,
+        STORE.liveStreamParcelsForPrivatePeer(
+          privateGatewayId,
           MOCK_NATS_CLIENT,
           abortController.signal,
           mockLogging.logger,
@@ -126,8 +129,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
     getMockInstance(MOCK_NATS_CLIENT.makeQueueConsumer).mockReturnValue(arrayToAsyncIterable([]));
 
     await asyncIterableToArray(
-      STORE.liveStreamActiveParcelsForGateway(
-        peerGatewayAddress,
+      STORE.liveStreamParcelsForPrivatePeer(
+        privateGatewayId,
         MOCK_NATS_CLIENT,
         abortController.signal,
         mockLogging.logger,
@@ -135,9 +138,9 @@ describe('liveStreamActiveParcelsForGateway', () => {
     );
 
     expect(MOCK_NATS_CLIENT.makeQueueConsumer).toBeCalledWith(
-      `pdc-parcel.${peerGatewayAddress}`,
+      `pdc-parcel.${privateGatewayId}`,
       'active-parcels',
-      peerGatewayAddress,
+      privateGatewayId,
       abortController.signal,
     );
   });
@@ -148,8 +151,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
 
       const [activeParcel] = await pipeline(
         () =>
-          STORE.liveStreamActiveParcelsForGateway(
-            peerGatewayAddress,
+          STORE.liveStreamParcelsForPrivatePeer(
+            privateGatewayId,
             MOCK_NATS_CLIENT,
             abortController.signal,
             mockLogging.logger,
@@ -168,8 +171,8 @@ describe('liveStreamActiveParcelsForGateway', () => {
 
       const [activeParcel] = await pipeline(
         () =>
-          STORE.liveStreamActiveParcelsForGateway(
-            peerGatewayAddress,
+          STORE.liveStreamParcelsForPrivatePeer(
+            privateGatewayId,
             MOCK_NATS_CLIENT,
             abortController.signal,
             mockLogging.logger,
@@ -197,7 +200,7 @@ describe('liveStreamActiveParcelsForGateway', () => {
   }
 });
 
-describe('streamActiveParcelsForGateway', () => {
+describe('streamParcelsForPrivatePeer', () => {
   let parcelObject: ParcelObject<null>;
   beforeEach(() => {
     parcelObject = {
@@ -209,31 +212,28 @@ describe('streamActiveParcelsForGateway', () => {
   });
 
   test('Only existing, active parcels should be retrieved', async () => {
-    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
     const parcelRetrieverSpy = jest
-      .spyOn(store, 'retrieveActiveParcelsForGateway')
+      .spyOn(store, 'retrieveParcelsForPrivatePeer')
       .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
-    const activeParcels = store.streamActiveParcelsForGateway(
-      peerGatewayAddress,
-      mockLogging.logger,
-    );
+    const activeParcels = store.streamParcelsForPrivatePeer(privateGatewayId, mockLogging.logger);
 
     await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
       { ack: expect.any(Function), parcelObjectKey: parcelObject.key, parcelSerialized },
     ]);
-    expect(parcelRetrieverSpy).toBeCalledWith(peerGatewayAddress, mockLogging.logger);
+    expect(parcelRetrieverSpy).toBeCalledWith(privateGatewayId, mockLogging.logger);
   });
 
   describe('Acknowledgement callback', () => {
     test('Parcel should be deleted from store when callback is called', async () => {
-      const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+      const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
       jest
-        .spyOn(store, 'retrieveActiveParcelsForGateway')
+        .spyOn(store, 'retrieveParcelsForPrivatePeer')
         .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
       const [message] = await asyncIterableToArray(
-        store.streamActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+        store.streamParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
       );
 
       expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).not.toBeCalled();
@@ -243,16 +243,16 @@ describe('streamActiveParcelsForGateway', () => {
   });
 });
 
-describe('retrieveActiveParcelsForGateway', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('retrieveParcelsForPrivatePeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   test('Parcels should be limited to those for the specified gateway', async () => {
     await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+      store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
     );
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(
-      `parcels/gateway-bound/${peerGatewayAddress}/`,
+      `parcels/gateway-bound/${privateGatewayId}/`,
       expect.anything(),
     );
   });
@@ -267,7 +267,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     setMockParcelObjectStore(objectsByKey);
 
     await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+      store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
     );
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
@@ -293,7 +293,7 @@ describe('retrieveActiveParcelsForGateway', () => {
     });
 
     const activeParcels = await asyncIterableToArray(
-      store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+      store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
     );
 
     expect(activeParcels).toEqual([
@@ -312,7 +312,7 @@ describe('retrieveActiveParcelsForGateway', () => {
 
     await expect(
       asyncIterableToArray(
-        store.retrieveActiveParcelsForGateway(peerGatewayAddress, mockLogging.logger),
+        store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
       ),
     ).resolves.toHaveLength(0);
   });
@@ -327,46 +327,84 @@ describe('retrieveActiveParcelsForGateway', () => {
   }
 });
 
-describe('storeParcelFromPeerGateway', () => {
+describe('storeParcelFromPrivatePeer', () => {
   const dummyObjectKey = 'the object key';
 
-  test('Parcel should be bound for private gateway if recipient is private', async () => {
-    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
-    const spiedStoreGatewayBoundParcel = jest
-      .spyOn(store, 'storeGatewayBoundParcel')
+  test('Parcel should be routed to private gateway if recipient Internet address is missing', async () => {
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
+    const spiedStoreParcelForPrivatePeer = jest
+      .spyOn(store, 'storeParcelForPrivatePeer')
       .mockImplementationOnce(async () => dummyObjectKey);
-
-    // Make sure the shared fixture remains valid for this test:
-    expect(parcel.isRecipientAddressPrivate).toBeTrue();
+    const parcelForPrivateGateway = new Parcel(parcelRecipient, pdaChain.pdaCert, Buffer.from([]), {
+      senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert],
+    });
+    const parcelForPrivateGatewaySerialized = Buffer.from(
+      await parcelForPrivateGateway.serialize(pdaChain.pdaGranteePrivateKey),
+    );
 
     await expect(
-      store.storeParcelFromPeerGateway(
-        parcel,
-        parcelSerialized,
-        await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      store.storeParcelFromPrivatePeer(
+        parcelForPrivateGateway,
+        parcelForPrivateGatewaySerialized,
+        privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
         mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
-    expect(spiedStoreGatewayBoundParcel).toBeCalledWith(
-      parcel,
-      parcelSerialized,
+    expect(spiedStoreParcelForPrivatePeer).toBeCalledWith(
+      parcelForPrivateGateway,
+      parcelForPrivateGatewaySerialized,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
     );
   });
 
-  test('Parcel should be bound for public endpoint if recipient is public', async () => {
-    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
-    const spiedStoreEndpointBoundParcel = jest
-      .spyOn(store, 'storeEndpointBoundParcel')
+  test('Parcel should be routed to private gateway if recipient served by current Internet gateway', async () => {
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
+    const spiedStoreParcelForPrivatePeer = jest
+      .spyOn(store, 'storeParcelForPrivatePeer')
+      .mockImplementationOnce(async () => dummyObjectKey);
+    const parcelForPrivateGateway = new Parcel(
+      { ...parcelRecipient, internetAddress: GATEWAY_INTERNET_ADDRESS },
+      pdaChain.pdaCert,
+      Buffer.from([]),
+      { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
+    );
+    const parcelForPrivateGatewaySerialized = Buffer.from(
+      await parcelForPrivateGateway.serialize(pdaChain.pdaGranteePrivateKey),
+    );
+
+    await expect(
+      store.storeParcelFromPrivatePeer(
+        parcelForPrivateGateway,
+        parcelForPrivateGatewaySerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        MOCK_NATS_CLIENT,
+        mockLogging.logger,
+      ),
+    ).resolves.toEqual(dummyObjectKey);
+
+    expect(spiedStoreParcelForPrivatePeer).toBeCalledWith(
+      parcelForPrivateGateway,
+      parcelForPrivateGatewaySerialized,
+      MOCK_MONGOOSE_CONNECTION,
+      MOCK_NATS_CLIENT,
+      mockLogging.logger,
+    );
+  });
+
+  test('Parcel should be routed to Internet peer if recipient is served by different Internet gateway', async () => {
+    const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
+    const spiedStoreParcelForInternetPeer = jest
+      .spyOn(store, 'storeParcelForInternetPeer')
       .mockImplementationOnce(async () => dummyObjectKey);
 
     const parcelForPublicEndpoint = new Parcel(
-      'https://endpoint.relaycorp.tech',
+      { ...parcelRecipient, internetAddress: PEER_INTERNET_ADDRESS },
       pdaChain.pdaCert,
       Buffer.from([]),
       { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
@@ -376,20 +414,20 @@ describe('storeParcelFromPeerGateway', () => {
     );
 
     await expect(
-      store.storeParcelFromPeerGateway(
+      store.storeParcelFromPrivatePeer(
         parcelForPublicEndpoint,
         parcelForPublicEndpointSerialized,
-        await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+        privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
         mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
 
-    expect(spiedStoreEndpointBoundParcel).toBeCalledWith(
+    expect(spiedStoreParcelForInternetPeer).toBeCalledWith(
       parcelForPublicEndpoint,
       parcelForPublicEndpointSerialized,
-      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -397,8 +435,8 @@ describe('storeParcelFromPeerGateway', () => {
   });
 });
 
-describe('storeGatewayBoundParcel', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('storeParcelForPrivatePeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   const mockRetrieveOwnCertificates = mockSpy(
     jest.spyOn(pki, 'retrieveOwnCertificates'),
@@ -410,7 +448,7 @@ describe('storeGatewayBoundParcel', () => {
     mockRetrieveOwnCertificates.mockResolvedValue([differentPDAChain.publicGatewayCert]);
 
     await expect(
-      store.storeGatewayBoundParcel(
+      store.storeParcelForPrivatePeer(
         parcel,
         parcelSerialized,
         MOCK_MONGOOSE_CONNECTION,
@@ -422,7 +460,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Debug log confirming validity of parcel should be recorded', async () => {
-    await store.storeGatewayBoundParcel(
+    await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -434,7 +472,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel object key should be output', async () => {
-    const key = await store.storeGatewayBoundParcel(
+    const key = await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -445,16 +483,16 @@ describe('storeGatewayBoundParcel', () => {
     const expectedObjectKey = [
       'parcels',
       'gateway-bound',
-      peerGatewayAddress,
-      parcel.recipientAddress,
-      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      privateGatewayId,
+      parcel.recipient.id,
+      await parcel.senderCertificate.calculateSubjectId(),
       sha256Hex(parcel.id),
     ].join('/');
     expect(key).toEqual(expectedObjectKey);
   });
 
   test('Parcel should be put in the right bucket', async () => {
-    await store.storeGatewayBoundParcel(
+    await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -470,7 +508,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel expiry date should be stored as object metadata', async () => {
-    await store.storeGatewayBoundParcel(
+    await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -488,7 +526,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    const parcelObjectKey = await store.storeGatewayBoundParcel(
+    const parcelObjectKey = await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -507,7 +545,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel object key should be unique for the parcel, sender and recipient', async () => {
-    const key = await store.storeGatewayBoundParcel(
+    const key = await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -523,7 +561,7 @@ describe('storeGatewayBoundParcel', () => {
   });
 
   test('Parcel object key should be published to right NATS Streaming channel', async () => {
-    const parcelObjectKey = await store.storeGatewayBoundParcel(
+    const parcelObjectKey = await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
@@ -534,7 +572,7 @@ describe('storeGatewayBoundParcel', () => {
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledTimes(1);
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       parcelObjectKey,
-      `pdc-parcel.${await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress()}`,
+      `pdc-parcel.${privateGatewayId}`,
     );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel storage was successfully published on NATS', {
@@ -544,11 +582,11 @@ describe('storeGatewayBoundParcel', () => {
   });
 });
 
-describe('deleteGatewayBoundParcel', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('deleteParcelForPrivatePeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   test('Object should be deleted from the right bucket', async () => {
-    await store.deleteGatewayBoundParcel('', '', '', '');
+    await store.deleteParcelForPrivatePeer('', '', '', '');
 
     expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
@@ -558,7 +596,7 @@ describe('deleteGatewayBoundParcel', () => {
     const senderPrivateAddress = '0deadbeef';
     const recipientAddress = '0deadc0de';
     const recipientGatewayAddress = '0beef';
-    await store.deleteGatewayBoundParcel(
+    await store.deleteParcelForPrivatePeer(
       parcelId,
       senderPrivateAddress,
       recipientAddress,
@@ -578,8 +616,8 @@ describe('deleteGatewayBoundParcel', () => {
   });
 });
 
-describe('retrieveEndpointBoundParcel', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('retrieveParcelForInternetPeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   beforeEach(() => {
     getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue({
@@ -588,14 +626,14 @@ describe('retrieveEndpointBoundParcel', () => {
   });
 
   test('Object should be retrieved from the right bucket', async () => {
-    await store.retrieveEndpointBoundParcel('');
+    await store.retrieveParcelForInternetPeer('');
 
     expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Lookup object key should be prefixed', async () => {
     const key = 'thingy.parcel';
-    await store.retrieveEndpointBoundParcel(key);
+    await store.retrieveParcelForInternetPeer(key);
 
     expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(
       `parcels/endpoint-bound/${key}`,
@@ -604,7 +642,7 @@ describe('retrieveEndpointBoundParcel', () => {
   });
 
   test('Parcel should be returned', async () => {
-    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
+    const retrievedParcelSerialized = await store.retrieveParcelForInternetPeer('key');
 
     expect(retrievedParcelSerialized).toEqual(parcelSerialized);
   });
@@ -612,14 +650,14 @@ describe('retrieveEndpointBoundParcel', () => {
   test('Nothing should be returned if the object does not exist', async () => {
     getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
 
-    const retrievedParcelSerialized = await store.retrieveEndpointBoundParcel('key');
+    const retrievedParcelSerialized = await store.retrieveParcelForInternetPeer('key');
 
     expect(retrievedParcelSerialized).toBeNull();
   });
 });
 
-describe('storeEndpointBoundParcel', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('storeParcelForInternetPeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   const mockWasParcelCollected = mockSpy(
     jest.spyOn(parcelCollection, 'wasParcelCollected'),
@@ -633,19 +671,16 @@ describe('storeEndpointBoundParcel', () => {
   test('Parcel should be refused if it is invalid', async () => {
     const invalidParcelCreationDate = new Date();
     invalidParcelCreationDate.setSeconds(invalidParcelCreationDate.getSeconds() + 5);
-    const invalidParcel = new Parcel(
-      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
-      pdaChain.pdaCert,
-      Buffer.from([]),
-      { creationDate: invalidParcelCreationDate },
-    );
+    const invalidParcel = new Parcel(parcelRecipient, pdaChain.pdaCert, Buffer.from([]), {
+      creationDate: invalidParcelCreationDate,
+    });
     const invalidParcelSerialized = await invalidParcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     await expect(
-      store.storeEndpointBoundParcel(
+      store.storeParcelForInternetPeer(
         invalidParcel,
         Buffer.from(invalidParcelSerialized),
-        peerGatewayAddress,
+        privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
         mockLogging.logger,
@@ -655,10 +690,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Debug log confirming validity of parcel should be recorded', async () => {
-    await store.storeEndpointBoundParcel(
+    await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -671,10 +706,10 @@ describe('storeEndpointBoundParcel', () => {
     mockWasParcelCollected.mockResolvedValue(true);
 
     await expect(
-      store.storeEndpointBoundParcel(
+      store.storeParcelForInternetPeer(
         parcel,
         parcelSerialized,
-        peerGatewayAddress,
+        privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
         mockLogging.logger,
@@ -684,7 +719,7 @@ describe('storeEndpointBoundParcel', () => {
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
     expect(mockWasParcelCollected).toBeCalledWith(
       parcel,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
     );
     expect(mockLogging.logs).toContainEqual(
@@ -693,10 +728,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('The processing of the parcel should be recorded if successful', async () => {
-    await store.storeEndpointBoundParcel(
+    await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -704,7 +739,7 @@ describe('storeEndpointBoundParcel', () => {
 
     expect(mockRecordParcelCollection).toBeCalledWith(
       parcel,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
     );
     expect(mockLogging.logs).toContainEqual(
@@ -713,25 +748,25 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Generated object key should be output', async () => {
-    const key = await store.storeEndpointBoundParcel(
+    const key = await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
     );
 
-    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-    const expectedKey = new RegExp(`^${peerGatewayAddress}/${senderPrivateAddress}/[0-9a-f-]+$`);
+    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
+    const expectedKey = new RegExp(`^${privateGatewayId}/${senderPrivateAddress}/[0-9a-f-]+$`);
     expect(key).toMatch(expectedKey);
   });
 
   test('Object should be put in the right bucket', async () => {
-    await store.storeEndpointBoundParcel(
+    await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -745,10 +780,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel should be stored with generated object key', async () => {
-    const key = await store.storeEndpointBoundParcel(
+    const key = await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -762,10 +797,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel serialization should be stored', async () => {
-    const parcelObjectKey = await store.storeEndpointBoundParcel(
+    const parcelObjectKey = await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -782,10 +817,10 @@ describe('storeEndpointBoundParcel', () => {
   });
 
   test('Parcel data should be published to right NATS Streaming channel', async () => {
-    const parcelObjectKey = await store.storeEndpointBoundParcel(
+    const parcelObjectKey = await store.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
       MOCK_NATS_CLIENT,
       mockLogging.logger,
@@ -795,7 +830,7 @@ describe('storeEndpointBoundParcel', () => {
       deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey: parcelObjectKey!!,
-      parcelRecipientAddress: parcel.recipientAddress,
+      parcelRecipientAddress: PEER_INTERNET_ADDRESS,
     };
     expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
       JSON.stringify(expectedMessageData),
@@ -809,18 +844,18 @@ describe('storeEndpointBoundParcel', () => {
   });
 });
 
-describe('deleteEndpointBoundParcel', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+describe('deleteParcelForInternetPeer', () => {
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   test('Object should be deleted from the right bucket', async () => {
-    await store.deleteEndpointBoundParcel('');
+    await store.deleteParcelForInternetPeer('');
 
     expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
   });
 
   test('Full object key should be prefixed', async () => {
     const key = 'thingy.parcel';
-    await store.deleteEndpointBoundParcel(key);
+    await store.deleteParcelForInternetPeer(key);
 
     expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(
       `parcels/endpoint-bound/${key}`,
@@ -832,15 +867,16 @@ describe('deleteEndpointBoundParcel', () => {
 describe('initFromEnv', () => {
   const requiredEnvVars = {
     OBJECT_STORE_BUCKET: 'the-bucket',
+    PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
   };
   const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 
   jest.spyOn(objectStorage, 'initObjectStoreFromEnv').mockReturnValue(MOCK_OBJECT_STORE_CLIENT);
 
-  test('OBJECT_STORE_BUCKET should be required', () => {
-    mockEnvVars({ ...requiredEnvVars, OBJECT_STORE_BUCKET: undefined });
+  test.each(Object.keys(requiredEnvVars))('%s should be required', (envVar) => {
+    mockEnvVars({ ...requiredEnvVars, [envVar]: undefined });
 
-    expect(() => ParcelStore.initFromEnv()).toThrowWithMessage(EnvVarError, /OBJECT_STORE_BUCKET/);
+    expect(() => ParcelStore.initFromEnv()).toThrowWithMessage(EnvVarError, new RegExp(envVar));
   });
 
   test('Parcel store should be returned', () => {
@@ -848,11 +884,12 @@ describe('initFromEnv', () => {
 
     expect(store.bucket).toEqual(requiredEnvVars.OBJECT_STORE_BUCKET);
     expect(store.objectStoreClient).toBe(MOCK_OBJECT_STORE_CLIENT);
+    expect(store.internetAddress).toBe(GATEWAY_INTERNET_ADDRESS);
   });
 });
 
 describe('makeActiveParcelRetriever', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET);
+  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   test('Active parcels should be output', async () => {
     const parcelObjectMetadata: ParcelObjectMetadata<{ readonly foo: string }> = {

@@ -24,7 +24,7 @@ beforeAll(async () => {
     validityEndDate: tomorrow,
   });
 
-  CCA = new CargoCollectionAuthorization('0deadbeef', senderCertificate, Buffer.from([]));
+  CCA = new CargoCollectionAuthorization({ id: '0deadbeef' }, senderCertificate, Buffer.from([]));
 });
 
 describe('wasCCAFulfilled', () => {
@@ -48,7 +48,7 @@ describe('wasCCAFulfilled', () => {
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledTimes(1);
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledWith({
       ccaId: CCA.id,
-      peerPrivateAddress: await CCA.senderCertificate.calculateSubjectPrivateAddress(),
+      peerPrivateAddress: await CCA.senderCertificate.calculateSubjectId(),
     });
   });
 
@@ -94,7 +94,7 @@ describe('recordCCAFulfillment', () => {
     await recordCCAFulfillment(CCA, MOCK_CONNECTION);
 
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledTimes(1);
-    const peerPrivateAddress = await CCA.senderCertificate.calculateSubjectPrivateAddress();
+    const peerPrivateAddress = await CCA.senderCertificate.calculateSubjectId();
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledWith(
       { peerPrivateAddress, ccaId: CCA.id },
       { peerPrivateAddress, ccaId: CCA.id, ccaExpiryDate: CCA.expiryDate },

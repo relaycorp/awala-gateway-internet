@@ -28,7 +28,7 @@ let stubPdaChain: PdaChain;
 let PARCEL: Parcel;
 
 interface StubParcelOptions {
-  readonly recipientAddress: string;
+  readonly recipientId: string;
   readonly senderCertificate: Certificate;
   readonly senderCertificateChain?: readonly Certificate[];
 }
@@ -37,7 +37,7 @@ beforeAll(async () => {
   stubPdaChain = await generatePdaChain();
 
   PARCEL = await generateStubParcel({
-    recipientAddress: await stubPdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    recipientId: await stubPdaChain.peerEndpointCert.calculateSubjectId(),
     senderCertificate: stubPdaChain.pdaCert,
     senderCertificateChain: [stubPdaChain.peerEndpointCert, stubPdaChain.privateGatewayCert],
   });
@@ -123,31 +123,10 @@ describe('receiveParcel', () => {
     );
   });
 
-  test('Parcel should be refused if recipient address is not private', async () => {
-    const parcel = await generateStubParcel({
-      recipientAddress: 'https://public.address/',
-      senderCertificate: stubPdaChain.pdaCert,
-    });
-    const payload = Buffer.from(await parcel.serialize(stubPdaChain.pdaGranteePrivateKey));
-    const response = await serverInstance.inject({
-      ...validRequestOptions,
-      headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
-      payload,
-    });
-
-    expect(response).toHaveProperty('statusCode', 400);
-    expect(JSON.parse(response.payload)).toHaveProperty(
-      'message',
-      'Parcel recipient should be specified as a private address',
-    );
-
-    expect(mockParcelStore.storeGatewayBoundParcel).not.toBeCalled();
-  });
-
   test('HTTP 403 should be returned if the parcel is well-formed but invalid', async () => {
     const error = new InvalidMessageError('Oops');
-    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockReset();
-    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValueOnce(error);
+    getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockReset();
+    getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockRejectedValueOnce(error);
 
     const response = await serverInstance.inject(validRequestOptions);
 
@@ -161,7 +140,7 @@ describe('receiveParcel', () => {
   });
 
   test('Failing to save parcel in object store should result in a 500 response', async () => {
-    getMockInstance(mockParcelStore.storeGatewayBoundParcel).mockRejectedValue(new Error('Oops'));
+    getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockRejectedValue(new Error('Oops'));
 
     const response = await serverInstance.inject(validRequestOptions);
 
@@ -177,8 +156,8 @@ describe('receiveParcel', () => {
   test('Parcel should be bound for private gateway if valid', async () => {
     await serverInstance.inject(validRequestOptions);
 
-    expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledTimes(1);
-    expect(mockParcelStore.storeGatewayBoundParcel).toBeCalledWith(
+    expect(mockParcelStore.storeParcelForPrivatePeer).toBeCalledTimes(1);
+    expect(mockParcelStore.storeParcelForPrivatePeer).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
       getMongooseConnection(),
@@ -204,7 +183,7 @@ describe('receiveParcel', () => {
 
 async function generateStubParcel(options: StubParcelOptions): Promise<Parcel> {
   return new Parcel(
-    options.recipientAddress,
+    { id: options.recipientId },
     options.senderCertificate,
     Buffer.from('the payload'),
     { senderCaCertificateChain: options.senderCertificateChain ?? [] },

@@ -11,7 +11,7 @@ export async function wasCCAFulfilled(
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
   const fulfillment = await fulfillmentModel.exists({
     ccaId: cca.id,
-    peerPrivateAddress: await cca.senderCertificate.calculateSubjectPrivateAddress(),
+    peerPrivateAddress: await cca.senderCertificate.calculateSubjectId(),
   });
   return !!fulfillment;
 }
@@ -22,7 +22,7 @@ export async function recordCCAFulfillment(
 ): Promise<void> {
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
 
-  const peerPrivateAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
+  const peerPrivateAddress = await cca.senderCertificate.calculateSubjectId();
   const fulfillment: CCAFulfillment = {
     ccaExpiryDate: cca.expiryDate,
     ccaId: cca.id,

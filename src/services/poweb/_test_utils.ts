@@ -4,6 +4,7 @@ import { Connection } from 'mongoose';
 import * as vault from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
 import { arrayToAsyncIterable } from '../../testUtils/iter';
@@ -21,20 +22,20 @@ export function setUpCommonFixtures(): () => FixtureSet {
   const getMongooseConnection = setUpTestDBConnection();
 
   const mockParcelStore: ParcelStore = {
-    liveStreamActiveParcelsForGateway: mockSpy(
+    liveStreamParcelsForPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'liveStreamParcelsForPrivatePeer'),
       async function* (): AsyncIterable<any> {
         // tslint:disable-next-line:no-unused-expression
         await new Promise(() => 'A promise that never resolves');
       },
     ),
-    storeParcelFromPeerGateway: mockSpy(
+    storeParcelFromPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
       async (parcel: Parcel) => {
         return `parcels/${parcel.id}`;
       },
     ),
-    streamActiveParcelsForGateway: mockSpy(
+    streamParcelsForPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'streamParcelsForPrivatePeer'),
       () => arrayToAsyncIterable([]),
     ),
@@ -75,6 +76,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
   beforeEach(() => {
     mockEnvVars({
       GATEWAY_VERSION: '1.0.2',
+      PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
     });
   });
 

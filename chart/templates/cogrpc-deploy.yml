@@ -38,8 +38,6 @@ spec:
           args:
             - build/main/bin/cogrpc-server.js
           env:
-            - name: PUBLIC_ADDRESS
-              value: {{ .Values.publicAddress }}
             - name: SERVER_IP_ADDRESS
               {{- if .Values.tags.gwDev }}
               value: 127.0.0.1

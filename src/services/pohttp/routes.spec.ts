@@ -60,7 +60,7 @@ const mockNatsClientInit = mockSpy(
 );
 
 const mockParcelStore: ParcelStore = {
-  storeGatewayBoundParcel: mockSpy(jest.fn(), async () => undefined),
+  storeParcelForPrivatePeer: mockSpy(jest.fn(), async () => undefined),
 } as any;
 jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 

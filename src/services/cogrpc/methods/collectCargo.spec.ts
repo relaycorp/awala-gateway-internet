@@ -219,10 +219,7 @@ describe('CCA validation', () => {
   });
 
   test('UNAUTHENTICATED should be returned if payload is not an EnvelopedData value', async () => {
-    const invalidCCASerialized = await generateCCAForPayload(
-      GATEWAY_INTERNET_ADDRESS,
-      new ArrayBuffer(0),
-    );
+    const invalidCCASerialized = await generateCCAForPayload(publicGatewayId, new ArrayBuffer(0));
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     const error = await catchErrorEvent(CALL, () =>
@@ -243,7 +240,7 @@ describe('CCA validation', () => {
       unknownSessionKey, // The public gateway doesn't have this key
     );
     const invalidCCASerialized = await generateCCAForPayload(
-      GATEWAY_INTERNET_ADDRESS,
+      publicGatewayId,
       envelopedData.serialize(),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
@@ -265,7 +262,7 @@ describe('CCA validation', () => {
       publicGatewaySessionKeyPair.sessionKey,
     );
     const invalidCCASerialized = await generateCCAForPayload(
-      GATEWAY_INTERNET_ADDRESS,
+      publicGatewayId,
       envelopedData.serialize(),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
@@ -312,7 +309,7 @@ describe('CCA validation', () => {
 
   test('INVALID_ARGUMENT should be returned if CCA is not bound for current gateway', async () => {
     const invalidCCA = new CargoCollectionAuthorization(
-      { id: '0deadbeef', internetAddress: `not-${GATEWAY_INTERNET_ADDRESS}` },
+      { id: publicGatewayId, internetAddress: `not-${GATEWAY_INTERNET_ADDRESS}` },
       pdaChain.privateGateway,
       Buffer.from([]),
     );

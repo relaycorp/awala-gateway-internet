@@ -6,6 +6,7 @@ import {
   SessionKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { initPrivateKeyStore } from '../../backingServices/keystore';
@@ -28,6 +29,8 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
   );
 
   const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
+
+  const internetAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -99,6 +102,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
         publicGatewayCertificationPath!.leafCertificate,
+        internetAddress,
         sessionKeyPair.sessionKey,
       );
       return reply

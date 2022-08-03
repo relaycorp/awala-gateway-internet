@@ -33,11 +33,11 @@ let PARCEL_SERIALIZED: ArrayBuffer;
 beforeEach(async () => {
   const fixtures = getFixtures();
   PARCEL = new Parcel(
-    'https://endpoint.relaycorp.tech',
-    fixtures.peerEndpointCert,
+    { id: await fixtures.peerEndpointCert.calculateSubjectId() },
+    fixtures.pdaCert,
     Buffer.from([]),
   );
-  PARCEL_SERIALIZED = await PARCEL.serialize(fixtures.peerEndpointPrivateKey);
+  PARCEL_SERIALIZED = await PARCEL.serialize(fixtures.pdaGranteePrivateKey);
 });
 
 describe('Disallowed methods', () => {

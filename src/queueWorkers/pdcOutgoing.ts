@@ -4,12 +4,10 @@ import {
   PoHTTPError,
   PoHTTPInvalidParcelError,
 } from '@relaycorp/relaynet-pohttp';
-import { get as getEnvVar } from 'env-var';
 import * as stan from 'node-nats-streaming';
 import { pipeline } from 'streaming-iterables';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -29,8 +27,7 @@ export async function processInternetBoundParcels(
   configureExitHandling(logger);
   logger.info('Starting queue worker');
 
-  const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-  const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
+  const parcelStore = ParcelStore.initFromEnv();
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
 

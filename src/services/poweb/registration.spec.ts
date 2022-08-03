@@ -10,6 +10,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest from 'light-my-request';
+import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 
 import { arrayBufferFrom } from '../../testUtils/buffers';
 import { sha256 } from '../../testUtils/crypto';
@@ -195,6 +196,17 @@ describe('Successful registration', () => {
     ).resolves.toEqual(privateGatewayPublicKeySerialized);
   });
 
+  test('Internet address should be included in registration', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
+    expect(registration.internetGatewayInternetAddress).toEqual(GATEWAY_INTERNET_ADDRESS);
+  });
+
   test('Session key should be included in registration', async () => {
     const fixtures = getFixtures();
 
@@ -217,7 +229,7 @@ describe('Successful registration', () => {
     const keyData =
       fixtures.privateKeyStore.sessionKeys[registration.sessionKey!!.keyId.toString('hex')];
     expect(keyData).toMatchObject<Partial<SessionPrivateKeyData>>({
-      peerPrivateAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
+      peerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     });
   });
 

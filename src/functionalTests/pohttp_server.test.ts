@@ -35,7 +35,7 @@ describe('PoHTTP server', () => {
     const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     // We should get a successful response
-    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized);
+    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized, { useTls: false });
 
     // The parcel should've been safely stored
     const poWebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
@@ -70,12 +70,10 @@ describe('PoHTTP server', () => {
       Buffer.from([]),
     );
 
-    try {
-      await deliverParcel(GW_POHTTP_LOCAL_URL, await parcel.serialize(senderKeyPair.privateKey));
-    } catch (error) {
-      expect(error).toBeInstanceOf(PoHTTPInvalidParcelError);
-      return;
-    }
-    expect.fail("Parcel delivery should've failed");
+    await expect(
+      deliverParcel(GW_POHTTP_LOCAL_URL, await parcel.serialize(senderKeyPair.privateKey), {
+        useTls: false,
+      }),
+    ).rejects.toThrow(PoHTTPInvalidParcelError);
   });
 });

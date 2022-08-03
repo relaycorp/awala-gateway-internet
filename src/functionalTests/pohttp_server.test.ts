@@ -7,12 +7,13 @@ import {
 } from '@relaycorp/relaynet-core';
 import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
+import { addDays } from 'date-fns';
 import { Stan } from 'node-nats-streaming';
 import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray } from '../testUtils/iter';
-import { GW_POHTTP_URL, GW_POWEB_LOCAL_PORT } from './services';
+import { GW_POHTTP_LOCAL_URL, GW_POWEB_LOCAL_PORT } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway } from './utils';
 
 describe('PoHTTP server', () => {
@@ -26,7 +27,7 @@ describe('PoHTTP server', () => {
   test('Valid parcel should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
     const parcel = new Parcel(
-      await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+      { id: await pdaChain.peerEndpointCert.calculateSubjectId() },
       pdaChain.pdaCert,
       Buffer.from([]),
       { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
@@ -34,7 +35,7 @@ describe('PoHTTP server', () => {
     const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     // We should get a successful response
-    await deliverParcel(GW_POHTTP_URL, parcelSerialized);
+    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized);
 
     // The parcel should've been safely stored
     const poWebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
@@ -58,17 +59,19 @@ describe('PoHTTP server', () => {
 
   test('Unauthorized parcel should be refused', async () => {
     const senderKeyPair = await generateRSAKeyPair();
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
     const senderCertificate = await issueEndpointCertificate({
       issuerPrivateKey: senderKeyPair.privateKey,
       subjectPublicKey: senderKeyPair.publicKey,
-      validityEndDate: tomorrow,
+      validityEndDate: addDays(new Date(), 1),
     });
-    const parcel = new Parcel('0deadbeef', senderCertificate, Buffer.from([]));
+    const parcel = new Parcel(
+      { id: senderCertificate.getIssuerId()! },
+      senderCertificate,
+      Buffer.from([]),
+    );
 
     try {
-      await deliverParcel(GW_POHTTP_URL, await parcel.serialize(senderKeyPair.privateKey));
+      await deliverParcel(GW_POHTTP_LOCAL_URL, await parcel.serialize(senderKeyPair.privateKey));
     } catch (error) {
       expect(error).toBeInstanceOf(PoHTTPInvalidParcelError);
       return;

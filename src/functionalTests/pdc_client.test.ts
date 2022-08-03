@@ -6,8 +6,9 @@ import {
 } from '@relaycorp/relaynet-core';
 import { Stan } from 'node-nats-streaming';
 import { promisify } from 'util';
+import { QueuedInternetBoundParcelMessage } from '../parcelStore';
 
-import { PONG_ENDPOINT_ADDRESS } from './services';
+import { PONG_INTERNET_ADDRESS } from './services';
 import {
   connectToNatsStreaming,
   IS_GITHUB,
@@ -43,7 +44,11 @@ afterEach(async () => {
 
 describe('PDC client', () => {
   test('Successfully delivered parcels should be taken off the queue', async () => {
-    const parcel = new Parcel(PONG_ENDPOINT_ADDRESS, senderCertificate, Buffer.from([]));
+    const parcel = new Parcel(
+      { id: '0deadbeef', internetAddress: PONG_INTERNET_ADDRESS },
+      senderCertificate,
+      Buffer.from([]),
+    );
 
     await queueParcel(parcel);
 
@@ -52,9 +57,14 @@ describe('PDC client', () => {
   });
 
   test('Undelivered parcels should eventually be taken off the queue', async () => {
-    const parcel = new Parcel('https://relaynet.local', senderCertificate, Buffer.from([]), {
-      ttl: 10,
-    });
+    const parcel = new Parcel(
+      { id: '0deadbeef', internetAddress: 'awala.local' },
+      senderCertificate,
+      Buffer.from([]),
+      {
+        ttl: 10,
+      },
+    );
 
     await queueParcel(parcel);
 
@@ -77,14 +87,13 @@ async function queueParcel(parcel: Parcel): Promise<void> {
   );
 
   const natsPublish = promisify(natsStreamingConnection.publish).bind(natsStreamingConnection);
-  await natsPublish(
-    'internet-parcels',
-    JSON.stringify({
-      parcelExpiryDate: parcel.expiryDate,
-      parcelObjectKey: parcel.id,
-      parcelRecipientAddress: parcel.recipientAddress,
-    }),
-  );
+  const queue: QueuedInternetBoundParcelMessage = {
+    parcelExpiryDate: parcel.expiryDate,
+    parcelObjectKey: parcel.id,
+    parcelRecipientAddress: parcel.recipient.id,
+    deliveryAttempts: 0,
+  };
+  await natsPublish('internet-parcels', JSON.stringify(queue));
 }
 
 async function isParcelInStore(parcel: Parcel): Promise<boolean> {

@@ -3,10 +3,11 @@ import { CogRPCClient, CogRPCError } from '@relaycorp/cogrpc';
 import {
   Cargo,
   CargoCollectionAuthorization,
+  Certificate,
   generateRSAKeyPair,
   issueGatewayCertificate,
   Parcel,
-  RecipientAddressType,
+  Recipient,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
@@ -17,14 +18,14 @@ import { expectBuffersToEqual } from '../testUtils/buffers';
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
-import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
+import { GW_COGRPC_LOCAL_URL, GW_INTERNET_ADDRESS, GW_POHTTP_LOCAL_URL } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';
 
 const TOMORROW = addDays(new Date(), 1);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
+  cogRPCClient = await CogRPCClient.init(GW_COGRPC_LOCAL_URL);
 });
 afterEach(() => {
   cogRPCClient.close();
@@ -33,7 +34,11 @@ afterEach(() => {
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
-    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from([]));
+    const cargo = new Cargo(
+      await getPublicGatewayRecipient(pdaChain.publicGatewayCert),
+      pdaChain.privateGatewayCert,
+      Buffer.from([]),
+    );
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
     const deliveryId = 'random-delivery-id';
@@ -53,7 +58,11 @@ describe('Cargo delivery', () => {
       validityEndDate: TOMORROW,
     });
 
-    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, unauthorizedCertificate, Buffer.from([]));
+    const cargo = new Cargo(
+      await getPublicGatewayRecipient(unauthorizedCertificate),
+      unauthorizedCertificate,
+      Buffer.from([]),
+    );
     const cargoSerialized = Buffer.from(
       await cargo.serialize(unauthorizedSenderKeyPair.privateKey),
     );
@@ -72,13 +81,13 @@ describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const parcelSerialized = await generateDummyParcel(pdaChain);
-    await deliverParcel(GW_POHTTP_URL, parcelSerialized);
+    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized);
 
     await sleep(1);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
+      GW_INTERNET_ADDRESS,
       publicGatewaySessionKey,
       cdaChain.publicGatewayCert,
       pdaChain.privateGatewayCert,
@@ -89,9 +98,7 @@ describe('Cargo collection', () => {
     await expect(collectedCargoes).toHaveLength(1);
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
-    expect(cargo.recipientAddress).toEqual(
-      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
-    );
+    expect(cargo.recipient.id).toEqual(await pdaChain.privateGatewayCert.calculateSubjectId());
     const { payload: cargoMessageSet } = await cargo.unwrapPayload(sessionPrivateKey);
     expect(cargoMessageSet.messages).toHaveLength(1);
     expectBuffersToEqual(cargoMessageSet.messages[0], parcelSerialized);
@@ -99,13 +106,13 @@ describe('Cargo collection', () => {
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
-    await deliverParcel(GW_POHTTP_URL, await generateDummyParcel(pdaChain));
+    await deliverParcel(GW_POHTTP_LOCAL_URL, await generateDummyParcel(pdaChain));
 
     await sleep(1);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
+      GW_INTERNET_ADDRESS,
       publicGatewaySessionKey,
       cdaChain.publicGatewayCert,
       pdaChain.privateGatewayCert,
@@ -114,7 +121,7 @@ describe('Cargo collection', () => {
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
-    await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
+    await cargo.validate([cdaChain.privateGatewayCert]);
   });
 
   test('Unauthorized CCA should be refused', async () => {
@@ -125,7 +132,7 @@ describe('Cargo collection', () => {
       validityEndDate: TOMORROW,
     });
     const cca = new CargoCollectionAuthorization(
-      GW_PUBLIC_ADDRESS_URL,
+      await getPublicGatewayRecipient(unauthorizedCertificate),
       unauthorizedCertificate,
       Buffer.from([]),
     );
@@ -143,7 +150,7 @@ describe('Cargo collection', () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
+      GW_INTERNET_ADDRESS,
       publicGatewaySessionKey,
       cdaChain.publicGatewayCert,
       pdaChain.privateGatewayCert,
@@ -160,9 +167,15 @@ describe('Cargo collection', () => {
   });
 });
 
+async function getPublicGatewayRecipient(
+  publicGatewayCertificate: Certificate,
+): Promise<Recipient> {
+  return { id: await publicGatewayCertificate.calculateSubjectId() };
+}
+
 async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<ArrayBuffer> {
   const parcel = new Parcel(
-    await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    { id: await pdaChain.peerEndpointCert.calculateSubjectId() },
     pdaChain.pdaCert,
     Buffer.from([]),
     { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },

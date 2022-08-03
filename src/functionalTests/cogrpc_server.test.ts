@@ -81,7 +81,7 @@ describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const parcelSerialized = await generateDummyParcel(pdaChain);
-    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized);
+    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized, { useTls: false });
 
     await sleep(1);
 
@@ -106,7 +106,9 @@ describe('Cargo collection', () => {
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
-    await deliverParcel(GW_POHTTP_LOCAL_URL, await generateDummyParcel(pdaChain));
+    await deliverParcel(GW_POHTTP_LOCAL_URL, await generateDummyParcel(pdaChain), {
+      useTls: false,
+    });
 
     await sleep(1);
 

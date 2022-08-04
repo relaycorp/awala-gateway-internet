@@ -5,7 +5,6 @@ import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 import { pipeline } from 'streaming-iterables';
-import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from './backingServices/objectStorage';
@@ -42,6 +41,16 @@ export interface ParcelStreamMessage {
   readonly parcelSerialized: Buffer;
 }
 
+function makeParcelObjectKeyForInternetPeer(
+  peerGatewayAddress: string,
+  senderPrivateAddress: string,
+  parcel: Parcel,
+): string {
+  return [peerGatewayAddress, senderPrivateAddress, parcel.recipient.id, sha256Hex(parcel.id)].join(
+    '/',
+  );
+}
+
 export class ParcelStore {
   public static initFromEnv(): ParcelStore {
     const objectStoreClient = initObjectStoreFromEnv();
@@ -75,7 +84,7 @@ export class ParcelStore {
     const peerAwareLogger = logger.child({ peerGatewayAddress });
 
     const parcelMessages = natsStreamingClient.makeQueueConsumer(
-      calculatePeerGatewayNATSChannel(peerGatewayAddress),
+      makePeerGatewayNATSChannel(peerGatewayAddress),
       'active-parcels',
       peerGatewayAddress,
       abortSignal,
@@ -217,7 +226,7 @@ export class ParcelStore {
 
     const recipientGatewayCert = certificationPath[certificationPath.length - 2];
     const privateGatewayAddress = await recipientGatewayCert.calculateSubjectId();
-    const key = calculateGatewayBoundParcelObjectKey(
+    const key = makeParcelObjectKeyForPrivatePeer(
       parcel.id,
       await parcel.senderCertificate.calculateSubjectId(),
       parcel.recipient.id,
@@ -237,7 +246,7 @@ export class ParcelStore {
 
     await natsStreamingClient.publishMessage(
       key,
-      calculatePeerGatewayNATSChannel(privateGatewayAddress),
+      makePeerGatewayNATSChannel(privateGatewayAddress),
     );
     keyAwareLogger.debug('Parcel storage was successfully published on NATS');
 
@@ -258,7 +267,7 @@ export class ParcelStore {
     recipientAddress: string,
     recipientGatewayAddress: string,
   ): Promise<void> {
-    const parcelKey = calculateGatewayBoundParcelObjectKey(
+    const parcelKey = makeParcelObjectKeyForPrivatePeer(
       parcelId,
       senderPrivateAddress,
       recipientAddress,
@@ -269,7 +278,7 @@ export class ParcelStore {
 
   public async retrieveParcelForInternetPeer(parcelObjectKey: string): Promise<Buffer | null> {
     const storeObject = await this.objectStoreClient.getObject(
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
     return storeObject?.body ?? null;
@@ -305,12 +314,16 @@ export class ParcelStore {
     }
 
     const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
-    const parcelObjectKey = `${peerGatewayAddress}/${senderPrivateAddress}/${uuid()}`;
+    const parcelObjectKey = makeParcelObjectKeyForInternetPeer(
+      peerGatewayAddress,
+      senderPrivateAddress,
+      parcel,
+    );
     const keyAwareLogger = logger.child({ parcelObjectKey });
 
     await this.objectStoreClient.putObject(
       { body: parcelSerialized, metadata: {} },
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
     keyAwareLogger.debug('Parcel object was successfully stored');
@@ -332,7 +345,7 @@ export class ParcelStore {
 
   public async deleteParcelForInternetPeer(parcelObjectKey: string): Promise<void> {
     await this.objectStoreClient.deleteObject(
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
   }
@@ -422,15 +435,15 @@ function getDateFromTimestamp(timestampString: string): Date | null {
   return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
 }
 
-function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
+function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-function calculatePeerGatewayNATSChannel(peerGatewayAddress: string): string {
+function makePeerGatewayNATSChannel(peerGatewayAddress: string): string {
   return `pdc-parcel.${peerGatewayAddress}`;
 }
 
-function calculateGatewayBoundParcelObjectKey(
+function makeParcelObjectKeyForPrivatePeer(
   parcelId: string,
   senderPrivateAddress: string,
   recipientAddress: string,

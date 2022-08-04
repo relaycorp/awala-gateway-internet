@@ -758,7 +758,12 @@ describe('storeParcelForInternetPeer', () => {
     );
 
     const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
-    const expectedKey = new RegExp(`^${privateGatewayId}/${senderPrivateAddress}/[0-9a-f-]+$`);
+    const expectedKey = [
+      privateGatewayId,
+      senderPrivateAddress,
+      parcel.recipient.id,
+      sha256Hex(parcel.id),
+    ].join('/');
     expect(key).toMatch(expectedKey);
   });
 

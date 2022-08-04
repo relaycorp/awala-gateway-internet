@@ -38,7 +38,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: POHTTP_TLS_REQUIRED
+            - name: POHTTP_USE_TLS
               value: {{ ternary "false" "true" .Values.tags.gwDev | quote }}
           envFrom:
             - configMapRef:

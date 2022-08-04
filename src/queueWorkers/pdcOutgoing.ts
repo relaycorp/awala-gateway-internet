@@ -4,6 +4,7 @@ import {
   PoHTTPError,
   PoHTTPInvalidParcelError,
 } from '@relaycorp/relaynet-pohttp';
+import { get as getEnvVar } from 'env-var';
 import * as stan from 'node-nats-streaming';
 import { pipeline } from 'streaming-iterables';
 
@@ -51,6 +52,7 @@ export async function processInternetBoundParcels(workerName: string): Promise<v
   }
 
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
+    const useTls = getEnvVar('POHTTP_USE_TLS').default('true').asBool();
     for await (const parcelData of activeParcels) {
       const parcelAwareLogger = logger.child({ parcelObjectKey: parcelData.parcelObjectKey });
       const parcelSerialized = await parcelStore.retrieveParcelForInternetPeer(
@@ -65,7 +67,7 @@ export async function processInternetBoundParcels(workerName: string): Promise<v
 
       const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
       try {
-        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized);
+        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, { useTls });
         parcelAwareLogger.debug('Parcel was successfully delivered');
       } catch (err) {
         if (!(err instanceof PoHTTPError)) {

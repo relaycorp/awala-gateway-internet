@@ -157,6 +157,7 @@ describe('processInternetBoundParcels', () => {
     expect(pohttp.deliverParcel).toBeCalledWith(
       QUEUE_MESSAGE_DATA.parcelRecipientAddress,
       PARCEL_SERIALIZED,
+      expect.anything(),
     );
   });
 
@@ -303,6 +304,47 @@ describe('processInternetBoundParcels', () => {
     expect(message.ack).not.toBeCalled();
     expect(MOCK_NATS_CLIENT.publishMessage).not.toBeCalled();
     expect(MOCK_DELETE_INTERNET_PARCEL).not.toBeCalled();
+  });
+
+  describe('TLS use', () => {
+    test('TLS should be used if POHTTP_USE_TLS is unset', async () => {
+      mockEnvVars({ ...ENV_VARS, POHTTP_USE_TLS: undefined });
+      MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
+        arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
+      );
+
+      await processInternetBoundParcels(WORKER_NAME);
+
+      expect(pohttp.deliverParcel).toBeCalledWith(expect.anything(), expect.anything(), {
+        useTls: true,
+      });
+    });
+
+    test('TLS should be used if POHTTP_USE_TLS is enabled', async () => {
+      mockEnvVars({ ...ENV_VARS, POHTTP_USE_TLS: 'true' });
+      MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
+        arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
+      );
+
+      await processInternetBoundParcels(WORKER_NAME);
+
+      expect(pohttp.deliverParcel).toBeCalledWith(expect.anything(), expect.anything(), {
+        useTls: true,
+      });
+    });
+
+    test('TLS should not be used if POHTTP_USE_TLS is disabled', async () => {
+      mockEnvVars({ ...ENV_VARS, POHTTP_USE_TLS: 'false' });
+      MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(
+        arrayToAsyncIterable([mockStanMessage(QUEUE_MESSAGE_DATA_SERIALIZED)]),
+      );
+
+      await processInternetBoundParcels(WORKER_NAME);
+
+      expect(pohttp.deliverParcel).toBeCalledWith(expect.anything(), expect.anything(), {
+        useTls: false,
+      });
+    });
   });
 
   describe('NATS Streaming connection', () => {

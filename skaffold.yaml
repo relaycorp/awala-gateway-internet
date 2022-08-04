@@ -38,7 +38,7 @@ portForward:
   localPort: 8080
 - resourceType: service
   resourceName: public-gateway-pohttp
-  port: 8080
+  port: 80
   localPort: 8081
 - resourceType: service
   resourceName: public-gateway-cogrpc

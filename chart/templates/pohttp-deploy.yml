@@ -48,17 +48,17 @@ spec:
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
           ports:
-            - name: http
+            - name: pohttp
               containerPort: 8080
               protocol: TCP
           livenessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: pohttp
           readinessProbe:
             httpGet:
               path: /
-              port: 8080
+              port: pohttp
           resources:
             {{- toYaml .Values.pohttp.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

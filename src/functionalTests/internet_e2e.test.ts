@@ -2,8 +2,6 @@ import { CogRPCClient } from '@relaycorp/cogrpc';
 import {
   Cargo,
   CargoMessageSet,
-  Certificate,
-  CertificationPath,
   getIdFromIdentityKey,
   issueDeliveryAuthorization,
   Parcel,
@@ -24,6 +22,7 @@ import uuid from 'uuid-random';
 
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
+import { deserializePong, serializePing } from './pingSerialization';
 import {
   GW_COGRPC_LOCAL_URL,
   GW_INTERNET_ADDRESS,
@@ -187,27 +186,6 @@ async function makePingParcel(
     parcelSerialized: await parcel.serialize(gwPDAChain.peerEndpointPrivateKey),
     sessionKey: pingEncryption.dhPrivateKey,
   };
-}
-
-function serializePing(id: string, pda: Certificate, pdaCAs: readonly Certificate[]): Buffer {
-  const path = new CertificationPath(pda, pdaCAs);
-  const pdaPathSerialized = Buffer.from(path.serialize()).toString('base64');
-  const pingSerialized = JSON.stringify({
-    id,
-    internet_address: GW_INTERNET_ADDRESS,
-    pda_path: pdaPathSerialized,
-  });
-  return Buffer.from(pingSerialized);
-}
-
-async function deserializePong(
-  parcelSerialized: ArrayBuffer,
-  sessionKey: CryptoKey,
-): Promise<string> {
-  const parcel = await Parcel.deserialize(parcelSerialized);
-  const unwrapResult = await parcel.unwrapPayload(sessionKey);
-  const serviceMessageContent = unwrapResult.payload.content;
-  return serviceMessageContent.toString();
 }
 
 async function encapsulateParcelsInCargo(

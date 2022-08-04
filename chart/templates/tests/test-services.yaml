@@ -16,7 +16,7 @@ spec:
         - '--spider'
         - '-T'
         - '2'
-        - http://{{ include "relaynet-internet-gateway.fullname" . }}-pohttp:8080
+        - http://{{ include "relaynet-internet-gateway.fullname" . }}-pohttp:80
     - name: cogrpc
       image: busybox:1.32.0
       imagePullPolicy: IfNotPresent

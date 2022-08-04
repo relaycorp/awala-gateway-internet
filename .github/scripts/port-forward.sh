@@ -7,7 +7,7 @@ set -x
 # Ugly workaround for https://github.com/GoogleContainerTools/skaffold/issues/4022
 
 kubectl port-forward --address 127.0.0.1 svc/public-gateway-poweb 8080:8082 &
-kubectl port-forward --address 127.0.0.1 svc/public-gateway-pohttp 8081:8080 &
+kubectl port-forward --address 127.0.0.1 svc/public-gateway-pohttp 8081:80 &
 kubectl port-forward --address 127.0.0.1 svc/public-gateway-cogrpc 8082:8081 &
 kubectl port-forward --address 127.0.0.1 svc/pong-pohttp 8083:80 &
 kubectl port-forward --address 127.0.0.1 svc/nats 4222:4222 &

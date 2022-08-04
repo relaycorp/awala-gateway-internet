@@ -4,7 +4,6 @@ import {
   issueDeliveryAuthorization,
   issueEndpointCertificate,
   Parcel,
-  ParcelCollectionHandshakeSigner,
   ParcelDeliverySigner,
   PrivateNodeRegistrationRequest,
   StreamingMode,
@@ -15,16 +14,13 @@ import {
   RefusedParcelError,
   ServerError,
 } from '@relaycorp/relaynet-poweb';
-import { pipeline } from 'streaming-iterables';
 
-import { expectBuffersToEqual } from '../testUtils/buffers';
-import { asyncIterableToArray } from '../testUtils/iter';
 import { ExternalPdaChain } from '../testUtils/pki';
+import { GW_POWEB_HOST_PORT } from './utils/constants';
 import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
-import { GW_POWEB_HOST_PORT } from './utils/constants';
 import { collectNextParcel } from './utils/poweb';
 import { sleep } from './utils/timing';
 
@@ -68,7 +64,7 @@ describe('Parcel delivery and collection', () => {
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
-    const { parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
+    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
 
     await client.deliverParcel(
       parcelSerialized,
@@ -79,28 +75,13 @@ describe('Parcel delivery and collection', () => {
     );
 
     await sleep(2);
-
-    const parcelCollection = client.collectParcels(
-      [
-        new ParcelCollectionHandshakeSigner(
-          recipientChain.privateGatewayCert,
-          recipientChain.privateGatewayPrivateKey,
-        ),
-      ],
+    const incomingParcel = await collectNextParcel(
+      client,
+      recipientChain.privateGatewayCert,
+      recipientChain.privateGatewayPrivateKey,
       StreamingMode.CLOSE_UPON_COMPLETION,
     );
-    const incomingParcels = await pipeline(
-      () => parcelCollection,
-      async function* (collections): AsyncIterable<ArrayBuffer> {
-        for await (const collection of collections) {
-          yield await collection.parcelSerialized;
-          await collection.ack();
-        }
-      },
-      asyncIterableToArray,
-    );
-    expect(incomingParcels).toHaveLength(1);
-    expectBuffersToEqual(parcelSerialized, incomingParcels[0]);
+    expect(incomingParcel.id).toEqual(parcel.id);
   });
 
   test('Delivering and collecting a given parcel (keep alive)', async () => {
@@ -122,8 +103,8 @@ describe('Parcel delivery and collection', () => {
       client,
       recipientChain.privateGatewayCert,
       recipientChain.privateGatewayPrivateKey,
+      StreamingMode.KEEP_ALIVE,
     );
-
     expect(incomingParcel.id).toEqual(parcel.id);
   });
 

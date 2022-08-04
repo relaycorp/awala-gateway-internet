@@ -13,10 +13,11 @@ export async function collectNextParcel(
   powebClient: PoWebClient,
   privateGatewayCert: Certificate,
   privateGatewayPrivateKey: CryptoKey,
+  streamingMode: StreamingMode = StreamingMode.KEEP_ALIVE,
 ): Promise<Parcel> {
   const signer = new ParcelCollectionHandshakeSigner(privateGatewayCert, privateGatewayPrivateKey);
   const incomingParcels = await pipeline(
-    () => powebClient.collectParcels([signer], StreamingMode.KEEP_ALIVE),
+    () => powebClient.collectParcels([signer], streamingMode),
     async function* (collections): AsyncIterable<Parcel> {
       for await (const collection of collections) {
         yield await collection.deserializeAndValidateParcel();

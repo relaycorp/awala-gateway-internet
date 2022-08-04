@@ -19,7 +19,7 @@ import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
-import { GW_COGRPC_HOST_URL, GW_INTERNET_ADDRESS, GW_POHTTP_HOST_URL } from './utils/constants';
+import { GW_COGRPC_HOST, GW_INTERNET_ADDRESS, GW_POHTTP_HOST_URL } from './utils/constants';
 import { connectToNatsStreaming } from './utils/nats';
 import { sleep } from './utils/timing';
 
@@ -27,7 +27,7 @@ const TOMORROW = addDays(new Date(), 1);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.init(GW_COGRPC_HOST_URL);
+  cogRPCClient = await CogRPCClient.initInternet(GW_COGRPC_HOST);
 });
 afterEach(() => {
   cogRPCClient.close();

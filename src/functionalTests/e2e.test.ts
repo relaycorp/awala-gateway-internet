@@ -7,7 +7,7 @@ import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { generateCCA, generateCDAChain } from '../testUtils/pki';
 import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
 import {
-  GW_COGRPC_HOST_URL,
+  GW_COGRPC_HOST,
   GW_INTERNET_ADDRESS,
   GW_POWEB_HOST_PORT,
   IS_GITHUB,
@@ -48,7 +48,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pingId = uuid();
   const pingParcelData = await makePingParcel(pingId, pdaChain);
 
-  const cogRPCClient = await CogRPCClient.init(GW_COGRPC_HOST_URL);
+  const cogRPCClient = await CogRPCClient.initInternet(GW_COGRPC_HOST);
   try {
     // Deliver the ping message encapsulated in a cargo
     const cargoSerialized = await encapsulateMessagesInCargo(

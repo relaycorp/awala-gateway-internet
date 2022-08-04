@@ -12,7 +12,7 @@ import { connect as stanConnect, Stan } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_LOCAL_PORT } from './services';
+import { GW_POWEB_HOST_PORT } from './services';
 
 export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
 
@@ -46,7 +46,7 @@ export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayR
     sessionKey: publicGatewaySessionKey,
   } = await registerPrivateGateway(
     privateGatewayKeyPair,
-    PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
+    PoWebClient.initLocal(GW_POWEB_HOST_PORT),
   );
 
   const peerEndpointKeyPair = await generateRSAKeyPair();

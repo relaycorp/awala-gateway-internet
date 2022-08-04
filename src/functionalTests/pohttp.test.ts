@@ -13,7 +13,7 @@ import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray } from '../testUtils/iter';
-import { GW_POHTTP_LOCAL_URL, GW_POWEB_LOCAL_PORT } from './services';
+import { GW_POHTTP_HOST_URL, GW_POWEB_HOST_PORT } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway } from './utils';
 
 describe('PoHTTP server', () => {
@@ -35,10 +35,10 @@ describe('PoHTTP server', () => {
     const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
 
     // We should get a successful response
-    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized, { useTls: false });
+    await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
 
     // The parcel should've been safely stored
-    const poWebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const poWebClient = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const signer = new ParcelCollectionHandshakeSigner(
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
@@ -71,7 +71,7 @@ describe('PoHTTP server', () => {
     );
 
     await expect(
-      deliverParcel(GW_POHTTP_LOCAL_URL, await parcel.serialize(senderKeyPair.privateKey), {
+      deliverParcel(GW_POHTTP_HOST_URL, await parcel.serialize(senderKeyPair.privateKey), {
         useTls: false,
       }),
     ).rejects.toThrow(PoHTTPInvalidParcelError);

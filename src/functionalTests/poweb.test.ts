@@ -20,12 +20,12 @@ import { pipeline } from 'streaming-iterables';
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_LOCAL_PORT } from './services';
+import { GW_POWEB_HOST_PORT } from './services';
 import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';
 
 describe('Node registration', () => {
   test('Valid registration requests should be accepted', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const privateGatewayKeyPair = await generateRSAKeyPair();
 
     const registration = await registerPrivateGateway(privateGatewayKeyPair, client);
@@ -43,7 +43,7 @@ describe('Node registration', () => {
   });
 
   test('Registration request for different key should be refused', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const keyPair1 = await generateRSAKeyPair();
     const keyPair2 = await generateRSAKeyPair();
 
@@ -59,7 +59,7 @@ describe('Node registration', () => {
 
 describe('Parcel delivery and collection', () => {
   test('Delivering and collecting a given parcel (closing upon completion)', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
@@ -99,7 +99,7 @@ describe('Parcel delivery and collection', () => {
   });
 
   test('Delivering and collecting a given parcel (keep alive)', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
@@ -138,7 +138,7 @@ describe('Parcel delivery and collection', () => {
   });
 
   test('Invalid parcel deliveries should be refused', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const privateGatewayKeyPair = await generateRSAKeyPair();
     const privateGatewayRegistration = await registerPrivateGateway(privateGatewayKeyPair, client);
 
@@ -156,7 +156,7 @@ describe('Parcel delivery and collection', () => {
   });
 
   test('Invalid parcels should be refused', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const privateGatewayKeyPair = await generateRSAKeyPair();
     const privateGatewayRegistration = await registerPrivateGateway(privateGatewayKeyPair, client);
 

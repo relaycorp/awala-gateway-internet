@@ -24,15 +24,15 @@ import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../tes
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import { deserializePong, serializePing } from './pingSerialization';
 import {
-  GW_COGRPC_LOCAL_URL,
+  GW_COGRPC_HOST_URL,
   GW_INTERNET_ADDRESS,
-  GW_POWEB_LOCAL_PORT,
+  GW_POWEB_HOST_PORT,
   PONG_LOCAL_URL,
 } from './services';
 import { createAndRegisterPrivateGateway, IS_GITHUB, sleep } from './utils';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
-  const powebClient = PoWebClient.initLocal(GW_POWEB_LOCAL_PORT);
+  const powebClient = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
   const { pdaChain } = await createAndRegisterPrivateGateway();
 
   const pingId = uuid();
@@ -78,7 +78,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pingId = uuid();
   const pingParcelData = await makePingParcel(pingId, pdaChain);
 
-  const cogRPCClient = await CogRPCClient.init(GW_COGRPC_LOCAL_URL);
+  const cogRPCClient = await CogRPCClient.init(GW_COGRPC_HOST_URL);
   try {
     // Deliver the ping message encapsulated in a cargo
     const cargoSerialized = await encapsulateParcelsInCargo(

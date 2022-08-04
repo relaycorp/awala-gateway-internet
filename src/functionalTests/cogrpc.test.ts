@@ -18,14 +18,14 @@ import { expectBuffersToEqual } from '../testUtils/buffers';
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
-import { GW_COGRPC_LOCAL_URL, GW_INTERNET_ADDRESS, GW_POHTTP_LOCAL_URL } from './services';
+import { GW_COGRPC_HOST_URL, GW_INTERNET_ADDRESS, GW_POHTTP_HOST_URL } from './services';
 import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';
 
 const TOMORROW = addDays(new Date(), 1);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.init(GW_COGRPC_LOCAL_URL);
+  cogRPCClient = await CogRPCClient.init(GW_COGRPC_HOST_URL);
 });
 afterEach(() => {
   cogRPCClient.close();
@@ -81,7 +81,7 @@ describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const parcelSerialized = await generateDummyParcel(pdaChain);
-    await deliverParcel(GW_POHTTP_LOCAL_URL, parcelSerialized, { useTls: false });
+    await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
 
     await sleep(1);
 
@@ -106,7 +106,7 @@ describe('Cargo collection', () => {
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
-    await deliverParcel(GW_POHTTP_LOCAL_URL, await generateDummyParcel(pdaChain), {
+    await deliverParcel(GW_POHTTP_HOST_URL, await generateDummyParcel(pdaChain), {
       useTls: false,
     });
 

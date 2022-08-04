@@ -27,7 +27,7 @@ const TOMORROW = addDays(new Date(), 1);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.initInternet(GW_COGRPC_HOST);
+  cogRPCClient = await CogRPCClient.initLan(GW_COGRPC_HOST);
 });
 afterEach(() => {
   cogRPCClient.close();

@@ -48,7 +48,7 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
   const pingId = uuid();
   const pingParcelData = await makePingParcel(pingId, pdaChain);
 
-  const cogRPCClient = await CogRPCClient.initInternet(GW_COGRPC_HOST);
+  const cogRPCClient = await CogRPCClient.initLan(GW_COGRPC_HOST);
   try {
     // Deliver the ping message encapsulated in a cargo
     const cargoSerialized = await encapsulateMessagesInCargo(

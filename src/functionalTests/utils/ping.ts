@@ -29,41 +29,6 @@ export function serializePing(
   return Buffer.from(pingSerialized);
 }
 
-export async function deserializePong(
-  parcelSerialized: ArrayBuffer,
-  sessionKey: CryptoKey,
-): Promise<string> {
-  const parcel = await Parcel.deserialize(parcelSerialized);
-  const unwrapResult = await parcel.unwrapPayload(sessionKey);
-  const serviceMessageContent = unwrapResult.payload.content;
-  return serviceMessageContent.toString();
-}
-
-async function getPongConnectionParams(): Promise<PublicNodeConnectionParams> {
-  const connectionParamsSerialization = await downloadFileFromURL(
-    `${PONG_LOCAL_URL}/connection-params.der`,
-  );
-  return PublicNodeConnectionParams.deserialize(bufferToArray(connectionParamsSerialization));
-}
-
-async function downloadFileFromURL(url: string): Promise<Buffer> {
-  // tslint:disable-next-line:readonly-array
-  const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
-    httpGet(url, { timeout: 2_000 }, (response) => {
-      if (response.statusCode !== 200) {
-        return reject(new Error(`Failed to download ${url} (HTTP ${response.statusCode})`));
-      }
-
-      response.on('error', reject);
-
-      response.on('data', (chunk) => chunks.push(chunk));
-
-      response.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-  });
-}
-
 export async function makePingParcel(
   pingId: string,
   gwPDAChain: ExternalPdaChain,
@@ -102,4 +67,35 @@ export async function makePingParcel(
     parcelSerialized: await parcel.serialize(gwPDAChain.peerEndpointPrivateKey),
     sessionKey: pingEncryption.dhPrivateKey,
   };
+}
+
+export async function extractPong(parcel: Parcel, sessionKey: CryptoKey): Promise<string> {
+  const unwrapResult = await parcel.unwrapPayload(sessionKey);
+  const serviceMessageContent = unwrapResult.payload.content;
+  return serviceMessageContent.toString();
+}
+
+async function getPongConnectionParams(): Promise<PublicNodeConnectionParams> {
+  const connectionParamsSerialization = await downloadFileFromURL(
+    `${PONG_LOCAL_URL}/connection-params.der`,
+  );
+  return PublicNodeConnectionParams.deserialize(bufferToArray(connectionParamsSerialization));
+}
+
+async function downloadFileFromURL(url: string): Promise<Buffer> {
+  // tslint:disable-next-line:readonly-array
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    httpGet(url, { timeout: 2_000 }, (response) => {
+      if (response.statusCode !== 200) {
+        return reject(new Error(`Failed to download ${url} (HTTP ${response.statusCode})`));
+      }
+
+      response.on('error', reject);
+
+      response.on('data', (chunk) => chunks.push(chunk));
+
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+  });
 }

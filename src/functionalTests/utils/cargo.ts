@@ -1,4 +1,11 @@
-import { Cargo, CargoMessageSet, SessionEnvelopedData, SessionKey } from '@relaycorp/relaynet-core';
+import {
+  Cargo,
+  CargoMessageSet,
+  SessionEnvelopedData,
+  SessionKey,
+  CargoMessageSetItem,
+  Certificate,
+} from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 
 import { ExternalPdaChain } from '../../testUtils/pki';
@@ -27,11 +34,11 @@ export async function encapsulateMessagesInCargo(
 
 export async function extractMessagesFromCargo(
   cargoSerialized: Buffer,
-  recipientId: string,
+  recipientCertificate: Certificate,
   recipientSessionPrivateKey: CryptoKey,
-): Promise<readonly ArrayBuffer[]> {
+): Promise<readonly CargoMessageSetItem[]> {
   const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-  expect(cargo.recipient.id).toEqual(recipientId);
+  await cargo.validate([recipientCertificate]);
   const { payload: cargoMessageSet } = await cargo.unwrapPayload(recipientSessionPrivateKey);
-  return Array.from(cargoMessageSet.messages);
+  return Promise.all(cargoMessageSet.messages.map(CargoMessageSet.deserializeItem));
 }

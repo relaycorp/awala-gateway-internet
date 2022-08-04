@@ -1,66 +1,45 @@
 import { CogRPCClient } from '@relaycorp/cogrpc';
-import {
-  ParcelCollectionAck,
-  ParcelCollectionHandshakeSigner,
-  ParcelDeliverySigner,
-  StreamingMode,
-} from '@relaycorp/relaynet-core';
+import { Parcel, ParcelCollectionAck, ParcelDeliverySigner } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
-import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
+import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { generateCCA, generateCDAChain } from '../testUtils/pki';
-import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
+import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
 import {
   GW_COGRPC_HOST_URL,
   GW_INTERNET_ADDRESS,
   GW_POWEB_HOST_PORT,
   IS_GITHUB,
 } from './utils/constants';
+import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
+import { extractPong, makePingParcel } from './utils/ping';
+import { collectNextParcel } from './utils/poweb';
 import { sleep } from './utils/timing';
-import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
-import { deserializePong, makePingParcel } from './utils/ping';
 
 test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
   const powebClient = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
   const { pdaChain } = await createAndRegisterPrivateGateway();
 
   const pingId = uuid();
-  const pingParcelData = await makePingParcel(pingId, pdaChain);
+  const { parcelSerialized: pingParcelSerialized, sessionKey } = await makePingParcel(
+    pingId,
+    pdaChain,
+  );
 
   // Deliver the ping message
   await powebClient.deliverParcel(
-    pingParcelData.parcelSerialized,
+    pingParcelSerialized,
     new ParcelDeliverySigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey),
   );
 
   // Collect the pong message once it's been received
-  const incomingParcels = await pipeline(
-    () =>
-      powebClient.collectParcels(
-        [
-          new ParcelCollectionHandshakeSigner(
-            pdaChain.privateGatewayCert,
-            pdaChain.privateGatewayPrivateKey,
-          ),
-        ],
-        StreamingMode.KEEP_ALIVE,
-      ),
-    async function* (collections): AsyncIterable<ArrayBuffer> {
-      for await (const collection of collections) {
-        yield collection.parcelSerialized;
-        await collection.ack();
-      }
-    },
-    iterableTake(1),
-    asyncIterableToArray,
+  const pongParcel = await collectNextParcel(
+    powebClient,
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
   );
-  expect(incomingParcels).toHaveLength(1);
-
-  await expect(deserializePong(incomingParcels[0], pingParcelData.sessionKey)).resolves.toEqual(
-    pingId,
-  );
+  await expect(extractPong(pongParcel, sessionKey)).resolves.toEqual(pingId);
 });
 
 test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
@@ -98,15 +77,16 @@ test('Sending pings via CogRPC and receiving pongs via PoHTTP', async () => {
     expect(collectedCargoes).toHaveLength(1);
     const collectedMessages = await extractMessagesFromCargo(
       collectedCargoes[0],
-      await pdaChain.privateGatewayCert.calculateSubjectId(),
+      pdaChain.privateGatewayCert,
       sessionPrivateKey,
     );
     expect(collectedMessages).toHaveLength(2);
-    expect(ParcelCollectionAck.deserialize(collectedMessages[0])).toHaveProperty(
-      'parcelId',
-      pingParcelData.parcelId,
-    );
-    await expect(deserializePong(collectedMessages[1], pingParcelData.sessionKey)).resolves.toEqual(
+    const collectionAck = collectedMessages[0];
+    expect(collectionAck).toBeInstanceOf(ParcelCollectionAck);
+    expect(collectionAck).toHaveProperty('parcelId', pingParcelData.parcelId);
+    const pongParcel = collectedMessages[1];
+    expect(pongParcel).toBeInstanceOf(Parcel);
+    await expect(extractPong(pongParcel as Parcel, pingParcelData.sessionKey)).resolves.toEqual(
       pingId,
     );
   } finally {

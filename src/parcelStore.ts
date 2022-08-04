@@ -181,10 +181,10 @@ export class ParcelStore {
     natsStreamingConnection: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {
-    const isBoundForPrivateGateway =
+    const isForAnotherPrivatePeer =
       !parcel.recipient.internetAddress ||
       parcel.recipient.internetAddress === this.internetAddress;
-    if (isBoundForPrivateGateway) {
+    if (isForAnotherPrivatePeer) {
       return this.storeParcelForPrivatePeer(
         parcel,
         parcelSerialized,

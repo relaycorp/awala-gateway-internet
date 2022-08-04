@@ -60,9 +60,10 @@ export async function registerPrivateGateway(
   client: PoWebClient,
 ): Promise<PrivateNodeRegistration> {
   const authorizationSerialized = await client.preRegisterNode(privateGatewayKeyPair.publicKey);
-  const registrationRequest = new PrivateNodeRegistrationRequest(
+  const request = new PrivateNodeRegistrationRequest(
     privateGatewayKeyPair.publicKey,
     authorizationSerialized,
   );
-  return client.registerNode(await registrationRequest.serialize(privateGatewayKeyPair.privateKey));
+  const requestSerialized = await request.serialize(privateGatewayKeyPair.privateKey);
+  return client.registerNode(requestSerialized);
 }

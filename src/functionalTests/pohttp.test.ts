@@ -13,8 +13,9 @@ import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray } from '../testUtils/iter';
-import { GW_POHTTP_HOST_URL, GW_POWEB_HOST_PORT } from './services';
-import { connectToNatsStreaming, createAndRegisterPrivateGateway } from './utils';
+import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
+import { GW_POHTTP_HOST_URL, GW_POWEB_HOST_PORT } from './utils/constants';
+import { connectToNatsStreaming } from './utils/nats';
 
 describe('PoHTTP server', () => {
   let stanConnection: Stan;

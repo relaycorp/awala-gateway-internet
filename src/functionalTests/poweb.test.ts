@@ -20,8 +20,12 @@ import { pipeline } from 'streaming-iterables';
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_HOST_PORT } from './services';
-import { createAndRegisterPrivateGateway, registerPrivateGateway, sleep } from './utils';
+import {
+  createAndRegisterPrivateGateway,
+  registerPrivateGateway,
+} from './utils/gatewayRegistration';
+import { GW_POWEB_HOST_PORT } from './utils/constants';
+import { sleep } from './utils/timing';
 
 describe('Node registration', () => {
   test('Valid registration requests should be accepted', async () => {

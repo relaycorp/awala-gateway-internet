@@ -7,31 +7,9 @@ import {
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Stan } from 'node-nats-streaming';
-import uuid from 'uuid-random';
 
-import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_HOST_PORT } from './services';
-
-export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
-
-export async function sleep(seconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, seconds * 1_000));
-}
-
-export function connectToNatsStreaming(): Promise<Stan> {
-  return new Promise((resolve) => {
-    const stanConnection = stanConnect(
-      getEnvVar('NATS_CLUSTER_ID').required().asString(),
-      `functional-tests-${uuid()}`,
-      {
-        url: getEnvVar('NATS_SERVER_URL').required().asString(),
-      },
-    );
-    stanConnection.on('connect', resolve);
-  });
-}
+import { ExternalPdaChain } from '../../testUtils/pki';
+import { GW_POWEB_HOST_PORT } from './constants';
 
 export interface PrivateGatewayRegistration {
   readonly pdaChain: ExternalPdaChain;

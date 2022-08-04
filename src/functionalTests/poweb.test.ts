@@ -18,13 +18,14 @@ import {
 import { pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
-import { asyncIterableToArray, iterableTake } from '../testUtils/iter';
+import { asyncIterableToArray } from '../testUtils/iter';
 import { ExternalPdaChain } from '../testUtils/pki';
 import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
 import { GW_POWEB_HOST_PORT } from './utils/constants';
+import { collectNextParcel } from './utils/poweb';
 import { sleep } from './utils/timing';
 
 describe('Node registration', () => {
@@ -67,7 +68,7 @@ describe('Parcel delivery and collection', () => {
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
-    const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
+    const { parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
 
     await client.deliverParcel(
       parcelSerialized,
@@ -107,7 +108,7 @@ describe('Parcel delivery and collection', () => {
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
 
-    const parcelSerialized = await generateDummyParcel(senderChain, recipientChain);
+    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
 
     await client.deliverParcel(
       parcelSerialized,
@@ -117,28 +118,13 @@ describe('Parcel delivery and collection', () => {
       ),
     );
 
-    const incomingParcels = await pipeline(
-      () =>
-        client.collectParcels(
-          [
-            new ParcelCollectionHandshakeSigner(
-              recipientChain.privateGatewayCert,
-              recipientChain.privateGatewayPrivateKey,
-            ),
-          ],
-          StreamingMode.KEEP_ALIVE,
-        ),
-      async function* (collections): AsyncIterable<ArrayBuffer> {
-        for await (const collection of collections) {
-          yield await collection.parcelSerialized;
-          await collection.ack();
-        }
-      },
-      iterableTake(1),
-      asyncIterableToArray,
+    const incomingParcel = await collectNextParcel(
+      client,
+      recipientChain.privateGatewayCert,
+      recipientChain.privateGatewayPrivateKey,
     );
-    expect(incomingParcels).toHaveLength(1);
-    expectBuffersToEqual(parcelSerialized, incomingParcels[0]);
+
+    expect(incomingParcel.id).toEqual(parcel.id);
   });
 
   test('Invalid parcel deliveries should be refused', async () => {
@@ -191,10 +177,15 @@ describe('Parcel delivery and collection', () => {
   });
 });
 
+interface GeneratedParcel {
+  readonly parcel: Parcel;
+  readonly parcelSerialized: ArrayBuffer;
+}
+
 async function generateDummyParcel(
   senderChain: ExternalPdaChain,
   recipientChain: ExternalPdaChain,
-): Promise<ArrayBuffer> {
+): Promise<GeneratedParcel> {
   const recipientEndpointCertificate = recipientChain.peerEndpointCert;
   const sendingEndpointCertificate = await issueDeliveryAuthorization({
     issuerCertificate: recipientEndpointCertificate,
@@ -211,5 +202,6 @@ async function generateDummyParcel(
       senderCaCertificateChain: [recipientEndpointCertificate, recipientChain.privateGatewayCert],
     },
   );
-  return parcel.serialize(senderChain.peerEndpointPrivateKey);
+  const parcelSerialized = await parcel.serialize(senderChain.peerEndpointPrivateKey);
+  return { parcel, parcelSerialized };
 }

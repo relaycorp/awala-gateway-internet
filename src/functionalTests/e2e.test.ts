@@ -27,13 +27,11 @@ test('Sending pings via PoWeb and receiving pongs via PoHTTP', async () => {
     pdaChain,
   );
 
-  // Deliver the ping message
   await powebClient.deliverParcel(
     pingParcelSerialized,
     new ParcelDeliverySigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey),
   );
 
-  // Collect the pong message once it's been received
   const pongParcel = await collectNextParcel(
     powebClient,
     pdaChain.privateGatewayCert,

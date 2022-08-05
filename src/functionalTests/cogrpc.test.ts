@@ -11,6 +11,7 @@ import {
   Recipient,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
+import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
@@ -26,13 +27,15 @@ import {
   GW_COGRPC_HOST,
   GW_INTERNET_ADDRESS,
   GW_POHTTP_HOST_URL,
-  IS_GITHUB,
+  GW_POWEB_HOST_PORT,
 } from './utils/constants';
 import { connectToNatsStreaming } from './utils/nats';
 import { extractPong, makePingParcel } from './utils/ping';
-import { sleep } from './utils/timing';
+import { waitForNextParcel } from './utils/poweb';
 
 const TOMORROW = addDays(new Date(), 1);
+
+const POWEB_CLIENT = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
@@ -93,8 +96,7 @@ describe('Cargo collection', () => {
     const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const parcelSerialized = await generateDummyParcel(pdaChain);
     await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
-
-    await sleep(1);
+    await waitForNextParcel(POWEB_CLIENT, pdaChain);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
@@ -120,8 +122,7 @@ describe('Cargo collection', () => {
     await deliverParcel(GW_POHTTP_HOST_URL, await generateDummyParcel(pdaChain), {
       useTls: false,
     });
-
-    await sleep(1);
+    await waitForNextParcel(POWEB_CLIENT, pdaChain);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
@@ -198,8 +199,6 @@ test('Sending pings and receiving pongs', async () => {
     ),
   );
 
-  await sleep(IS_GITHUB ? 4 : 2);
-
   // Collect the pong message encapsulated in a cargo
   const cdaChain = await generateCDAChain(pdaChain);
   const { ccaSerialized, sessionPrivateKey } = await generateCCA(
@@ -209,6 +208,7 @@ test('Sending pings and receiving pongs', async () => {
     pdaChain.privateGatewayCert,
     pdaChain.privateGatewayPrivateKey,
   );
+  await waitForNextParcel(POWEB_CLIENT, pdaChain);
   const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
   expect(collectedCargoes).toHaveLength(1);
   const collectedMessages = await extractMessagesFromCargo(

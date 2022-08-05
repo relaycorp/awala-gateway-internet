@@ -8,16 +8,19 @@ import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { pipeline } from 'streaming-iterables';
 
 import { asyncIterableToArray, iterableTake } from '../../testUtils/iter';
+import { ExternalPdaChain } from '../../testUtils/pki';
 
 /**
  * Wait for a parcel to become available for collection but don't actually collect it.
  */
 export async function waitForNextParcel(
   client: PoWebClient,
-  privateGatewayCert: Certificate,
-  privateGatewayPrivateKey: CryptoKey,
+  pdaChain: ExternalPdaChain,
 ): Promise<void> {
-  const signer = new ParcelCollectionHandshakeSigner(privateGatewayCert, privateGatewayPrivateKey);
+  const signer = new ParcelCollectionHandshakeSigner(
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
+  );
   await pipeline(
     () => client.collectParcels([signer], StreamingMode.KEEP_ALIVE),
     iterableTake(1),

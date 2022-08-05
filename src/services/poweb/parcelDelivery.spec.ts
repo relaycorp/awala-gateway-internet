@@ -167,7 +167,7 @@ test('Well-formed yet invalid parcels should be refused with an HTTP 422 respons
   expect(logging.logs).toContainEqual(
     partialPinoLog('info', 'Invalid parcel', {
       err: expect.objectContaining({ message: error.message }),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
@@ -200,14 +200,14 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
   expect(logging.logs).toContainEqual(
     partialPinoLog('debug', 'Parcel is well-formed', {
       parcelId: PARCEL.id,
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
   expect(logging.logs).toContainEqual(
     partialPinoLog('info', 'Parcel was successfully stored', {
       parcelId: PARCEL.id,
       parcelObjectKey: expect.stringContaining(PARCEL.id),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
@@ -238,7 +238,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
   expect(logging.logs).toContainEqual(
     partialPinoLog('error', 'Failed to save parcel', {
       err: expect.objectContaining({ message: error.message }),
-      peerGatewayAddress: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     }),
   );
 });

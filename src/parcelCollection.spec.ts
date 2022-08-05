@@ -109,7 +109,7 @@ describe('generatePCAs', () => {
     });
   });
 
-  test('PCAs should be limited to specified peer gateway', async () => {
+  test('PCAs should be limited to specified peer', async () => {
     await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     expect(MOCK_MONGOOSE_FIND).toBeCalledTimes(1);

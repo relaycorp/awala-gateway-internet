@@ -301,7 +301,7 @@ describe('CCA validation', () => {
         ccaRecipient: malformedCCA.recipient,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayId,
+        privatePeerId: privateGatewayId,
       }),
     );
     expect(error).toEqual({
@@ -358,7 +358,7 @@ describe('CCA validation', () => {
         err: expect.objectContaining({ type: InvalidMessageError.name }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: await ccaSenderCertificate.calculateSubjectId(),
+        privatePeerId: await ccaSenderCertificate.calculateSubjectId(),
       }),
     );
     expect(error).toEqual({
@@ -379,7 +379,7 @@ describe('CCA validation', () => {
       partialPinoLog('info', 'Refusing CCA that was already fulfilled', {
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayId,
+        privatePeerId: privateGatewayId,
       }),
     );
     expect(error).toEqual({
@@ -423,7 +423,7 @@ test('Parcels retrieved should be limited to sender of CCA', async () => {
 
   expect(MOCK_RETRIEVE_ACTIVE_PARCELS).toBeCalledWith(
     privateGatewayId,
-    partialPinoLogger({ peerGatewayAddress: privateGatewayId }) as any,
+    partialPinoLogger({ privatePeerId: privateGatewayId }) as any,
   );
 });
 
@@ -555,7 +555,7 @@ test('CCA fulfillment should be logged and end the call', async () => {
       cargoesCollected: 0,
       grpcClient: CALL.getPeer(),
       grpcMethod: 'collectCargo',
-      peerGatewayAddress: privateGatewayId,
+      privatePeerId: privateGatewayId,
     }),
   );
   expect(CALL.end).toBeCalledWith();
@@ -623,7 +623,7 @@ describe('Private gateway certificate rotation', () => {
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Sending certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayId,
+        privatePeerId: privateGatewayId,
       }),
     );
   });
@@ -649,8 +649,8 @@ describe('Private gateway certificate rotation', () => {
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('debug', 'Skipping certificate rotation', {
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayId,
-        peerGatewayCertificateExpiry: expiringPDAChain.privateGateway.expiryDate.toISOString(),
+        privatePeerId: privateGatewayId,
+        privatePeerCertificateExpiry: expiringPDAChain.privateGateway.expiryDate.toISOString(),
       }),
     );
   });
@@ -673,7 +673,7 @@ describe('Errors while generating cargo', () => {
         err: expect.objectContaining({ message: err.message }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'collectCargo',
-        peerGatewayAddress: privateGatewayId,
+        privatePeerId: privateGatewayId,
       }),
     );
   });

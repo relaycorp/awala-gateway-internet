@@ -324,7 +324,7 @@ describe('Handshake', () => {
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Handshake completed successfully', {
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -342,11 +342,11 @@ describe('Keep alive', () => {
     expect(client.popOldestPeerMessage()).toBeUndefined();
     expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).toBeCalledWith(
       privatePeerId,
-      partialPinoLogger({ peerGatewayAddress: privatePeerId, reqId: expect.anything() }),
+      partialPinoLogger({ privatePeerId, reqId: expect.anything() }),
     );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'All parcels were acknowledged shortly after the last one was sent', {
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -384,7 +384,7 @@ describe('Keep alive', () => {
       privatePeerId,
       MOCK_NATS_STREAMING_CLIENT,
       expect.anything(),
-      partialPinoLogger({ peerGatewayAddress: privatePeerId, reqId: expect.anything() }),
+      partialPinoLogger({ privatePeerId, reqId: expect.anything() }),
     );
     expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
     expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).not.toBeCalled();
@@ -416,7 +416,7 @@ describe('Keep alive', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('warn', 'Failed to subscribe to NATS queue to live stream active parcels', {
         err: expect.objectContaining({ message: error.message }),
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -438,7 +438,7 @@ describe('Keep alive', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('error', 'Failed to live stream parcels', {
         err: expect.objectContaining({ message: error.message }),
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -464,7 +464,7 @@ test('Server should send parcel to client', async () => {
   expect(mockLogging.logs).toContainEqual(
     partialPinoLog('info', 'Sending parcel', {
       reqId: UUID4_REGEX,
-      peerGatewayAddress: privatePeerId,
+      privatePeerId,
     }),
   );
 });
@@ -510,7 +510,7 @@ describe('Acknowledgements', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Acknowledgement received', {
         parcelObjectKey: parcelStreamMessage.parcelObjectKey,
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -552,7 +552,7 @@ describe('Acknowledgements', () => {
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -577,7 +577,7 @@ describe('Acknowledgements', () => {
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );
@@ -618,7 +618,7 @@ describe('Acknowledgements', () => {
 
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Closing connection after all parcels have been acknowledged', {
-        peerGatewayAddress: privatePeerId,
+        privatePeerId,
         reqId: UUID4_REGEX,
       }),
     );

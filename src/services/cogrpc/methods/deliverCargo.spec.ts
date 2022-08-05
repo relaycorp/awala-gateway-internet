@@ -115,7 +115,7 @@ describe('Cargo processing', () => {
         err: expect.objectContaining({ type: RAMFSyntaxError.name }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: null,
+        privatePeerId: null,
       }),
     );
   });
@@ -150,7 +150,7 @@ describe('Cargo processing', () => {
         err: expect.objectContaining({ type: InvalidMessageError.name }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: await invalidCargo.senderCertificate.calculateSubjectId(),
+        privatePeerId: await invalidCargo.senderCertificate.calculateSubjectId(),
       }),
     );
   });
@@ -173,7 +173,7 @@ describe('Cargo processing', () => {
         cargoId: cargo.id,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: privateGatewayId,
+        privatePeerId: privateGatewayId,
       }),
     );
   });

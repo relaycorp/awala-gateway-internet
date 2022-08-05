@@ -81,7 +81,7 @@ const OBJECT_STORE_BUCKET = 'the-bucket';
 const MOCK_OBJECT_STORE_CLIENT = { what: 'object store client' };
 mockSpy(jest.spyOn(objectStorage, 'initObjectStoreFromEnv'), () => MOCK_OBJECT_STORE_CLIENT);
 mockSpy(jest.spyOn(ParcelStore.prototype, 'deleteParcelForPrivatePeer'), () => undefined);
-const mockStoreParcelFromPeerGateway = mockSpy(
+const mockStoreParcelFromPrivatePeer = mockSpy(
   jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
   async (parcel: Parcel) => {
     return `parcels/${parcel.id}`;
@@ -243,7 +243,7 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
     partialPinoLog('info', 'Cargo payload is invalid', {
       cargoId: cargo.id,
       err: expect.objectContaining({ message: expect.stringMatching(/Could not deserialize/) }),
-      peerGatewayAddress: await cargo.senderCertificate.calculateSubjectId(),
+      privatePeerId: await cargo.senderCertificate.calculateSubjectId(),
       worker: STUB_WORKER_NAME,
     }),
   );
@@ -320,7 +320,7 @@ describe('Parcel processing', () => {
 
     await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-    expect(mockStoreParcelFromPeerGateway).toBeCalledWith(
+    expect(mockStoreParcelFromPrivatePeer).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       Buffer.from(PARCEL_SERIALIZED),
       await certificateChain.privateGatewayCert.calculateSubjectId(),
@@ -334,14 +334,14 @@ describe('Parcel processing', () => {
         parcelId: PARCEL.id,
         parcelObjectKey: `parcels/${PARCEL.id}`,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectId(),
-        peerGatewayAddress: await certificateChain.privateGatewayCert.calculateSubjectId(),
+        privatePeerId: await certificateChain.privateGatewayCert.calculateSubjectId(),
         worker: STUB_WORKER_NAME,
       }),
     );
   });
 
   test('Parcels previously received should be ignored', async () => {
-    mockStoreParcelFromPeerGateway.mockResolvedValue(null);
+    mockStoreParcelFromPrivatePeer.mockResolvedValue(null);
 
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
@@ -356,14 +356,14 @@ describe('Parcel processing', () => {
         parcelId: PARCEL.id,
         parcelObjectKey: null,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectId(),
-        peerGatewayAddress: await certificateChain.privateGatewayCert.calculateSubjectId(),
+        privatePeerId: await certificateChain.privateGatewayCert.calculateSubjectId(),
         worker: STUB_WORKER_NAME,
       }),
     );
   });
 
   test('Well-formed yet invalid parcels should be logged and ignored', async () => {
-    mockStoreParcelFromPeerGateway.mockRejectedValue(new InvalidMessageError('Oops'));
+    mockStoreParcelFromPrivatePeer.mockRejectedValue(new InvalidMessageError('Oops'));
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(certificateChain.privateGatewayPrivateKey)),
@@ -375,7 +375,7 @@ describe('Parcel processing', () => {
       partialPinoLog('info', 'Parcel is invalid', {
         cargoId: cargo.id,
         err: expect.objectContaining({ type: InvalidMessageError.name }),
-        peerGatewayAddress: await certificateChain.privateGatewayCert.calculateSubjectId(),
+        privatePeerId: await certificateChain.privateGatewayCert.calculateSubjectId(),
         worker: STUB_WORKER_NAME,
       }),
     );
@@ -383,7 +383,7 @@ describe('Parcel processing', () => {
 
   test('Errors in backing services should be propagated', async () => {
     const error = new Error('Oops');
-    mockStoreParcelFromPeerGateway.mockRejectedValue(error);
+    mockStoreParcelFromPrivatePeer.mockRejectedValue(error);
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
       mockStanMessage(await cargo.serialize(certificateChain.privateGatewayPrivateKey)),
@@ -437,7 +437,7 @@ test('CertificateRotation messages should be ignored', async () => {
   expect(mockLogging.logs).toContainEqual(
     partialPinoLog('info', 'Ignoring certificate rotation message', {
       cargoId: (await Cargo.deserialize(cargoSerialized)).id,
-      peerGatewayAddress: cargoSenderAddress,
+      privatePeerId: cargoSenderAddress,
       worker: STUB_WORKER_NAME,
     }),
   );
@@ -479,7 +479,7 @@ test('Cargo containing invalid messages should be logged and ignored', async () 
     partialPinoLog('info', 'Cargo contains an invalid message', {
       cargoId: (await Cargo.deserialize(stubCargo1Serialized)).id,
       err: expect.objectContaining({ type: InvalidMessageError.name }),
-      peerGatewayAddress: cargoSenderAddress,
+      privatePeerId: cargoSenderAddress,
       worker: STUB_WORKER_NAME,
     }),
   );

@@ -42,11 +42,11 @@ export interface ParcelStreamMessage {
 }
 
 function makeParcelObjectKeyForInternetPeer(
-  peerGatewayAddress: string,
+  privatePeerId: string,
   senderId: string,
   parcel: Parcel,
 ): string {
-  return [peerGatewayAddress, senderId, parcel.recipient.id, sha256Hex(parcel.id)].join('/');
+  return [privatePeerId, senderId, parcel.recipient.id, sha256Hex(parcel.id)].join('/');
 }
 
 export class ParcelStore {
@@ -64,27 +64,27 @@ export class ParcelStore {
   ) {}
 
   /**
-   * Output existing and new parcels for `peerGatewayAddress` until `abortSignal` is triggered,
+   * Output existing and new parcels for `privatePeerId` until `abortSignal` is triggered,
    * excluding expired ones.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param natsStreamingClient
    * @param abortSignal
    * @param logger
    * @throws NatsStreamingSubscriptionError
    */
   public async *liveStreamParcelsForPrivatePeer(
-    peerGatewayAddress: string,
+    privatePeerId: string,
     natsStreamingClient: NatsStreamingClient,
     abortSignal: AbortSignal,
     logger: Logger,
   ): AsyncIterable<ParcelStreamMessage> {
-    const peerAwareLogger = logger.child({ peerGatewayAddress });
+    const peerAwareLogger = logger.child({ privatePeerId });
 
     const parcelMessages = natsStreamingClient.makeQueueConsumer(
-      makePeerGatewayNATSChannel(peerGatewayAddress),
+      makeInternetPeerNATSChannel(privatePeerId),
       'active-parcels',
-      peerGatewayAddress,
+      privatePeerId,
       abortSignal,
     );
 
@@ -117,15 +117,15 @@ export class ParcelStore {
   }
 
   /**
-   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * Output existing parcels bound for `privatePeerId`, ignoring new parcels received during
    * the lifespan of the function call, and giving the option to delete the parcel from each item
    * in the result.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param logger
    */
   public async *streamParcelsForPrivatePeer(
-    peerGatewayAddress: string,
+    privatePeerId: string,
     logger: Logger,
   ): AsyncIterable<ParcelStreamMessage> {
     const objectStoreClient = this.objectStoreClient;
@@ -147,23 +147,23 @@ export class ParcelStore {
     }
 
     yield* await pipeline(
-      () => this.retrieveParcelsForPrivatePeer(peerGatewayAddress, logger),
+      () => this.retrieveParcelsForPrivatePeer(privatePeerId, logger),
       buildStream,
     );
   }
 
   /**
-   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * Output existing parcels bound for `privatePeerId`, ignoring new parcels received during
    * the lifespan of the function call.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param logger
    */
   public async *retrieveParcelsForPrivatePeer(
-    peerGatewayAddress: string,
+    privatePeerId: string,
     logger: Logger,
   ): AsyncIterable<ParcelObject<null>> {
-    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${peerGatewayAddress}/`;
+    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${privatePeerId}/`;
     yield* await pipeline(
       () => this.objectStoreClient.listObjectKeys(prefix, this.bucket),
       buildParcelObjectMetadataFromString,
@@ -174,7 +174,7 @@ export class ParcelStore {
   public async storeParcelFromPrivatePeer(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    peerGatewayAddress: string,
+    privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingConnection: NatsStreamingClient,
     logger: BasicLogger,
@@ -194,7 +194,7 @@ export class ParcelStore {
     return this.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privatePeerId,
       mongooseConnection,
       natsStreamingConnection,
       logger,
@@ -202,7 +202,7 @@ export class ParcelStore {
   }
 
   /**
-   * Store a parcel bound for a private endpoint served by a peer gateway.
+   * Store a parcel bound for a private endpoint served by a private peer.
    *
    * @param parcel
    * @param parcelSerialized
@@ -244,7 +244,7 @@ export class ParcelStore {
 
     await natsStreamingClient.publishMessage(
       key,
-      makePeerGatewayNATSChannel(privateGatewayAddress),
+      makeInternetPeerNATSChannel(privateGatewayAddress),
     );
     keyAwareLogger.debug('Parcel storage was successfully published on NATS');
 
@@ -287,7 +287,7 @@ export class ParcelStore {
    *
    * @param parcel
    * @param parcelSerialized
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param mongooseConnection
    * @param natsStreamingClient
    * @param logger
@@ -296,7 +296,7 @@ export class ParcelStore {
   public async storeParcelForInternetPeer(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    peerGatewayAddress: string,
+    privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
@@ -306,17 +306,13 @@ export class ParcelStore {
     await parcel.validate();
     logger.debug('Parcel is valid');
 
-    if (await wasParcelCollected(parcel, peerGatewayAddress, mongooseConnection)) {
+    if (await wasParcelCollected(parcel, privatePeerId, mongooseConnection)) {
       logger.debug('Parcel was previously processed');
       return null;
     }
 
     const senderId = await parcel.senderCertificate.calculateSubjectId();
-    const parcelObjectKey = makeParcelObjectKeyForInternetPeer(
-      peerGatewayAddress,
-      senderId,
-      parcel,
-    );
+    const parcelObjectKey = makeParcelObjectKeyForInternetPeer(privatePeerId, senderId, parcel);
     const keyAwareLogger = logger.child({ parcelObjectKey });
 
     await this.objectStoreClient.putObject(
@@ -335,7 +331,7 @@ export class ParcelStore {
     await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'internet-parcels');
     keyAwareLogger.debug('Parcel storage was successfully published on NATS');
 
-    await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
+    await recordParcelCollection(parcel, privatePeerId, mongooseConnection);
     keyAwareLogger.debug('Parcel storage was successfully recorded');
 
     return parcelObjectKey;
@@ -437,8 +433,8 @@ function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-function makePeerGatewayNATSChannel(peerGatewayAddress: string): string {
-  return `pdc-parcel.${peerGatewayAddress}`;
+function makeInternetPeerNATSChannel(privatePeerId: string): string {
+  return `pdc-parcel.${privatePeerId}`;
 }
 
 function makeParcelObjectKeyForPrivatePeer(

@@ -49,8 +49,8 @@ export default async function collectCargo(
   }
 
   const cca = ccaOrError;
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectId();
-  const ccaAwareLogger = logger.child({ peerGatewayAddress });
+  const privatePeerId = await cca.senderCertificate.calculateSubjectId();
+  const ccaAwareLogger = logger.child({ privatePeerId });
 
   const config = new Config(mongooseConnection);
   const internetGatewayId = (await config.get(ConfigKey.CURRENT_ID))!!;
@@ -127,7 +127,7 @@ export default async function collectCargo(
 
   const cargoMessageStream = await generateCargoMessageStream(
     cca,
-    peerGatewayAddress,
+    privatePeerId,
     parcelStore,
     mongooseConnection,
     internetGatewayPrivateKey!,
@@ -180,7 +180,7 @@ async function parseCCAFromMetadata(
 
 async function* generateCargoMessageStream(
   cca: CargoCollectionAuthorization,
-  peerGatewayAddress: string,
+  privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   internetGatewayPrivateKey: CryptoKey,
@@ -188,13 +188,10 @@ async function* generateCargoMessageStream(
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
   const activeParcels = pipeline(
-    () => parcelStore.retrieveParcelsForPrivatePeer(peerGatewayAddress, ccaAwareLogger),
+    () => parcelStore.retrieveParcelsForPrivatePeer(privatePeerId, ccaAwareLogger),
     convertParcelsToCargoMessageStream,
   );
-  yield* await concatMessageStreams(
-    generatePCAs(peerGatewayAddress, mongooseConnection),
-    activeParcels,
-  );
+  yield* await concatMessageStreams(generatePCAs(privatePeerId, mongooseConnection), activeParcels);
 
   const minCertTTL = addDays(new Date(), 90);
   if (cca.senderCertificate.expiryDate < minCertTTL) {
@@ -210,7 +207,7 @@ async function* generateCargoMessageStream(
     };
   } else {
     ccaAwareLogger.debug(
-      { peerGatewayCertificateExpiry: cca.senderCertificate.expiryDate },
+      { privatePeerCertificateExpiry: cca.senderCertificate.expiryDate },
       'Skipping certificate rotation',
     );
   }

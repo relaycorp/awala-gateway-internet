@@ -110,15 +110,11 @@ function makeConnectionHandler(
 
     const abortController = makeAbortController(wsConnection, requestAwareLogger);
 
-    const peerGatewayAddress = await doHandshake(
-      wsConnection,
-      mongooseConnection,
-      requestAwareLogger,
-    );
-    if (!peerGatewayAddress) {
+    const privatePeerId = await doHandshake(wsConnection, mongooseConnection, requestAwareLogger);
+    if (!privatePeerId) {
       return;
     }
-    const peerAwareLogger = requestAwareLogger.child({ peerGatewayAddress });
+    const peerAwareLogger = requestAwareLogger.child({ privatePeerId });
     peerAwareLogger.debug('Handshake completed successfully');
 
     const tracker = new CollectionTracker();
@@ -128,7 +124,7 @@ function makeConnectionHandler(
       () =>
         streamActiveParcels(
           parcelStore,
-          peerGatewayAddress,
+          privatePeerId,
           peerAwareLogger,
           reqId,
           request.headers,
@@ -194,9 +190,9 @@ async function doHandshake(
       const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
 
       const nonceVerifier = new ParcelCollectionHandshakeVerifier(trustedCertificates);
-      let peerGatewayCertificate: Certificate;
+      let privatePeerCertificate: Certificate;
       try {
-        peerGatewayCertificate = await nonceVerifier.verify(
+        privatePeerCertificate = await nonceVerifier.verify(
           handshakeResponse.nonceSignatures[0],
           nonce,
         );
@@ -206,7 +202,7 @@ async function doHandshake(
         return resolve(null);
       }
 
-      resolve(await peerGatewayCertificate.calculateSubjectId());
+      resolve(await privatePeerCertificate.calculateSubjectId());
     });
 
     logger.debug('Sending handshake challenge');
@@ -217,7 +213,7 @@ async function doHandshake(
 
 async function* streamActiveParcels(
   parcelStore: ParcelStore,
-  peerGatewayAddress: string,
+  privatePeerId: string,
   logger: Logger,
   requestId: string,
   requestHeaders: IncomingHttpHeaders,
@@ -231,7 +227,7 @@ async function* streamActiveParcels(
     const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
     try {
       yield* await parcelStore.liveStreamParcelsForPrivatePeer(
-        peerGatewayAddress,
+        privatePeerId,
         natsStreamingClient,
         abortSignal,
         logger,
@@ -245,7 +241,7 @@ async function* streamActiveParcels(
       tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
     }
   } else {
-    yield* await parcelStore.streamParcelsForPrivatePeer(peerGatewayAddress, logger);
+    yield* await parcelStore.streamParcelsForPrivatePeer(privatePeerId, logger);
   }
 }
 

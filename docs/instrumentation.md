@@ -12,7 +12,7 @@ The following attributes are shared by multiple logs:
 
 - `parcelId`: The id of a parcel, which can be useful to track its processing from delivery to collection.
 - `cargoId`: The id of a cargo, which can be useful to track its processing from delivery to collection.
-- `peerGatewayAddress`: The address of a private gateway paired or potentially paired to this Internet gateway. Useful to find all the events involving a specific private gateway.
+- `privatePeerId`: The id of a private gateway paired or potentially paired to this Internet gateway. Useful to find all the events involving a specific private gateway.
 
 ## Log levels
 

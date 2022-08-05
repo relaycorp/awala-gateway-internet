@@ -76,9 +76,9 @@ async function processCargo(
   natsStreamingClient: NatsStreamingClient,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
-  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectId();
+  const privatePeerId = await cargo.senderCertificate.calculateSubjectId();
 
-  const cargoAwareLogger = logger.child({ cargoId: cargo.id, peerGatewayAddress });
+  const cargoAwareLogger = logger.child({ cargoId: cargo.id, privatePeerId });
 
   let cargoMessageSet: CargoMessageSet;
   try {
@@ -104,7 +104,7 @@ async function processCargo(
       await processParcel(
         item,
         Buffer.from(itemSerialized),
-        peerGatewayAddress,
+        privatePeerId,
         parcelStore,
         mongooseConnection,
         natsStreamingClient,
@@ -115,7 +115,7 @@ async function processCargo(
         item.parcelId,
         item.senderEndpointId,
         item.recipientEndpointId,
-        peerGatewayAddress,
+        privatePeerId,
       );
     } else {
       cargoAwareLogger.info('Ignoring certificate rotation message');
@@ -129,7 +129,7 @@ async function processCargo(
 async function processParcel(
   parcel: Parcel,
   parcelSerialized: Buffer,
-  peerGatewayAddress: string,
+  privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
@@ -140,7 +140,7 @@ async function processParcel(
     parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privatePeerId,
       mongooseConnection,
       natsStreamingClient,
       parcelAwareLogger,

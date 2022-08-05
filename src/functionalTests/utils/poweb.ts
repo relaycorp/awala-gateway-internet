@@ -1,9 +1,4 @@
-import {
-  Certificate,
-  Parcel,
-  ParcelCollectionHandshakeSigner,
-  StreamingMode,
-} from '@relaycorp/relaynet-core';
+import { Parcel, ParcelCollectionHandshakeSigner, StreamingMode } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { pipeline } from 'streaming-iterables';
 
@@ -33,11 +28,13 @@ export async function waitForNextParcel(
  */
 export async function collectNextParcel(
   client: PoWebClient,
-  privateGatewayCert: Certificate,
-  privateGatewayPrivateKey: CryptoKey,
+  pdaChain: ExternalPdaChain,
   streamingMode: StreamingMode = StreamingMode.KEEP_ALIVE,
 ): Promise<Parcel> {
-  const signer = new ParcelCollectionHandshakeSigner(privateGatewayCert, privateGatewayPrivateKey);
+  const signer = new ParcelCollectionHandshakeSigner(
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
+  );
   const incomingParcels = await pipeline(
     () => client.collectParcels([signer], streamingMode),
     async function* (collections): AsyncIterable<Parcel> {

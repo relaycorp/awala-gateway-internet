@@ -128,8 +128,7 @@ describe('Parcel delivery and collection (end-to-end)', () => {
 
     const incomingParcel = await collectNextParcel(
       client,
-      recipientChain.privateGatewayCert,
-      recipientChain.privateGatewayPrivateKey,
+      recipientChain,
       StreamingMode.KEEP_ALIVE,
     );
     expect(incomingParcel.id).toEqual(parcel.id);
@@ -150,15 +149,10 @@ describe('Parcel delivery and collection (end-to-end)', () => {
       ),
     );
 
-    await waitForNextParcel(
-      client,
-      recipientChain.privateGatewayCert,
-      recipientChain.privateGatewayPrivateKey,
-    );
+    await waitForNextParcel(client, recipientChain);
     const incomingParcel = await collectNextParcel(
       client,
-      recipientChain.privateGatewayCert,
-      recipientChain.privateGatewayPrivateKey,
+      recipientChain,
       StreamingMode.CLOSE_UPON_COMPLETION,
     );
     expect(incomingParcel.id).toEqual(parcel.id);
@@ -179,11 +173,7 @@ describe('Parcel delivery and collection (end-to-end)', () => {
       new ParcelDeliverySigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey),
     );
 
-    const pongParcel = await collectNextParcel(
-      client,
-      pdaChain.privateGatewayCert,
-      pdaChain.privateGatewayPrivateKey,
-    );
+    const pongParcel = await collectNextParcel(client, pdaChain);
     await expect(extractPong(pongParcel, sessionKey)).resolves.toEqual(pingId);
   });
 });

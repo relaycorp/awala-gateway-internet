@@ -22,6 +22,7 @@ import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
+import { GeneratedParcel } from './utils/parcels';
 import { extractPong, makePingParcel } from './utils/ping';
 import { collectNextParcel, waitForNextParcel } from './utils/poweb';
 
@@ -177,11 +178,6 @@ describe('Parcel delivery and collection (end-to-end)', () => {
     await expect(extractPong(pongParcel, sessionKey)).resolves.toEqual(pingId);
   });
 });
-
-interface GeneratedParcel {
-  readonly parcel: Parcel;
-  readonly parcelSerialized: ArrayBuffer;
-}
 
 async function generateDummyParcel(
   senderChain: ExternalPdaChain,

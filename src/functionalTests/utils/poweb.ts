@@ -9,15 +9,34 @@ import { pipeline } from 'streaming-iterables';
 
 import { asyncIterableToArray, iterableTake } from '../../testUtils/iter';
 
+/**
+ * Wait for a parcel to become available for collection but don't actually collect it.
+ */
+export async function waitForNextParcel(
+  client: PoWebClient,
+  privateGatewayCert: Certificate,
+  privateGatewayPrivateKey: CryptoKey,
+): Promise<void> {
+  const signer = new ParcelCollectionHandshakeSigner(privateGatewayCert, privateGatewayPrivateKey);
+  await pipeline(
+    () => client.collectParcels([signer], StreamingMode.KEEP_ALIVE),
+    iterableTake(1),
+    asyncIterableToArray,
+  );
+}
+
+/**
+ * Collect the next parcel available.
+ */
 export async function collectNextParcel(
-  powebClient: PoWebClient,
+  client: PoWebClient,
   privateGatewayCert: Certificate,
   privateGatewayPrivateKey: CryptoKey,
   streamingMode: StreamingMode = StreamingMode.KEEP_ALIVE,
 ): Promise<Parcel> {
   const signer = new ParcelCollectionHandshakeSigner(privateGatewayCert, privateGatewayPrivateKey);
   const incomingParcels = await pipeline(
-    () => powebClient.collectParcels([signer], streamingMode),
+    () => client.collectParcels([signer], streamingMode),
     async function* (collections): AsyncIterable<Parcel> {
       for await (const collection of collections) {
         yield await collection.deserializeAndValidateParcel();

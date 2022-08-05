@@ -14,6 +14,7 @@ import {
   RefusedParcelError,
   ServerError,
 } from '@relaycorp/relaynet-poweb';
+import uuid from 'uuid-random';
 
 import { ExternalPdaChain } from '../testUtils/pki';
 import { GW_POWEB_HOST_PORT } from './utils/constants';
@@ -21,8 +22,8 @@ import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
-import { collectNextParcel } from './utils/poweb';
-import { sleep } from './utils/timing';
+import { extractPong, makePingParcel } from './utils/ping';
+import { collectNextParcel, waitForNextParcel } from './utils/poweb';
 
 describe('Node registration', () => {
   test('Valid registration requests should be accepted', async () => {
@@ -58,57 +59,8 @@ describe('Node registration', () => {
   });
 });
 
-describe('Parcel delivery and collection', () => {
-  test('Delivering and collecting a given parcel (closing upon completion)', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
-    const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
-    const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
-
-    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
-
-    await client.deliverParcel(
-      parcelSerialized,
-      new ParcelDeliverySigner(
-        senderChain.privateGatewayCert,
-        senderChain.privateGatewayPrivateKey,
-      ),
-    );
-
-    await sleep(2);
-    const incomingParcel = await collectNextParcel(
-      client,
-      recipientChain.privateGatewayCert,
-      recipientChain.privateGatewayPrivateKey,
-      StreamingMode.CLOSE_UPON_COMPLETION,
-    );
-    expect(incomingParcel.id).toEqual(parcel.id);
-  });
-
-  test('Delivering and collecting a given parcel (keep alive)', async () => {
-    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
-    const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
-    const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
-
-    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
-
-    await client.deliverParcel(
-      parcelSerialized,
-      new ParcelDeliverySigner(
-        senderChain.privateGatewayCert,
-        senderChain.privateGatewayPrivateKey,
-      ),
-    );
-
-    const incomingParcel = await collectNextParcel(
-      client,
-      recipientChain.privateGatewayCert,
-      recipientChain.privateGatewayPrivateKey,
-      StreamingMode.KEEP_ALIVE,
-    );
-    expect(incomingParcel.id).toEqual(parcel.id);
-  });
-
-  test('Invalid parcel deliveries should be refused', async () => {
+describe('Parcel delivery', () => {
+  test('Invalid deliveries should be refused', async () => {
     const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const privateGatewayKeyPair = await generateRSAKeyPair();
     const privateGatewayRegistration = await registerPrivateGateway(privateGatewayKeyPair, client);
@@ -155,6 +107,84 @@ describe('Parcel delivery and collection', () => {
         ),
       ),
     ).rejects.toBeInstanceOf(RefusedParcelError);
+  });
+});
+
+describe('Parcel delivery and collection (end-to-end)', () => {
+  test('Delivering and collecting a given parcel (keep alive)', async () => {
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
+    const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+    const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
+
+    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
+
+    await client.deliverParcel(
+      parcelSerialized,
+      new ParcelDeliverySigner(
+        senderChain.privateGatewayCert,
+        senderChain.privateGatewayPrivateKey,
+      ),
+    );
+
+    const incomingParcel = await collectNextParcel(
+      client,
+      recipientChain.privateGatewayCert,
+      recipientChain.privateGatewayPrivateKey,
+      StreamingMode.KEEP_ALIVE,
+    );
+    expect(incomingParcel.id).toEqual(parcel.id);
+  });
+
+  test('Delivering and collecting a given parcel (closing upon completion)', async () => {
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
+    const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
+    const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
+
+    const { parcel, parcelSerialized } = await generateDummyParcel(senderChain, recipientChain);
+
+    await client.deliverParcel(
+      parcelSerialized,
+      new ParcelDeliverySigner(
+        senderChain.privateGatewayCert,
+        senderChain.privateGatewayPrivateKey,
+      ),
+    );
+
+    await waitForNextParcel(
+      client,
+      recipientChain.privateGatewayCert,
+      recipientChain.privateGatewayPrivateKey,
+    );
+    const incomingParcel = await collectNextParcel(
+      client,
+      recipientChain.privateGatewayCert,
+      recipientChain.privateGatewayPrivateKey,
+      StreamingMode.CLOSE_UPON_COMPLETION,
+    );
+    expect(incomingParcel.id).toEqual(parcel.id);
+  });
+
+  test('Sending pings and receiving pongs (communication with Internet node)', async () => {
+    const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
+    const { pdaChain } = await createAndRegisterPrivateGateway();
+
+    const pingId = uuid();
+    const { parcelSerialized: pingParcelSerialized, sessionKey } = await makePingParcel(
+      pingId,
+      pdaChain,
+    );
+
+    await client.deliverParcel(
+      pingParcelSerialized,
+      new ParcelDeliverySigner(pdaChain.privateGatewayCert, pdaChain.privateGatewayPrivateKey),
+    );
+
+    const pongParcel = await collectNextParcel(
+      client,
+      pdaChain.privateGatewayCert,
+      pdaChain.privateGatewayPrivateKey,
+    );
+    await expect(extractPong(pongParcel, sessionKey)).resolves.toEqual(pingId);
   });
 });
 

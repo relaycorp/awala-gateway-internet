@@ -7,20 +7,29 @@ import {
   generateRSAKeyPair,
   issueGatewayCertificate,
   Parcel,
+  ParcelCollectionAck,
   Recipient,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
+import uuid from 'uuid-random';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
+import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
 import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
-import { GW_COGRPC_HOST, GW_INTERNET_ADDRESS, GW_POHTTP_HOST_URL } from './utils/constants';
+import {
+  GW_COGRPC_HOST,
+  GW_INTERNET_ADDRESS,
+  GW_POHTTP_HOST_URL,
+  IS_GITHUB,
+} from './utils/constants';
 import { connectToNatsStreaming } from './utils/nats';
+import { extractPong, makePingParcel } from './utils/ping';
 import { sleep } from './utils/timing';
 
 const TOMORROW = addDays(new Date(), 1);
@@ -169,6 +178,53 @@ describe('Cargo collection', () => {
 
     expect(error.cause()).toHaveProperty('code', grpc.status.PERMISSION_DENIED);
   });
+});
+
+test('Sending pings and receiving pongs', async () => {
+  const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+
+  const pingId = uuid();
+  const pingParcelData = await makePingParcel(pingId, pdaChain);
+
+  // Deliver the ping message encapsulated in a cargo
+  const cargoSerialized = await encapsulateMessagesInCargo(
+    [pingParcelData.parcelSerialized],
+    pdaChain,
+    publicGatewaySessionKey,
+  );
+  await asyncIterableToArray(
+    cogRPCClient.deliverCargo(
+      arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+    ),
+  );
+
+  await sleep(IS_GITHUB ? 4 : 2);
+
+  // Collect the pong message encapsulated in a cargo
+  const cdaChain = await generateCDAChain(pdaChain);
+  const { ccaSerialized, sessionPrivateKey } = await generateCCA(
+    GW_INTERNET_ADDRESS,
+    publicGatewaySessionKey,
+    cdaChain.publicGatewayCert,
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
+  );
+  const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
+  expect(collectedCargoes).toHaveLength(1);
+  const collectedMessages = await extractMessagesFromCargo(
+    collectedCargoes[0],
+    pdaChain.privateGatewayCert,
+    sessionPrivateKey,
+  );
+  expect(collectedMessages).toHaveLength(2);
+  const collectionAck = collectedMessages[0];
+  expect(collectionAck).toBeInstanceOf(ParcelCollectionAck);
+  expect(collectionAck).toHaveProperty('parcelId', pingParcelData.parcelId);
+  const pongParcel = collectedMessages[1];
+  expect(pongParcel).toBeInstanceOf(Parcel);
+  await expect(extractPong(pongParcel as Parcel, pingParcelData.sessionKey)).resolves.toEqual(
+    pingId,
+  );
 });
 
 async function getPublicGatewayRecipient(

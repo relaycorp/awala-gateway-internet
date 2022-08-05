@@ -111,7 +111,7 @@ describe('Parcel delivery', () => {
 });
 
 describe('Parcel delivery and collection (end-to-end)', () => {
-  test('Delivering and collecting a given parcel (keep alive)', async () => {
+  test('Delivering and collecting a parcel (keep alive)', async () => {
     const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();
@@ -134,7 +134,7 @@ describe('Parcel delivery and collection (end-to-end)', () => {
     expect(incomingParcel.id).toEqual(parcel.id);
   });
 
-  test('Delivering and collecting a given parcel (closing upon completion)', async () => {
+  test('Delivering and collecting a parcel (closing upon completion)', async () => {
     const client = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
     const { pdaChain: senderChain } = await createAndRegisterPrivateGateway();
     const { pdaChain: recipientChain } = await createAndRegisterPrivateGateway();

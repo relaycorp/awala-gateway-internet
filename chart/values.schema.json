@@ -3,7 +3,7 @@
   "type": "object",
   "required": [
     "logging",
-    "publicAddress",
+    "internetAddress",
     "pdcQueue",
     "mongo",
     "nats",
@@ -89,7 +89,7 @@
         }
       }
     },
-    "publicAddress": {
+    "internetAddress": {
       "type": "string"
     },
     "pdcQueue": {

@@ -65,21 +65,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Generate PoWeb host name
 */}}
 {{- define "relaynet-internet-gateway.powebHost" -}}
-{{ default (printf "poweb.%s" .Values.publicAddress) .Values.ingress.serviceDomains.poweb }}
+{{ default (printf "poweb.%s" .Values.internetAddress) .Values.ingress.serviceDomains.poweb }}
 {{- end }}
 
 {{/*
 Generate PoHTTP host name
 */}}
 {{- define "relaynet-internet-gateway.pohttpHost" -}}
-{{ default (printf "pohttp.%s" .Values.publicAddress) .Values.ingress.serviceDomains.pohttp }}
+{{ default (printf "pohttp.%s" .Values.internetAddress) .Values.ingress.serviceDomains.pohttp }}
 {{- end }}
 
 {{/*
 Generate CogRPC host name
 */}}
 {{- define "relaynet-internet-gateway.cogrpcHost" -}}
-{{ default (printf "cogrpc.%s" .Values.publicAddress) .Values.ingress.serviceDomains.cogrpc }}
+{{ default (printf "cogrpc.%s" .Values.internetAddress) .Values.ingress.serviceDomains.cogrpc }}
 {{- end }}
 
 {{/*

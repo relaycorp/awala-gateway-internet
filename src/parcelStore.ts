@@ -43,12 +43,10 @@ export interface ParcelStreamMessage {
 
 function makeParcelObjectKeyForInternetPeer(
   peerGatewayAddress: string,
-  senderPrivateAddress: string,
+  senderId: string,
   parcel: Parcel,
 ): string {
-  return [peerGatewayAddress, senderPrivateAddress, parcel.recipient.id, sha256Hex(parcel.id)].join(
-    '/',
-  );
+  return [peerGatewayAddress, senderId, parcel.recipient.id, sha256Hex(parcel.id)].join('/');
 }
 
 export class ParcelStore {
@@ -257,19 +255,19 @@ export class ParcelStore {
    * Delete specified parcel if it exists.
    *
    * @param parcelId
-   * @param senderPrivateAddress
+   * @param senderId
    * @param recipientAddress
    * @param recipientGatewayAddress
    */
   public async deleteParcelForPrivatePeer(
     parcelId: string,
-    senderPrivateAddress: string,
+    senderId: string,
     recipientAddress: string,
     recipientGatewayAddress: string,
   ): Promise<void> {
     const parcelKey = makeParcelObjectKeyForPrivatePeer(
       parcelId,
-      senderPrivateAddress,
+      senderId,
       recipientAddress,
       recipientGatewayAddress,
     );
@@ -313,10 +311,10 @@ export class ParcelStore {
       return null;
     }
 
-    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
+    const senderId = await parcel.senderCertificate.calculateSubjectId();
     const parcelObjectKey = makeParcelObjectKeyForInternetPeer(
       peerGatewayAddress,
-      senderPrivateAddress,
+      senderId,
       parcel,
     );
     const keyAwareLogger = logger.child({ parcelObjectKey });
@@ -445,7 +443,7 @@ function makePeerGatewayNATSChannel(peerGatewayAddress: string): string {
 
 function makeParcelObjectKeyForPrivatePeer(
   parcelId: string,
-  senderPrivateAddress: string,
+  senderId: string,
   recipientAddress: string,
   recipientGatewayAddress: string,
 ): string {
@@ -453,7 +451,7 @@ function makeParcelObjectKeyForPrivatePeer(
     GATEWAY_BOUND_OBJECT_KEY_PREFIX,
     recipientGatewayAddress,
     recipientAddress,
-    senderPrivateAddress,
+    senderId,
     sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
   ].join('/');
 }

@@ -42,18 +42,18 @@ export function setUpCommonFixtures(): () => FixtureSet {
   } as any;
   mockSpy(jest.spyOn(ParcelStore, 'initFromEnv'), () => mockParcelStore);
 
-  let privateAddress: string;
+  let internetGatewayId: string;
   let certificatePath: PdaChain;
   beforeAll(async () => {
     certificatePath = await generatePdaChain();
-    privateAddress = await certificatePath.publicGatewayCert.calculateSubjectId();
+    internetGatewayId = await certificatePath.publicGatewayCert.calculateSubjectId();
   });
 
   let mockPrivateKeyStore: MockPrivateKeyStore;
   beforeEach(async () => {
     mockPrivateKeyStore = new MockPrivateKeyStore();
     await mockPrivateKeyStore.saveIdentityKey(
-      privateAddress,
+      internetGatewayId,
       certificatePath.publicGatewayPrivateKey,
     );
   });
@@ -65,11 +65,11 @@ export function setUpCommonFixtures(): () => FixtureSet {
     const certificateStore = new MongoCertificateStore(connection);
     await certificateStore.save(
       new CertificationPath(certificatePath.publicGatewayCert, []),
-      privateAddress,
+      internetGatewayId,
     );
 
     const config = new Config(connection);
-    await config.set(ConfigKey.CURRENT_ID, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, internetGatewayId);
   });
 
   const mockEnvVars = configureMockEnvVars();

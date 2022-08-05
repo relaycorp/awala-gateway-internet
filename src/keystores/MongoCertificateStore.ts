@@ -20,21 +20,21 @@ export class MongoCertificateStore extends CertificateStore {
 
   protected async saveData(
     subjectCertificateSerialized: ArrayBuffer,
-    subjectPrivateAddress: string,
+    subjectId: string,
     subjectCertificateExpiryDate: Date,
-    issuerPrivateAddress: string,
+    issuerId: string,
   ): Promise<void> {
     const record: CertificationPath = {
       expiryDate: subjectCertificateExpiryDate,
-      issuerPrivateAddress,
+      issuerId,
       pathSerialized: Buffer.from(subjectCertificateSerialized),
-      subjectPrivateAddress,
+      subjectId,
     };
     await this.certificateModel
       .updateOne(
         {
           expiryDate: subjectCertificateExpiryDate,
-          subjectPrivateAddress,
+          subjectId,
         },
         record,
         { upsert: true },
@@ -42,20 +42,16 @@ export class MongoCertificateStore extends CertificateStore {
       .exec();
   }
 
-  protected async retrieveLatestSerialization(
-    subjectPrivateAddress: string,
-  ): Promise<ArrayBuffer | null> {
+  protected async retrieveLatestSerialization(subjectId: string): Promise<ArrayBuffer | null> {
     const record = await this.certificateModel
-      .findOne({ subjectPrivateAddress })
+      .findOne({ subjectId })
       .sort({ expiryDate: -1 })
       .exec();
     return record ? bufferToArray(record.pathSerialized) : null;
   }
 
-  protected async retrieveAllSerializations(
-    subjectPrivateAddress: string,
-  ): Promise<readonly ArrayBuffer[]> {
-    const records = await this.certificateModel.find({ subjectPrivateAddress }).exec();
+  protected async retrieveAllSerializations(subjectId: string): Promise<readonly ArrayBuffer[]> {
+    const records = await this.certificateModel.find({ subjectId }).exec();
     return records.map((r) => bufferToArray(r.pathSerialized));
   }
 }

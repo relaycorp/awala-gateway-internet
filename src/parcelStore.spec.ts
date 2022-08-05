@@ -593,22 +593,17 @@ describe('deleteParcelForPrivatePeer', () => {
 
   test('Full object key should be prefixed', async () => {
     const parcelId = 'thingy.parcel';
-    const senderPrivateAddress = '0deadbeef';
-    const recipientAddress = '0deadc0de';
-    const recipientGatewayAddress = '0beef';
-    await store.deleteParcelForPrivatePeer(
-      parcelId,
-      senderPrivateAddress,
-      recipientAddress,
-      recipientGatewayAddress,
-    );
+    const senderId = '0deadbeef';
+    const recipientId = '0deadc0de';
+    const recipientGatewayId = '0beef';
+    await store.deleteParcelForPrivatePeer(parcelId, senderId, recipientId, recipientGatewayId);
 
     expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(
       [
         'parcels/gateway-bound',
-        recipientGatewayAddress,
-        recipientAddress,
-        senderPrivateAddress,
+        recipientGatewayId,
+        recipientId,
+        senderId,
         sha256Hex(parcelId),
       ].join('/'),
       expect.anything(),
@@ -757,10 +752,10 @@ describe('storeParcelForInternetPeer', () => {
       mockLogging.logger,
     );
 
-    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectId();
+    const senderId = await parcel.senderCertificate.calculateSubjectId();
     const expectedKey = [
       privateGatewayId,
-      senderPrivateAddress,
+      senderId,
       parcel.recipient.id,
       sha256Hex(parcel.id),
     ].join('/');

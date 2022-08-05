@@ -65,20 +65,20 @@ describe('getCurrent', () => {
 
     await expect(manager.getCurrent()).rejects.toThrowWithMessage(
       PublicGatewayError,
-      'Current private address is unset',
+      'Current id is unset',
     );
   });
 
   test('Error should be thrown if current address is set but key does not exist', async () => {
     const connection = getMongoConnection();
     const manager = new PublicGatewayManager(connection, keyStoreSet);
-    const privateAddress = 'does not exist';
+    const invalidId = 'does not exist';
     const config = new Config(connection);
-    await config.set(ConfigKey.CURRENT_ID, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, invalidId);
 
     await expect(manager.getCurrent()).rejects.toThrowWithMessage(
       PublicGatewayError,
-      `Public gateway does not exist (private address: ${privateAddress})`,
+      `Public gateway does not exist (id: ${invalidId})`,
     );
   });
 

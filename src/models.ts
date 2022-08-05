@@ -12,13 +12,13 @@ export class ConfigItem {
   public value!: string;
 }
 
-@index({ subjectPrivateAddress: 1 })
+@index({ subjectId: 1 })
 export class CertificationPath {
   @prop({ required: true })
-  public subjectPrivateAddress!: string;
+  public subjectId!: string;
 
   @prop({ required: true })
-  public issuerPrivateAddress!: string;
+  public issuerId!: string;
 
   @prop({ required: true })
   public pathSerialized!: Buffer;
@@ -31,7 +31,7 @@ export class PeerPublicKeyData {
   protected static TTL_DAYS = 30;
 
   @prop({ required: true, unique: true })
-  public peerPrivateAddress!: string;
+  public peerId!: string;
 
   @prop({ required: true })
   public keyId!: Buffer;
@@ -43,10 +43,10 @@ export class PeerPublicKeyData {
   public creationDate!: Date;
 }
 
-@index({ peerPrivateAddress: 1, ccaId: 1 }, { unique: true })
+@index({ peerId: 1, ccaId: 1 }, { unique: true })
 export class CCAFulfillment {
   @prop({ required: true })
-  public peerPrivateAddress!: string;
+  public peerId!: string;
 
   @prop({ required: true })
   public ccaId!: string;
@@ -58,24 +58,21 @@ export class CCAFulfillment {
 @index(
   {
     parcelId: 1,
-    peerGatewayPrivateAddress: 1,
-    recipientEndpointAddress: 1,
-    senderEndpointPrivateAddress: 1,
+    privatePeerId: 1,
+    recipientEndpointId: 1,
+    senderEndpointId: 1,
   },
   { unique: true },
 )
 export class ParcelCollection {
   @prop({ required: true })
-  public peerGatewayPrivateAddress!: string;
+  public privatePeerId!: string;
 
   @prop({ required: true })
-  public senderEndpointPrivateAddress!: string;
+  public senderEndpointId!: string;
 
-  /**
-   * Id (fka private/public address) of recipient endpoint.
-   */
   @prop({ required: true })
-  public recipientEndpointAddress!: string;
+  public recipientEndpointId!: string;
 
   @prop({ required: true })
   public parcelId!: string;

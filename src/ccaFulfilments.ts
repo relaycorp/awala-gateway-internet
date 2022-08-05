@@ -11,7 +11,7 @@ export async function wasCCAFulfilled(
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
   const fulfillment = await fulfillmentModel.exists({
     ccaId: cca.id,
-    peerPrivateAddress: await cca.senderCertificate.calculateSubjectId(),
+    peerId: await cca.senderCertificate.calculateSubjectId(),
   });
   return !!fulfillment;
 }
@@ -22,14 +22,14 @@ export async function recordCCAFulfillment(
 ): Promise<void> {
   const fulfillmentModel = getModelForClass(CCAFulfillment, { existingConnection: connection });
 
-  const peerPrivateAddress = await cca.senderCertificate.calculateSubjectId();
+  const peerId = await cca.senderCertificate.calculateSubjectId();
   const fulfillment: CCAFulfillment = {
     ccaExpiryDate: cca.expiryDate,
     ccaId: cca.id,
-    peerPrivateAddress,
+    peerId,
   };
   await fulfillmentModel
-    .replaceOne({ ccaId: cca.id, peerPrivateAddress }, fulfillment)
+    .replaceOne({ ccaId: cca.id, peerId }, fulfillment)
     .setOptions({ upsert: true })
     .exec();
 }

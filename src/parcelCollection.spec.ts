@@ -31,9 +31,9 @@ describe('wasParcelCollected', () => {
 
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledWith({
       parcelId: PARCEL.id,
-      peerGatewayPrivateAddress: PEER_GATEWAY_ID,
-      recipientEndpointAddress: PARCEL.recipient.id,
-      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectId(),
+      privatePeerId: PEER_GATEWAY_ID,
+      recipientEndpointId: PARCEL.recipient.id,
+      senderEndpointId: await PARCEL.senderCertificate.calculateSubjectId(),
     });
   });
 
@@ -67,9 +67,9 @@ describe('recordParcelCollection', () => {
 
     const collection = {
       parcelId: PARCEL.id,
-      peerGatewayPrivateAddress: PEER_GATEWAY_ID,
-      recipientEndpointAddress: PARCEL.recipient.id,
-      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectId(),
+      privatePeerId: PEER_GATEWAY_ID,
+      recipientEndpointId: PARCEL.recipient.id,
+      senderEndpointId: await PARCEL.senderCertificate.calculateSubjectId(),
     };
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledWith(collection, {
       ...collection,
@@ -86,9 +86,9 @@ describe('generatePCAs', () => {
     PARCEL_COLLECTION = {
       parcelExpiryDate: PARCEL.expiryDate,
       parcelId: PARCEL.id,
-      peerGatewayPrivateAddress: PEER_GATEWAY_ID,
-      recipientEndpointAddress: PARCEL.recipient.id,
-      senderEndpointPrivateAddress: await PARCEL.senderCertificate.calculateSubjectId(),
+      privatePeerId: PEER_GATEWAY_ID,
+      recipientEndpointId: PARCEL.recipient.id,
+      senderEndpointId: await PARCEL.senderCertificate.calculateSubjectId(),
     };
   });
 
@@ -114,7 +114,7 @@ describe('generatePCAs', () => {
 
     expect(MOCK_MONGOOSE_FIND).toBeCalledTimes(1);
     expect(MOCK_MONGOOSE_FIND).toBeCalledWith({
-      peerGatewayPrivateAddress: PEER_GATEWAY_ID,
+      privatePeerId: PEER_GATEWAY_ID,
     });
   });
 
@@ -130,8 +130,8 @@ describe('generatePCAs', () => {
     const results = await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     const expectedPca = new ParcelCollectionAck(
-      PARCEL_COLLECTION.senderEndpointPrivateAddress,
-      PARCEL_COLLECTION.recipientEndpointAddress,
+      PARCEL_COLLECTION.senderEndpointId,
+      PARCEL_COLLECTION.recipientEndpointId,
       PARCEL_COLLECTION.parcelId,
     );
     expect(results).toHaveLength(1);

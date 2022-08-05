@@ -29,8 +29,8 @@ export async function retrieveOwnCertificates(
   const store = new MongoCertificateStore(connection);
   const config = new Config(connection);
 
-  const privateAddress = await config.get(ConfigKey.CURRENT_ID);
-  const allCertificationPaths = await store.retrieveAll(privateAddress!, privateAddress!);
+  const id = await config.get(ConfigKey.CURRENT_ID);
+  const allCertificationPaths = await store.retrieveAll(id!, id!);
   return allCertificationPaths.map((p) => p.leafCertificate);
 }
 
@@ -39,9 +39,9 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
   const config = new Config(connection);
   const now = new Date();
 
-  const privateAddress = await config.get(ConfigKey.CURRENT_ID);
+  const id = await config.get(ConfigKey.CURRENT_ID);
 
-  const latestCertificatePath = await store.retrieveLatest(privateAddress!, privateAddress!);
+  const latestCertificatePath = await store.retrieveLatest(id!, id!);
 
   const minExpiryDate = addDays(now, MIN_CERTIFICATE_TTL_DAYS);
   if (latestCertificatePath && minExpiryDate < latestCertificatePath.leafCertificate.expiryDate) {
@@ -49,14 +49,14 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
   }
 
   const privateKeyStore = initPrivateKeyStore(connection);
-  const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
+  const privateKey = await privateKeyStore.retrieveIdentityKey(id!!);
   const newCertificate = await issueGatewayCertificate({
     issuerPrivateKey: privateKey!,
     subjectPublicKey: await getRSAPublicKeyFromPrivate(privateKey!),
     validityEndDate: addDays(now, CERTIFICATE_TTL_DAYS),
     validityStartDate: subHours(now, CERTIFICATE_START_OFFSET_HOURS),
   });
-  await store.save(new CertificationPath(newCertificate, []), privateAddress!);
+  await store.save(new CertificationPath(newCertificate, []), id!);
 
   return newCertificate;
 }

@@ -48,7 +48,7 @@ describe('wasCCAFulfilled', () => {
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledTimes(1);
     expect(MOCK_MONGOOSE_EXISTS).toBeCalledWith({
       ccaId: CCA.id,
-      peerPrivateAddress: await CCA.senderCertificate.calculateSubjectId(),
+      peerId: await CCA.senderCertificate.calculateSubjectId(),
     });
   });
 
@@ -94,10 +94,10 @@ describe('recordCCAFulfillment', () => {
     await recordCCAFulfillment(CCA, MOCK_CONNECTION);
 
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledTimes(1);
-    const peerPrivateAddress = await CCA.senderCertificate.calculateSubjectId();
+    const peerId = await CCA.senderCertificate.calculateSubjectId();
     expect(MOCK_MONGOOSE_REPLACE_ONE).toBeCalledWith(
-      { peerPrivateAddress, ccaId: CCA.id },
-      { peerPrivateAddress, ccaId: CCA.id, ccaExpiryDate: CCA.expiryDate },
+      { peerId, ccaId: CCA.id },
+      { peerId, ccaId: CCA.id, ccaExpiryDate: CCA.expiryDate },
     );
     expect(MOCK_MONGOOSE_REPLACE_ONE_SET_OPTIONS).toBeCalledWith({ upsert: true });
     expect(MOCK_MONGOOSE_REPLACE_ONE_EXEC).toBeCalledTimes(1);

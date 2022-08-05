@@ -70,7 +70,7 @@ describe('getChannel', () => {
     expect(cdaChain.publicGateway.isEqual(channel.nodeDeliveryAuth)).toBeTrue();
   });
 
-  test('Private gateway private address should be set', async () => {
+  test('Private gateway id should be set', async () => {
     const channel = await publicGateway.getChannel(
       cdaChain.publicGateway,
       keyPairSet.privateGateway.publicKey,

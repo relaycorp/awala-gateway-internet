@@ -7,11 +7,11 @@ export class PublicGateway extends Gateway {
     pda: Certificate,
     privateGatewayPublicKey: CryptoKey,
   ): Promise<PublicGatewayChannel> {
-    const privateGatewayPrivateAddress = await getIdFromIdentityKey(privateGatewayPublicKey);
+    const privateGatewayId = await getIdFromIdentityKey(privateGatewayPublicKey);
     return new PublicGatewayChannel(
       this.identityPrivateKey,
       pda,
-      privateGatewayPrivateAddress,
+      privateGatewayId,
       privateGatewayPublicKey,
       this.keyStores,
     );

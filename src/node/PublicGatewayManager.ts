@@ -30,11 +30,11 @@ export class PublicGatewayManager extends GatewayManager<PublicGateway> {
     const config = new Config(this.connection);
     const id = await config.get(ConfigKey.CURRENT_ID);
     if (!id) {
-      throw new PublicGatewayError('Current private address is unset');
+      throw new PublicGatewayError('Current id is unset');
     }
     const gateway = await this.get(id);
     if (!gateway) {
-      throw new PublicGatewayError(`Public gateway does not exist (private address: ${id})`);
+      throw new PublicGatewayError(`Public gateway does not exist (id: ${id})`);
     }
     return gateway;
   }

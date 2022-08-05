@@ -64,7 +64,7 @@ This server is used to store parcels and cargoes under the following object key 
 
 [NAT Streaming](https://docs.nats.io/nats-streaming-concepts/intro) is used for inter-component communication using asynchronous messaging. The following channels are used:
 
-- `pdc-parcel.${localGatewayAddress}` where `${localGatewayAddress}` is the private address of the local gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
+- `pdc-parcel.${privateGatewayId}` where `${privateGatewayId}` is the id of the private gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
 - `internet-parcels`. Parcels bound for an internet.
 - `crc-cargo`. Cargo received via CRC (e.g., CogRPC) are published here.
 

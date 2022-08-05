@@ -63,13 +63,13 @@ export async function rotateOwnCertificate(connection: Connection): Promise<Cert
 
 export async function issuePrivateGatewayCertificate(
   privateGatewayPublicKey: CryptoKey,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
+  internetGatewayPrivateKey: CryptoKey,
+  internetGatewayCertificate: Certificate,
 ): Promise<Certificate> {
   const now = new Date();
   return issueGatewayCertificate({
-    issuerCertificate: publicGatewayCertificate,
-    issuerPrivateKey: publicGatewayPrivateKey,
+    issuerCertificate: internetGatewayCertificate,
+    issuerPrivateKey: internetGatewayPrivateKey,
     subjectPublicKey: privateGatewayPublicKey,
     validityEndDate: addDays(now, PRIVATE_GATEWAY_CERTIFICATE_VALIDITY_DAYS),
     validityStartDate: subHours(now, CERTIFICATE_START_OFFSET_HOURS),

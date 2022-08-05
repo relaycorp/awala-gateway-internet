@@ -18,7 +18,7 @@ import uuid from 'uuid-random';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
-import { PublicGatewayManager } from '../../../node/PublicGatewayManager';
+import { InternetGatewayManager } from '../../../node/InternetGatewayManager';
 import { generatePCAs } from '../../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../../parcelStore';
 import { issuePrivateGatewayCertificate } from '../../../pki';
@@ -53,12 +53,12 @@ export default async function collectCargo(
   const ccaAwareLogger = logger.child({ peerGatewayAddress });
 
   const config = new Config(mongooseConnection);
-  const publicGatewayId = (await config.get(ConfigKey.CURRENT_ID))!!;
-  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(publicGatewayId);
+  const internetGatewayId = (await config.get(ConfigKey.CURRENT_ID))!!;
+  const internetGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(internetGatewayId);
   const certificateStore = new MongoCertificateStore(mongooseConnection);
   const allCertificationPaths = await certificateStore.retrieveAll(
-    publicGatewayId,
-    publicGatewayId,
+    internetGatewayId,
+    internetGatewayId,
   );
   const allCertificates = allCertificationPaths.map((p) => p.leafCertificate);
   try {
@@ -72,7 +72,7 @@ export default async function collectCargo(
     return;
   }
 
-  if (cca.recipient.id !== publicGatewayId) {
+  if (cca.recipient.id !== internetGatewayId) {
     ccaAwareLogger.info({ ccaRecipient: cca.recipient }, 'Refusing CCA bound for another gateway');
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
@@ -81,7 +81,7 @@ export default async function collectCargo(
     return;
   }
 
-  const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+  const gatewayManager = await InternetGatewayManager.init(mongooseConnection);
   const gateway = await gatewayManager.getCurrent();
 
   let ccr: CargoCollectionRequest;
@@ -130,8 +130,8 @@ export default async function collectCargo(
     peerGatewayAddress,
     parcelStore,
     mongooseConnection,
-    publicGatewayPrivateKey!,
-    (await certificateStore.retrieveLatest(publicGatewayId, publicGatewayId))!.leafCertificate,
+    internetGatewayPrivateKey!,
+    (await certificateStore.retrieveLatest(internetGatewayId, internetGatewayId))!.leafCertificate,
     ccaAwareLogger,
   );
   try {
@@ -183,8 +183,8 @@ async function* generateCargoMessageStream(
   peerGatewayAddress: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
+  internetGatewayPrivateKey: CryptoKey,
+  internetGatewayCertificate: Certificate,
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
   const activeParcels = pipeline(
@@ -201,8 +201,8 @@ async function* generateCargoMessageStream(
     ccaAwareLogger.info('Sending certificate rotation');
     const certificateRotation = await generateCertificateRotation(
       await cca.senderCertificate.getPublicKey(),
-      publicGatewayPrivateKey,
-      publicGatewayCertificate,
+      internetGatewayPrivateKey,
+      internetGatewayCertificate,
     );
     yield {
       expiryDate: certificateRotation.certificationPath.leafCertificate.expiryDate,
@@ -218,16 +218,16 @@ async function* generateCargoMessageStream(
 
 async function generateCertificateRotation(
   privateGatewayPublicKey: CryptoKey,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
+  internetGatewayPrivateKey: CryptoKey,
+  internetGatewayCertificate: Certificate,
 ): Promise<CertificateRotation> {
   const privateGatewayCertificate = await issuePrivateGatewayCertificate(
     privateGatewayPublicKey,
-    publicGatewayPrivateKey,
-    publicGatewayCertificate,
+    internetGatewayPrivateKey,
+    internetGatewayCertificate,
   );
   return new CertificateRotation(
-    new CertificationPath(privateGatewayCertificate, [publicGatewayCertificate]),
+    new CertificationPath(privateGatewayCertificate, [internetGatewayCertificate]),
   );
 }
 

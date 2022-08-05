@@ -6,7 +6,7 @@ import {
   NodeKeyPairSet,
 } from '@relaycorp/relaynet-testing';
 
-import { PublicGatewayChannel } from './PublicGatewayChannel';
+import { InternetGatewayChannel } from './InternetGatewayChannel';
 
 let keyPairSet: NodeKeyPairSet;
 let cdaChain: CDACertPath;
@@ -18,9 +18,9 @@ beforeAll(async () => {
 describe('getOutboundRAMFRecipient', () => {
   test('Address should be that of private gateway', async () => {
     const peerId = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey);
-    const channel = new PublicGatewayChannel(
-      keyPairSet.publicGateway.privateKey,
-      cdaChain.publicGateway,
+    const channel = new InternetGatewayChannel(
+      keyPairSet.internetGateway.privateKey,
+      cdaChain.internetGateway,
       peerId,
       keyPairSet.privateGateway.publicKey,
       new MockKeyStoreSet(),

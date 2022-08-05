@@ -58,11 +58,11 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateKey = await privateKeyStore.retrieveIdentityKey(internetGatewayId!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
-      const publicGatewayCertificationPath = await certificateStore.retrieveLatest(
+      const internetGatewayCertPath = await certificateStore.retrieveLatest(
         internetGatewayId!,
         internetGatewayId!,
       );
-      const gatewayPublicKey = await publicGatewayCertificationPath!.leafCertificate.getPublicKey();
+      const gatewayPublicKey = await internetGatewayCertPath!.leafCertificate.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
@@ -90,7 +90,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateGatewayCertificate = await issuePrivateGatewayCertificate(
         registrationRequest.privateNodePublicKey,
         privateKey!,
-        publicGatewayCertificationPath!.leafCertificate,
+        internetGatewayCertPath!.leafCertificate,
       );
       const sessionKeyPair = await SessionKeyPair.generate();
       await privateKeyStore.saveSessionKey(
@@ -101,7 +101,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
-        publicGatewayCertificationPath!.leafCertificate,
+        internetGatewayCertPath!.leafCertificate,
         internetAddress,
         sessionKeyPair.sessionKey,
       );

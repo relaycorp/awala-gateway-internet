@@ -8,7 +8,7 @@ The Relaynet-Internet Gateway is distributed as a Helm chart. Note that deployin
 
 ## Example
 
-At a minimum, you have to specify the public address and the connection settings for the backing services; e.g.:
+At a minimum, you have to specify the Internet address and the connection settings for the backing services; e.g.:
 
 ```yaml
 # values.yaml

@@ -7,14 +7,14 @@ import { PassThrough } from 'stream';
 import { pipeline } from 'streaming-iterables';
 import { promisify } from 'util';
 
-import { PublicGatewayError } from '../errors';
+import { InternetGatewayError } from '../errors';
 
 export interface PublisherMessage {
   readonly id: string;
   readonly data: Buffer | string;
 }
 
-export class NatsStreamingSubscriptionError extends PublicGatewayError {}
+export class NatsStreamingSubscriptionError extends InternetGatewayError {}
 
 export class NatsStreamingClient {
   public static initFromEnv(clientId: string): NatsStreamingClient {

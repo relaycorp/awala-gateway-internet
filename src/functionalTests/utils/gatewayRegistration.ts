@@ -13,15 +13,15 @@ import { GW_POWEB_HOST_PORT } from './constants';
 
 export interface PrivateGatewayRegistration {
   readonly pdaChain: ExternalPdaChain;
-  readonly publicGatewaySessionKey: SessionKey;
+  readonly internetGatewaySessionKey: SessionKey;
 }
 
 export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayRegistration> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const {
     privateNodeCertificate: privateGatewayCertificate,
-    gatewayCertificate: publicGatewayCert,
-    sessionKey: publicGatewaySessionKey,
+    gatewayCertificate: internetGatewayCert,
+    sessionKey: internetGatewaySessionKey,
   } = await registerPrivateGateway(
     privateGatewayKeyPair,
     PoWebClient.initLocal(GW_POWEB_HOST_PORT),
@@ -43,16 +43,16 @@ export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayR
     validityEndDate: peerEndpointCertificate.expiryDate,
   });
 
-  const pdaChain = {
+  const pdaChain: ExternalPdaChain = {
     pdaCert: pda,
     pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
     peerEndpointCert: peerEndpointCertificate,
     peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
     privateGatewayCert: privateGatewayCertificate,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    publicGatewayCert,
+    internetGatewayCert,
   };
-  return { pdaChain, publicGatewaySessionKey: publicGatewaySessionKey!! };
+  return { pdaChain, internetGatewaySessionKey: internetGatewaySessionKey!! };
 }
 
 export async function registerPrivateGateway(

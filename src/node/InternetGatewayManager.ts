@@ -2,39 +2,39 @@ import { GatewayManager, KeyStoreSet } from '@relaycorp/relaynet-core';
 import { Connection } from 'mongoose';
 
 import { initPrivateKeyStore } from '../backingServices/keystore';
-import { PublicGatewayError } from '../errors';
+import { InternetGatewayError } from '../errors';
 import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { Config, ConfigKey } from '../utilities/config';
-import { PublicGateway } from './PublicGateway';
+import { InternetGateway } from './InternetGateway';
 
-export class PublicGatewayManager extends GatewayManager<PublicGateway> {
-  public static async init(mongoConnection: Connection): Promise<PublicGatewayManager> {
+export class InternetGatewayManager extends GatewayManager<InternetGateway> {
+  public static async init(mongoConnection: Connection): Promise<InternetGatewayManager> {
     const certificateStore = new MongoCertificateStore(mongoConnection);
     const publicKeyStore = new MongoPublicKeyStore(mongoConnection);
     const privateKeyStore = await initPrivateKeyStore(mongoConnection);
-    return new PublicGatewayManager(mongoConnection, {
+    return new InternetGatewayManager(mongoConnection, {
       certificateStore,
       privateKeyStore,
       publicKeyStore,
     });
   }
 
-  protected readonly defaultNodeConstructor = PublicGateway;
+  protected readonly defaultNodeConstructor = InternetGateway;
 
   constructor(protected connection: Connection, keyStores: KeyStoreSet) {
     super(keyStores);
   }
 
-  public async getCurrent(): Promise<PublicGateway> {
+  public async getCurrent(): Promise<InternetGateway> {
     const config = new Config(this.connection);
     const id = await config.get(ConfigKey.CURRENT_ID);
     if (!id) {
-      throw new PublicGatewayError('Current id is unset');
+      throw new InternetGatewayError('Current id is unset');
     }
     const gateway = await this.get(id);
     if (!gateway) {
-      throw new PublicGatewayError(`Public gateway does not exist (id: ${id})`);
+      throw new InternetGatewayError(`Internet gateway does not exist (id: ${id})`);
     }
     return gateway;
   }

@@ -301,7 +301,7 @@ export class ParcelStore {
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {
-    // Don't require the sender to be on a valid path from the current public gateway: Doing so
+    // Don't require the sender to be on a valid path from the current Internet gateway: Doing so
     // would only work if the recipient is also served by this gateway.
     await parcel.validate();
     logger.debug('Parcel is valid');

@@ -50,30 +50,30 @@ const TOMORROW = addDays(new Date(), 1);
 let keyPairSet: NodeKeyPairSet;
 let pdaChain: PDACertPath;
 let cdaChain: CDACertPath;
-let publicGatewayId: string;
+let internetGatewayId: string;
 let privateGatewayId: string;
 beforeAll(async () => {
   keyPairSet = await generateIdentityKeyPairSet();
   pdaChain = await generatePDACertificationPath(keyPairSet, addDays(new Date(), 181));
   cdaChain = await generateCDACertificationPath(keyPairSet);
-  publicGatewayId = await pdaChain.publicGateway.calculateSubjectId();
+  internetGatewayId = await pdaChain.internetGateway.calculateSubjectId();
   privateGatewayId = await pdaChain.privateGateway.calculateSubjectId();
 });
 
 const { getMongooseConnection, getSvcImplOptions, getMockLogs, getPrivateKeystore } =
   setUpTestEnvironment();
 
-let publicGatewaySessionKeyPair: SessionKeyPair;
+let internetGatewaySessionKeyPair: SessionKeyPair;
 beforeAll(async () => {
-  publicGatewaySessionKeyPair = await SessionKeyPair.generate();
+  internetGatewaySessionKeyPair = await SessionKeyPair.generate();
 });
 beforeEach(async () => {
   const privateKeyStore = getPrivateKeystore();
-  await privateKeyStore.saveIdentityKey(publicGatewayId, keyPairSet.publicGateway.privateKey);
+  await privateKeyStore.saveIdentityKey(internetGatewayId, keyPairSet.internetGateway.privateKey);
   await privateKeyStore.saveSessionKey(
-    publicGatewaySessionKeyPair.privateKey,
-    publicGatewaySessionKeyPair.sessionKey.keyId,
-    publicGatewayId,
+    internetGatewaySessionKeyPair.privateKey,
+    internetGatewaySessionKeyPair.sessionKey.keyId,
+    internetGatewayId,
     privateGatewayId,
   );
 });
@@ -82,10 +82,13 @@ beforeEach(async () => {
   const connection = getMongooseConnection();
 
   const certificateStore = new MongoCertificateStore(connection);
-  await certificateStore.save(new CertificationPath(pdaChain.publicGateway, []), publicGatewayId);
+  await certificateStore.save(
+    new CertificationPath(pdaChain.internetGateway, []),
+    internetGatewayId,
+  );
 
   const config = new Config(connection);
-  await config.set(ConfigKey.CURRENT_ID, await pdaChain.publicGateway.calculateSubjectId());
+  await config.set(ConfigKey.CURRENT_ID, await pdaChain.internetGateway.calculateSubjectId());
 });
 
 let SERVICE: CargoRelayServerMethodSet;
@@ -132,8 +135,8 @@ let privateGatewaySessionPrivateKey: CryptoKey;
 beforeAll(async () => {
   const generatedCCA = await generateCCA(
     GATEWAY_INTERNET_ADDRESS,
-    publicGatewaySessionKeyPair.sessionKey,
-    cdaChain.publicGateway,
+    internetGatewaySessionKeyPair.sessionKey,
+    cdaChain.internetGateway,
     pdaChain.privateGateway,
     keyPairSet.privateGateway.privateKey,
   );
@@ -219,7 +222,7 @@ describe('CCA validation', () => {
   });
 
   test('UNAUTHENTICATED should be returned if payload is not an EnvelopedData value', async () => {
-    const invalidCCASerialized = await generateCCAForPayload(publicGatewayId, new ArrayBuffer(0));
+    const invalidCCASerialized = await generateCCAForPayload(internetGatewayId, new ArrayBuffer(0));
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
 
     const error = await catchErrorEvent(CALL, () =>
@@ -237,10 +240,10 @@ describe('CCA validation', () => {
     const unknownSessionKey = (await SessionKeyPair.generate()).sessionKey;
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       new ArrayBuffer(0),
-      unknownSessionKey, // The public gateway doesn't have this key
+      unknownSessionKey, // The Internet gateway doesn't have this key
     );
     const invalidCCASerialized = await generateCCAForPayload(
-      publicGatewayId,
+      internetGatewayId,
       envelopedData.serialize(),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
@@ -259,10 +262,10 @@ describe('CCA validation', () => {
   test('UNAUTHENTICATED should be returned if CCR is malformed', async () => {
     const { envelopedData } = await SessionEnvelopedData.encrypt(
       arrayBufferFrom('not a valid CCR'),
-      publicGatewaySessionKeyPair.sessionKey,
+      internetGatewaySessionKeyPair.sessionKey,
     );
     const invalidCCASerialized = await generateCCAForPayload(
-      publicGatewayId,
+      internetGatewayId,
       envelopedData.serialize(),
     );
     CALL.metadata.add('Authorization', serializeAuthzMetadata(invalidCCASerialized));
@@ -589,8 +592,8 @@ describe('Private gateway certificate rotation', () => {
     );
     const { ccaSerialized: expiringCCA, sessionPrivateKey } = await generateCCA(
       GATEWAY_INTERNET_ADDRESS,
-      publicGatewaySessionKeyPair.sessionKey,
-      cdaChain.publicGateway,
+      internetGatewaySessionKeyPair.sessionKey,
+      cdaChain.internetGateway,
       expiringPDAChain.privateGateway,
       keyPairSet.privateGateway.privateKey,
     );
@@ -606,12 +609,15 @@ describe('Private gateway certificate rotation', () => {
       derSerializePublicKey(await rotation.certificationPath.leafCertificate.getPublicKey()),
     ).resolves.toEqual(await derSerializePublicKey(await pdaChain.privateGateway.getPublicKey()));
     await expect(
-      rotation.certificationPath.leafCertificate.getCertificationPath([], [pdaChain.publicGateway]),
+      rotation.certificationPath.leafCertificate.getCertificationPath(
+        [],
+        [pdaChain.internetGateway],
+      ),
     ).resolves.toHaveLength(2);
-    // Check public gateway certificate
+    // Check Internet gateway certificate
     expect(rotation.certificationPath.certificateAuthorities).toHaveLength(1);
     expect(
-      pdaChain.publicGateway.isEqual(rotation.certificationPath.certificateAuthorities[0]),
+      pdaChain.internetGateway.isEqual(rotation.certificationPath.certificateAuthorities[0]),
     ).toBeTrue();
     // Other checks
     expect(getMockLogs()).toContainEqual(
@@ -630,8 +636,8 @@ describe('Private gateway certificate rotation', () => {
     );
     const { ccaSerialized: expiringCCA } = await generateCCA(
       GATEWAY_INTERNET_ADDRESS,
-      publicGatewaySessionKeyPair.sessionKey,
-      cdaChain.publicGateway,
+      internetGatewaySessionKeyPair.sessionKey,
+      cdaChain.internetGateway,
       expiringPDAChain.privateGateway,
       keyPairSet.privateGateway.privateKey,
     );

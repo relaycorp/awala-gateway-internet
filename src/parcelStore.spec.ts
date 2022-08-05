@@ -440,12 +440,12 @@ describe('storeParcelForPrivatePeer', () => {
 
   const mockRetrieveOwnCertificates = mockSpy(
     jest.spyOn(pki, 'retrieveOwnCertificates'),
-    async () => [pdaChain.publicGatewayCert],
+    async () => [pdaChain.internetGatewayCert],
   );
 
   test('Parcel should be refused if sender is not trusted', async () => {
     const differentPDAChain = await generatePdaChain();
-    mockRetrieveOwnCertificates.mockResolvedValue([differentPDAChain.publicGatewayCert]);
+    mockRetrieveOwnCertificates.mockResolvedValue([differentPDAChain.internetGatewayCert]);
 
     await expect(
       store.storeParcelForPrivatePeer(

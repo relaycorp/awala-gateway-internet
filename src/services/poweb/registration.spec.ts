@@ -131,10 +131,10 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
   });
 
-  test('Private gateway certificate should be issued by public gateway', async () => {
+  test('Private gateway certificate should be issued by Internet gateway', async () => {
     const fixtures = getFixtures();
 
     const response = await completeRegistration(fixtures);
@@ -142,9 +142,9 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
     await expect(
-      registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
+      registration.privateNodeCertificate.getCertificationPath([], [fixtures.internetGatewayCert]),
     ).resolves.toHaveLength(2);
   });
 
@@ -187,7 +187,7 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
 
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
     const privateGatewayPublicKeySerialized = await derSerializePublicKey(privateGatewayPublicKey);
@@ -257,5 +257,5 @@ async function generatePNRA(privateGatewayPublicKeySerialized: Buffer): Promise<
     fiveSecondsInTheFuture,
     serverData,
   );
-  return authorization.serialize(fixtures.publicGatewayPrivateKey);
+  return authorization.serialize(fixtures.internetGatewayPrivateKey);
 }

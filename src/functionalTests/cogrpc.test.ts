@@ -50,7 +50,7 @@ describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
     const cargo = new Cargo(
-      await getPublicGatewayRecipient(pdaChain.publicGatewayCert),
+      await getInternetGatewayRecipient(pdaChain.internetGatewayCert),
       pdaChain.privateGatewayCert,
       Buffer.from([]),
     );
@@ -74,7 +74,7 @@ describe('Cargo delivery', () => {
     });
 
     const cargo = new Cargo(
-      await getPublicGatewayRecipient(unauthorizedCertificate),
+      await getInternetGatewayRecipient(unauthorizedCertificate),
       unauthorizedCertificate,
       Buffer.from([]),
     );
@@ -94,7 +94,7 @@ describe('Cargo delivery', () => {
 
 describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const { parcel, parcelSerialized } = await generateDummyParcel(pdaChain);
     await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
     await waitForNextParcel(POWEB_CLIENT, pdaChain);
@@ -102,8 +102,8 @@ describe('Cargo collection', () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
       GW_INTERNET_ADDRESS,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
@@ -121,7 +121,7 @@ describe('Cargo collection', () => {
   });
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const { parcelSerialized } = await generateDummyParcel(pdaChain);
     await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
     await waitForNextParcel(POWEB_CLIENT, pdaChain);
@@ -129,8 +129,8 @@ describe('Cargo collection', () => {
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
       GW_INTERNET_ADDRESS,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
@@ -148,7 +148,7 @@ describe('Cargo collection', () => {
       validityEndDate: TOMORROW,
     });
     const cca = new CargoCollectionAuthorization(
-      await getPublicGatewayRecipient(unauthorizedCertificate),
+      await getInternetGatewayRecipient(unauthorizedCertificate),
       unauthorizedCertificate,
       Buffer.from([]),
     );
@@ -163,12 +163,12 @@ describe('Cargo collection', () => {
   });
 
   test('CCAs should not be reusable', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
       GW_INTERNET_ADDRESS,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
@@ -184,7 +184,7 @@ describe('Cargo collection', () => {
 });
 
 test('Sending pings and receiving pongs', async () => {
-  const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+  const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
 
   const pingId = uuid();
   const pingParcelData = await makePingParcel(pingId, pdaChain);
@@ -194,7 +194,7 @@ test('Sending pings and receiving pongs', async () => {
   const cargoSerialized = await encapsulateMessagesInCargo(
     [pingParcelData.parcelSerialized],
     pdaChain,
-    publicGatewaySessionKey,
+    internetGatewaySessionKey,
     privateGatewayKeyStore,
   );
   await asyncIterableToArray(
@@ -208,8 +208,8 @@ test('Sending pings and receiving pongs', async () => {
   const cdaChain = await generateCDAChain(pdaChain);
   const { ccaSerialized } = await generateCCA(
     GW_INTERNET_ADDRESS,
-    publicGatewaySessionKey,
-    cdaChain.publicGatewayCert,
+    internetGatewaySessionKey,
+    cdaChain.internetGatewayCert,
     pdaChain.privateGatewayCert,
     pdaChain.privateGatewayPrivateKey,
     privateGatewayKeyStore,
@@ -232,10 +232,10 @@ test('Sending pings and receiving pongs', async () => {
   );
 });
 
-async function getPublicGatewayRecipient(
-  publicGatewayCertificate: Certificate,
+async function getInternetGatewayRecipient(
+  internetGatewayCertificate: Certificate,
 ): Promise<Recipient> {
-  return { id: await publicGatewayCertificate.calculateSubjectId() };
+  return { id: await internetGatewayCertificate.calculateSubjectId() };
 }
 
 async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<GeneratedParcel> {

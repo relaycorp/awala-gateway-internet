@@ -63,7 +63,7 @@ const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
   async (connection) => {
     expect(connection).toBe(getFixtures().getMongooseConnection());
     const fixtures = getFixtures();
-    return [fixtures.publicGatewayCert];
+    return [fixtures.internetGatewayCert];
   },
 );
 

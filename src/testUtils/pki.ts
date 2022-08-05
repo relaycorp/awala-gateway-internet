@@ -17,7 +17,7 @@ import { CERTIFICATE_TTL_DAYS } from '../pki';
 const TOMORROW = addDays(new Date(), 1);
 
 export interface CDAChain {
-  readonly publicGatewayCert: Certificate;
+  readonly internetGatewayCert: Certificate;
   readonly privateGatewayCert: Certificate;
 }
 
@@ -30,16 +30,16 @@ export interface ExternalPdaChain extends CDAChain {
 }
 
 export interface PdaChain extends ExternalPdaChain {
-  readonly publicGatewayPrivateKey: CryptoKey;
+  readonly internetGatewayPrivateKey: CryptoKey;
 }
 
 // TODO: Replace with respective function in @relaycorp/relaynet-testing
 export async function generatePdaChain(): Promise<PdaChain> {
-  const publicGatewayKeyPair = await generateRSAKeyPair();
-  const publicGatewayCert = reSerializeCertificate(
+  const internetGatewayKeyPair = await generateRSAKeyPair();
+  const internetGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerPrivateKey: publicGatewayKeyPair.privateKey,
-      subjectPublicKey: publicGatewayKeyPair.publicKey,
+      issuerPrivateKey: internetGatewayKeyPair.privateKey,
+      subjectPublicKey: internetGatewayKeyPair.publicKey,
       validityEndDate: addDays(new Date(), CERTIFICATE_TTL_DAYS),
     }),
   );
@@ -47,8 +47,8 @@ export async function generatePdaChain(): Promise<PdaChain> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const privateGatewayCert = reSerializeCertificate(
     await issueGatewayCertificate({
-      issuerCertificate: publicGatewayCert,
-      issuerPrivateKey: publicGatewayKeyPair.privateKey,
+      issuerCertificate: internetGatewayCert,
+      issuerPrivateKey: internetGatewayKeyPair.privateKey,
       subjectPublicKey: privateGatewayKeyPair.publicKey,
       validityEndDate: TOMORROW,
     }),
@@ -81,8 +81,8 @@ export async function generatePdaChain(): Promise<PdaChain> {
     peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
     privateGatewayCert,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    publicGatewayCert,
-    publicGatewayPrivateKey: publicGatewayKeyPair.privateKey,
+    internetGatewayCert,
+    internetGatewayPrivateKey: internetGatewayKeyPair.privateKey,
   };
 }
 
@@ -114,15 +114,15 @@ export async function generateCDAChain(pdaChain: ExternalPdaChain): Promise<CDAC
       validityEndDate: pdaChain.privateGatewayCert.expiryDate,
     }),
   );
-  const publicGatewayCert = reSerializeCertificate(
+  const internetGatewayCert = reSerializeCertificate(
     await issueDeliveryAuthorization({
       issuerCertificate: privateGatewayCert,
       issuerPrivateKey: pdaChain.privateGatewayPrivateKey,
-      subjectPublicKey: await pdaChain.publicGatewayCert.getPublicKey(),
-      validityEndDate: pdaChain.publicGatewayCert.expiryDate,
+      subjectPublicKey: await pdaChain.internetGatewayCert.getPublicKey(),
+      validityEndDate: pdaChain.internetGatewayCert.expiryDate,
     }),
   );
-  return { privateGatewayCert, publicGatewayCert };
+  return { privateGatewayCert, internetGatewayCert };
 }
 
 export interface GeneratedCCA {

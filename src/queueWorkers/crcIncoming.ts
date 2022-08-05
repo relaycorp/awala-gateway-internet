@@ -15,9 +15,9 @@ import { pipeline } from 'streaming-iterables';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { PublicGatewayError } from '../errors';
-import { PublicGateway } from '../node/PublicGateway';
-import { PublicGatewayManager } from '../node/PublicGatewayManager';
+import { InternetGatewayError } from '../errors';
+import { InternetGateway } from '../node/InternetGateway';
+import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -45,7 +45,7 @@ function makeCargoProcessor(
 ): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
     const mongooseConnection = await createMongooseConnectionFromEnv();
-    const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+    const gatewayManager = await InternetGatewayManager.init(mongooseConnection);
     const gateway = await gatewayManager.getCurrent();
 
     const parcelStore = ParcelStore.initFromEnv();
@@ -69,7 +69,7 @@ function makeCargoProcessor(
 
 async function processCargo(
   message: Message,
-  gateway: PublicGateway,
+  gateway: InternetGateway,
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
@@ -85,7 +85,7 @@ async function processCargo(
     cargoMessageSet = await gateway.unwrapMessagePayload(cargo);
   } catch (err) {
     if (err instanceof KeyStoreError) {
-      throw new PublicGatewayError(err, 'Failed to use key store to unwrap message');
+      throw new InternetGatewayError(err, 'Failed to use key store to unwrap message');
     }
     cargoAwareLogger.info({ err }, 'Cargo payload is invalid');
     message.ack();

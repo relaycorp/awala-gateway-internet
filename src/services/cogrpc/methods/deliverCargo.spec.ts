@@ -29,7 +29,7 @@ let cargoSerialization: Buffer;
 beforeAll(async () => {
   cargo = new Cargo(
     {
-      id: await pdaChain.publicGatewayCert.calculateSubjectId(),
+      id: await pdaChain.internetGatewayCert.calculateSubjectId(),
       internetAddress: GATEWAY_INTERNET_ADDRESS,
     },
     pdaChain.privateGatewayCert,
@@ -73,7 +73,7 @@ beforeEach(() => {
 });
 
 const RETRIEVE_OWN_CERTIFICATES_SPY = mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), () => [
-  pdaChain.publicGatewayCert,
+  pdaChain.internetGatewayCert,
 ]);
 
 test('NATS Streaming publisher should be initialized upfront', async () => {

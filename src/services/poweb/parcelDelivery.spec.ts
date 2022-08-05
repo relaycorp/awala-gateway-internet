@@ -25,7 +25,7 @@ const mockNatsStreamingInit = mockSpy(
 );
 
 mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), async () => {
-  return [getFixtures().publicGatewayCert];
+  return [getFixtures().internetGatewayCert];
 });
 
 let PARCEL: Parcel;

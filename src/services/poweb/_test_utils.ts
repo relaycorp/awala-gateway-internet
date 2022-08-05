@@ -46,7 +46,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
   let certificatePath: PdaChain;
   beforeAll(async () => {
     certificatePath = await generatePdaChain();
-    internetGatewayId = await certificatePath.publicGatewayCert.calculateSubjectId();
+    internetGatewayId = await certificatePath.internetGatewayCert.calculateSubjectId();
   });
 
   let mockPrivateKeyStore: MockPrivateKeyStore;
@@ -54,7 +54,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     mockPrivateKeyStore = new MockPrivateKeyStore();
     await mockPrivateKeyStore.saveIdentityKey(
       internetGatewayId,
-      certificatePath.publicGatewayPrivateKey,
+      certificatePath.internetGatewayPrivateKey,
     );
   });
   mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
@@ -64,7 +64,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
 
     const certificateStore = new MongoCertificateStore(connection);
     await certificateStore.save(
-      new CertificationPath(certificatePath.publicGatewayCert, []),
+      new CertificationPath(certificatePath.internetGatewayCert, []),
       internetGatewayId,
     );
 

@@ -20,8 +20,8 @@ import * as stan from 'node-nats-streaming';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
-import { PublicGatewayError } from '../errors';
-import { PublicGatewayManager } from '../node/PublicGatewayManager';
+import { InternetGatewayError } from '../errors';
+import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { GATEWAY_INTERNET_ADDRESS } from '../testUtils/awala';
 import { arrayBufferFrom } from '../testUtils/buffers';
@@ -72,8 +72,8 @@ beforeEach(() => {
   mockKeyStores.clear();
 });
 const mockManagerInit = mockSpy(
-  jest.spyOn(PublicGatewayManager, 'init'),
-  (connection) => new PublicGatewayManager(connection, mockKeyStores),
+  jest.spyOn(InternetGatewayManager, 'init'),
+  (connection) => new InternetGatewayManager(connection, mockKeyStores),
 );
 
 //region Parcel store-related fixtures
@@ -98,35 +98,35 @@ const BASE_ENV_VARS = {
 configureMockEnvVars(BASE_ENV_VARS);
 
 let certificateChain: PdaChain;
-let publicGatewayId: string;
-let publicGatewaySessionPrivateKey: CryptoKey;
-let publicGatewaySessionKey: SessionKey;
+let internetGatewayId: string;
+let internetGatewaySessionPrivateKey: CryptoKey;
+let internetGatewaySessionKey: SessionKey;
 beforeAll(async () => {
   certificateChain = await generatePdaChain();
 
-  publicGatewayId = await certificateChain.publicGatewayCert.calculateSubjectId();
+  internetGatewayId = await certificateChain.internetGatewayCert.calculateSubjectId();
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const sessionKeyPair = await SessionKeyPair.generate();
-  publicGatewaySessionKey = sessionKeyPair.sessionKey;
-  publicGatewaySessionPrivateKey = sessionKeyPair.privateKey;
+  internetGatewaySessionKey = sessionKeyPair.sessionKey;
+  internetGatewaySessionPrivateKey = sessionKeyPair.privateKey;
 });
 
 beforeEach(async () => {
   await mockKeyStores.privateKeyStore.saveIdentityKey(
-    publicGatewayId,
-    certificateChain.publicGatewayPrivateKey,
+    internetGatewayId,
+    certificateChain.internetGatewayPrivateKey,
   );
   await mockKeyStores.privateKeyStore.saveSessionKey(
-    publicGatewaySessionPrivateKey,
-    publicGatewaySessionKey.keyId,
-    publicGatewayId,
+    internetGatewaySessionPrivateKey,
+    internetGatewaySessionKey.keyId,
+    internetGatewayId,
   );
 
   const mongoConnection = getMongoConnection();
   const config = new Config(mongoConnection);
-  await config.set(ConfigKey.CURRENT_ID, publicGatewayId);
+  await config.set(ConfigKey.CURRENT_ID, internetGatewayId);
 });
 
 let PARCEL: Parcel;
@@ -228,7 +228,7 @@ describe('Queue subscription', () => {
 
 test('Cargo with invalid payload should be logged and ignored', async () => {
   const cargo = new Cargo(
-    { id: publicGatewayId },
+    { id: internetGatewayId },
     certificateChain.privateGatewayCert,
     Buffer.from('Not a CMS EnvelopedData value'),
   );
@@ -258,17 +258,20 @@ test('Keystore errors should be propagated and cargo should remain in the queue'
   );
   mockQueueMessages = [stanMessage];
   const privateKeyStore = new MockPrivateKeyStore();
-  await privateKeyStore.saveIdentityKey(publicGatewayId, certificateChain.publicGatewayPrivateKey);
+  await privateKeyStore.saveIdentityKey(
+    internetGatewayId,
+    certificateChain.internetGatewayPrivateKey,
+  );
   const keyStoreError = new KeyStoreError('The planets are not aligned');
   jest.spyOn(privateKeyStore, 'retrieveSessionKey').mockRejectedValue(keyStoreError);
   mockManagerInit.mockImplementation(
     async (connection) =>
-      new PublicGatewayManager(connection, { ...mockKeyStores, privateKeyStore }),
+      new InternetGatewayManager(connection, { ...mockKeyStores, privateKeyStore }),
   );
 
   const error = await getPromiseRejection(
     processIncomingCrcCargo(STUB_WORKER_NAME),
-    PublicGatewayError,
+    InternetGatewayError,
   );
 
   expect(error.message).toStartWith('Failed to use key store to unwrap message:');
@@ -280,10 +283,10 @@ test('Session keys of sender should be stored if present', async () => {
   const cargoMessageSet = new CargoMessageSet([]);
   const { envelopedData } = await SessionEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
-    publicGatewaySessionKey,
+    internetGatewaySessionKey,
   );
   const cargo = new Cargo(
-    { id: publicGatewayId },
+    { id: internetGatewayId },
     certificateChain.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );
@@ -421,7 +424,9 @@ describe('PCA processing', () => {
 
 test('CertificateRotation messages should be ignored', async () => {
   const rotation = new CertificateRotation(
-    new CertificationPath(certificateChain.publicGatewayCert, [certificateChain.publicGatewayCert]),
+    new CertificationPath(certificateChain.internetGatewayCert, [
+      certificateChain.internetGatewayCert,
+    ]),
   );
   const cargoSerialized = await generateCargoSerialized(rotation.serialize());
   mockQueueMessages = [mockStanMessage(cargoSerialized)];
@@ -506,10 +511,10 @@ async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {
   const cargoMessageSet = new CargoMessageSet(items);
   const { envelopedData } = await SessionEnvelopedData.encrypt(
     cargoMessageSet.serialize(),
-    publicGatewaySessionKey,
+    internetGatewaySessionKey,
   );
   return new Cargo(
-    { id: publicGatewayId },
+    { id: internetGatewayId },
     certificateChain.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );

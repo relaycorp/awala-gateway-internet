@@ -15,25 +15,25 @@ import { GW_INTERNET_ADDRESS } from './constants';
 export async function encapsulateMessagesInCargo(
   messages: readonly ArrayBuffer[],
   gwPDAChain: ExternalPdaChain,
-  publicGatewaySessionKey: SessionKey,
+  internetGatewaySessionKey: SessionKey,
   privateGatewayKeyStore: PrivateKeyStore,
 ): Promise<Buffer> {
   const messageSet = new CargoMessageSet(messages);
   const { envelopedData, dhKeyId, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     messageSet.serialize(),
-    publicGatewaySessionKey,
+    internetGatewaySessionKey,
   );
 
-  const publicGatewayId = await gwPDAChain.publicGatewayCert.calculateSubjectId();
+  const internetGatewayId = await gwPDAChain.internetGatewayCert.calculateSubjectId();
   await privateGatewayKeyStore.saveSessionKey(
     dhPrivateKey,
     Buffer.from(dhKeyId),
     await gwPDAChain.privateGatewayCert.calculateSubjectId(),
-    publicGatewayId,
+    internetGatewayId,
   );
 
   const cargo = new Cargo(
-    { id: publicGatewayId, internetAddress: GW_INTERNET_ADDRESS },
+    { id: internetGatewayId, internetAddress: GW_INTERNET_ADDRESS },
     gwPDAChain.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );

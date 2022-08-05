@@ -67,7 +67,7 @@ test('A valid authorization should be issued if the request if valid', async () 
 
   const authorization = await PrivateNodeRegistrationAuthorization.deserialize(
     bufferToArray(response.rawPayload),
-    await getFixtures().publicGatewayCert.getPublicKey(),
+    await getFixtures().internetGatewayCert.getPublicKey(),
   );
   const now = new Date();
   expect(authorization.expiryDate.getTime()).toBeGreaterThan(now.getTime() + 8_000);

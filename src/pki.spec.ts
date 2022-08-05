@@ -186,9 +186,9 @@ describe('issuePrivateGatewayCertificate', () => {
     privateGatewayPublicKey = privateGatewayKeyPair.publicKey;
   });
 
-  let publicGatewayCertificate: Certificate;
+  let internetGatewayCertificate: Certificate;
   beforeAll(async () => {
-    publicGatewayCertificate = reSerializeCertificate(
+    internetGatewayCertificate = reSerializeCertificate(
       await issueGatewayCertificate({
         issuerPrivateKey: identityKeyPair.privateKey,
         subjectPublicKey: identityKeyPair.publicKey,
@@ -201,7 +201,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     await expect(
@@ -209,17 +209,17 @@ describe('issuePrivateGatewayCertificate', () => {
     ).resolves.toEqual(await derSerializePublicKey(privateGatewayPublicKey));
   });
 
-  test('Issuer should be public gateway', async () => {
+  test('Issuer should be Internet gateway', async () => {
     const privateGatewayCertificate = reSerializeCertificate(
       await issuePrivateGatewayCertificate(
         privateGatewayPublicKey,
         identityKeyPair.privateKey,
-        publicGatewayCertificate,
+        internetGatewayCertificate,
       ),
     );
 
     await expect(
-      privateGatewayCertificate.getCertificationPath([], [publicGatewayCertificate]),
+      privateGatewayCertificate.getCertificationPath([], [internetGatewayCertificate]),
     ).resolves.toHaveLength(2);
   });
 
@@ -228,7 +228,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     const expectedStartDate = subHours(dateBeforeIssuance, 3);
@@ -242,7 +242,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     const expectedExpiryDate = addDays(new Date(), 180);

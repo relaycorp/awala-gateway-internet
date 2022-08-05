@@ -6,6 +6,7 @@ import {
   Certificate,
   generateRSAKeyPair,
   issueGatewayCertificate,
+  MockPrivateKeyStore,
   Parcel,
   ParcelCollectionAck,
   Recipient,
@@ -16,6 +17,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
 import uuid from 'uuid-random';
+import { GeneratedParcel } from '../testUtils/awala';
 
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
@@ -29,7 +31,6 @@ import {
   GW_POWEB_HOST_PORT,
 } from './utils/constants';
 import { connectToNatsStreaming } from './utils/nats';
-import { GeneratedParcel } from './utils/parcels';
 import { extractPong, makePingParcel } from './utils/ping';
 import { waitForNextParcel } from './utils/poweb';
 
@@ -189,10 +190,12 @@ test('Sending pings and receiving pongs', async () => {
   const pingParcelData = await makePingParcel(pingId, pdaChain);
 
   // Deliver the ping message encapsulated in a cargo
+  const privateGatewayKeyStore = new MockPrivateKeyStore();
   const cargoSerialized = await encapsulateMessagesInCargo(
     [pingParcelData.parcelSerialized],
     pdaChain,
     publicGatewaySessionKey,
+    privateGatewayKeyStore,
   );
   await asyncIterableToArray(
     cogRPCClient.deliverCargo(
@@ -203,19 +206,20 @@ test('Sending pings and receiving pongs', async () => {
 
   // Collect the pong message encapsulated in a cargo
   const cdaChain = await generateCDAChain(pdaChain);
-  const { ccaSerialized, sessionPrivateKey } = await generateCCA(
+  const { ccaSerialized } = await generateCCA(
     GW_INTERNET_ADDRESS,
     publicGatewaySessionKey,
     cdaChain.publicGatewayCert,
     pdaChain.privateGatewayCert,
     pdaChain.privateGatewayPrivateKey,
+    privateGatewayKeyStore,
   );
   const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
   expect(collectedCargoes).toHaveLength(1);
   const collectedMessages = await extractMessagesFromCargo(
     collectedCargoes[0],
     cdaChain.privateGatewayCert,
-    sessionPrivateKey,
+    privateGatewayKeyStore,
   );
   expect(collectedMessages).toHaveLength(2);
   const collectionAck = collectedMessages[0];

@@ -5,6 +5,7 @@ import {
   SessionKey,
   CargoMessageSetItem,
   Certificate,
+  PrivateKeyStore,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 
@@ -15,17 +16,24 @@ export async function encapsulateMessagesInCargo(
   messages: readonly ArrayBuffer[],
   gwPDAChain: ExternalPdaChain,
   publicGatewaySessionKey: SessionKey,
+  privateGatewayKeyStore: PrivateKeyStore,
 ): Promise<Buffer> {
   const messageSet = new CargoMessageSet(messages);
-  const { envelopedData } = await SessionEnvelopedData.encrypt(
+  const { envelopedData, dhKeyId, dhPrivateKey } = await SessionEnvelopedData.encrypt(
     messageSet.serialize(),
     publicGatewaySessionKey,
   );
+
+  const publicGatewayId = await gwPDAChain.publicGatewayCert.calculateSubjectId();
+  await privateGatewayKeyStore.saveSessionKey(
+    dhPrivateKey,
+    Buffer.from(dhKeyId),
+    await gwPDAChain.privateGatewayCert.calculateSubjectId(),
+    publicGatewayId,
+  );
+
   const cargo = new Cargo(
-    {
-      id: await gwPDAChain.publicGatewayCert.calculateSubjectId(),
-      internetAddress: GW_INTERNET_ADDRESS,
-    },
+    { id: publicGatewayId, internetAddress: GW_INTERNET_ADDRESS },
     gwPDAChain.privateGatewayCert,
     Buffer.from(envelopedData.serialize()),
   );
@@ -35,7 +43,7 @@ export async function encapsulateMessagesInCargo(
 export async function extractMessagesFromCargo(
   cargoSerialized: Buffer,
   recipientCertificate: Certificate,
-  recipientSessionPrivateKey: CryptoKey,
+  recipientSessionPrivateKey: CryptoKey | PrivateKeyStore,
 ): Promise<readonly CargoMessageSetItem[]> {
   const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
   await cargo.validate([recipientCertificate]);

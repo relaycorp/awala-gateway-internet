@@ -16,13 +16,13 @@ import {
 } from '@relaycorp/relaynet-poweb';
 import uuid from 'uuid-random';
 
+import { GeneratedParcel } from '../testUtils/awala';
 import { ExternalPdaChain } from '../testUtils/pki';
 import { GW_POWEB_HOST_PORT } from './utils/constants';
 import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
-import { GeneratedParcel } from './utils/parcels';
 import { extractPong, makePingParcel } from './utils/ping';
 import { collectNextParcel, waitForNextParcel } from './utils/poweb';
 

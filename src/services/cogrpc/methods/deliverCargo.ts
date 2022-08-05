@@ -33,22 +33,22 @@ export default async function deliverCargo(
     source: AsyncIterable<CargoDelivery>,
   ): AsyncIterable<PublisherMessage> {
     for await (const delivery of source) {
-      let peerGatewayAddress: string | null = null;
+      let privatePeerId: string | null = null;
       let cargoId: string | null = null;
       try {
         const cargo = await Cargo.deserialize(bufferToArray(delivery.cargo));
         cargoId = cargo.id;
-        peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
-        await cargo.validate(undefined, trustedCerts);
+        privatePeerId = await cargo.senderCertificate.calculateSubjectId();
+        await cargo.validate(trustedCerts);
       } catch (err) {
         // Acknowledge that we got it, not that it was accepted and stored. See:
         // https://github.com/relaynet/specs/issues/38
-        logger.info({ err, peerGatewayAddress }, 'Ignoring malformed/invalid cargo');
+        logger.info({ err, privatePeerId }, 'Ignoring malformed/invalid cargo');
         call.write({ id: delivery.id });
         continue;
       }
 
-      logger.info({ cargoId, peerGatewayAddress }, 'Processing valid cargo');
+      logger.info({ cargoId, privatePeerId }, 'Processing valid cargo');
       cargoesDelivered += 1;
       yield { id: delivery.id, data: delivery.cargo };
     }

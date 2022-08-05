@@ -38,13 +38,13 @@ portForward:
   localPort: 8080
 - resourceType: service
   resourceName: public-gateway-pohttp
-  port: 8080
+  port: 80
   localPort: 8081
 - resourceType: service
   resourceName: public-gateway-cogrpc
   port: 8081
   localPort: 8082
 - resourceType: service
-  resourceName: relaynet-pong-pohttp
+  resourceName: pong-pohttp
   port: 80
   localPort: 8083

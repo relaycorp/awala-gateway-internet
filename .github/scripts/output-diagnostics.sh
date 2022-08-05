@@ -19,23 +19,23 @@ if ! command -v kubectl; then
   exit 1
 fi
 
-print_header "Pods"
-kubectl get pods
-
 print_header "Services"
 kubectl get services
 
-DEPLOYMENTS="$(
-  kubectl get deploy \
+print_header "Jobs"
+kubectl get jobs
+
+print_header "Pods"
+kubectl get pods
+
+PODS="$(
+  kubectl get pod \
     -l app.kubernetes.io/name=relaynet-internet-gateway \
     "-o=jsonpath={.items[*]['metadata.name']}"
 )"
 
-for deployment in ${DEPLOYMENTS}; do
-  print_header "Logs for ${deployment}"
+for pod in ${PODS}; do
+  print_header "Logs for ${pod}"
 
-  kubectl logs "deploy/${deployment}" --all-containers=true
+  kubectl logs "${pod}" --all-containers=true
 done
-
-print_header "Jobs"
-kubectl get jobs

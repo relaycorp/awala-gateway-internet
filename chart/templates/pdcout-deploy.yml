@@ -34,13 +34,11 @@ spec:
           args:
             - build/main/bin/pdc-outgoing-queue-worker.js
           env:
-            - name: POHTTP_ADDRESS
-              value: {{ default (include "relaynet-internet-gateway.publicAddressUri" .) .Values.pdcQueue.pohttpAddress  }}
             - name: WORKER_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: POHTTP_TLS_REQUIRED
+            - name: POHTTP_USE_TLS
               value: {{ ternary "false" "true" .Values.tags.gwDev | quote }}
           envFrom:
             - configMapRef:

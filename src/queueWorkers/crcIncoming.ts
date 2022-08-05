@@ -8,7 +8,6 @@ import {
   ParcelCollectionAck,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
@@ -16,10 +15,9 @@ import { pipeline } from 'streaming-iterables';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
-import { PublicGatewayError } from '../errors';
-import { PublicGateway } from '../node/PublicGateway';
-import { PublicGatewayManager } from '../node/PublicGatewayManager';
+import { InternetGatewayError } from '../errors';
+import { InternetGateway } from '../node/InternetGateway';
+import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -47,12 +45,10 @@ function makeCargoProcessor(
 ): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
     const mongooseConnection = await createMongooseConnectionFromEnv();
-    const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+    const gatewayManager = await InternetGatewayManager.init(mongooseConnection);
     const gateway = await gatewayManager.getCurrent();
 
-    const objectStoreClient = initObjectStoreFromEnv();
-    const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-    const parcelStore = new ParcelStore(objectStoreClient, parcelStoreBucket);
+    const parcelStore = ParcelStore.initFromEnv();
 
     try {
       for await (const message of messages) {
@@ -73,23 +69,23 @@ function makeCargoProcessor(
 
 async function processCargo(
   message: Message,
-  gateway: PublicGateway,
+  gateway: InternetGateway,
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
-  const peerGatewayAddress = await cargo.senderCertificate.calculateSubjectPrivateAddress();
+  const privatePeerId = await cargo.senderCertificate.calculateSubjectId();
 
-  const cargoAwareLogger = logger.child({ cargoId: cargo.id, peerGatewayAddress });
+  const cargoAwareLogger = logger.child({ cargoId: cargo.id, privatePeerId });
 
   let cargoMessageSet: CargoMessageSet;
   try {
     cargoMessageSet = await gateway.unwrapMessagePayload(cargo);
   } catch (err) {
     if (err instanceof KeyStoreError) {
-      throw new PublicGatewayError(err, 'Failed to use key store to unwrap message');
+      throw new InternetGatewayError(err, 'Failed to use key store to unwrap message');
     }
     cargoAwareLogger.info({ err }, 'Cargo payload is invalid');
     message.ack();
@@ -108,18 +104,18 @@ async function processCargo(
       await processParcel(
         item,
         Buffer.from(itemSerialized),
-        peerGatewayAddress,
+        privatePeerId,
         parcelStore,
         mongooseConnection,
         natsStreamingClient,
         cargoAwareLogger.child({ parcelId: item.id }),
       );
     } else if (item instanceof ParcelCollectionAck) {
-      await parcelStore.deleteGatewayBoundParcel(
+      await parcelStore.deleteParcelForPrivatePeer(
         item.parcelId,
-        item.senderEndpointPrivateAddress,
-        item.recipientEndpointAddress,
-        peerGatewayAddress,
+        item.senderEndpointId,
+        item.recipientEndpointId,
+        privatePeerId,
       );
     } else {
       cargoAwareLogger.info('Ignoring certificate rotation message');
@@ -133,7 +129,7 @@ async function processCargo(
 async function processParcel(
   parcel: Parcel,
   parcelSerialized: Buffer,
-  peerGatewayAddress: string,
+  privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
@@ -141,10 +137,10 @@ async function processParcel(
 ): Promise<void> {
   let parcelObjectKey: string | null;
   try {
-    parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(
+    parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privatePeerId,
       mongooseConnection,
       natsStreamingClient,
       parcelAwareLogger,
@@ -161,7 +157,7 @@ async function processParcel(
   parcelAwareLogger.debug(
     {
       parcelObjectKey,
-      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectPrivateAddress(),
+      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectId(),
     },
     parcelObjectKey ? 'Parcel was stored' : 'Ignoring previously processed parcel',
   );

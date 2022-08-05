@@ -9,7 +9,6 @@ import * as stan from 'node-nats-streaming';
 import { pipeline } from 'streaming-iterables';
 
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { initObjectStoreFromEnv } from '../backingServices/objectStorage';
 import { ParcelStore, QueuedInternetBoundParcelMessage } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
@@ -21,16 +20,12 @@ interface ActiveParcelData extends QueuedInternetBoundParcelMessage {
   readonly ack: () => void;
 }
 
-export async function processInternetBoundParcels(
-  workerName: string,
-  ownPohttpAddress: string,
-): Promise<void> {
+export async function processInternetBoundParcels(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
   configureExitHandling(logger);
   logger.info('Starting queue worker');
 
-  const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-  const parcelStore = new ParcelStore(initObjectStoreFromEnv(), parcelStoreBucket);
+  const parcelStore = ParcelStore.initFromEnv();
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
 
@@ -50,16 +45,17 @@ export async function processInternetBoundParcels(
           ack: () => message.ack(),
         };
       } else {
-        await parcelStore.deleteEndpointBoundParcel(messageData.parcelObjectKey);
+        await parcelStore.deleteParcelForInternetPeer(messageData.parcelObjectKey);
         message.ack();
       }
     }
   }
 
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
+    const useTls = getEnvVar('POHTTP_USE_TLS').default('true').asBool();
     for await (const parcelData of activeParcels) {
       const parcelAwareLogger = logger.child({ parcelObjectKey: parcelData.parcelObjectKey });
-      const parcelSerialized = await parcelStore.retrieveEndpointBoundParcel(
+      const parcelSerialized = await parcelStore.retrieveParcelForInternetPeer(
         parcelData.parcelObjectKey,
       );
 
@@ -71,9 +67,7 @@ export async function processInternetBoundParcels(
 
       const deliveryAttempts = (parcelData.deliveryAttempts ?? 0) + 1;
       try {
-        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, {
-          gatewayAddress: ownPohttpAddress,
-        });
+        await deliverParcel(parcelData.parcelRecipientAddress, parcelSerialized, { useTls });
         parcelAwareLogger.debug('Parcel was successfully delivered');
       } catch (err) {
         if (!(err instanceof PoHTTPError)) {
@@ -97,7 +91,7 @@ export async function processInternetBoundParcels(
         }
       }
 
-      await parcelStore.deleteEndpointBoundParcel(parcelData.parcelObjectKey);
+      await parcelStore.deleteParcelForInternetPeer(parcelData.parcelObjectKey);
       parcelData.ack();
     }
   }

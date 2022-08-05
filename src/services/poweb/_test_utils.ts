@@ -4,6 +4,7 @@ import { Connection } from 'mongoose';
 import * as vault from '../../backingServices/keystore';
 import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
+import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
 import { arrayToAsyncIterable } from '../../testUtils/iter';
@@ -21,39 +22,39 @@ export function setUpCommonFixtures(): () => FixtureSet {
   const getMongooseConnection = setUpTestDBConnection();
 
   const mockParcelStore: ParcelStore = {
-    liveStreamActiveParcelsForGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'liveStreamActiveParcelsForGateway'),
+    liveStreamParcelsForPrivatePeer: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'liveStreamParcelsForPrivatePeer'),
       async function* (): AsyncIterable<any> {
         // tslint:disable-next-line:no-unused-expression
         await new Promise(() => 'A promise that never resolves');
       },
     ),
-    storeParcelFromPeerGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'storeParcelFromPeerGateway'),
+    storeParcelFromPrivatePeer: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
       async (parcel: Parcel) => {
         return `parcels/${parcel.id}`;
       },
     ),
-    streamActiveParcelsForGateway: mockSpy(
-      jest.spyOn(ParcelStore.prototype, 'streamActiveParcelsForGateway'),
+    streamParcelsForPrivatePeer: mockSpy(
+      jest.spyOn(ParcelStore.prototype, 'streamParcelsForPrivatePeer'),
       () => arrayToAsyncIterable([]),
     ),
   } as any;
   mockSpy(jest.spyOn(ParcelStore, 'initFromEnv'), () => mockParcelStore);
 
-  let privateAddress: string;
+  let internetGatewayId: string;
   let certificatePath: PdaChain;
   beforeAll(async () => {
     certificatePath = await generatePdaChain();
-    privateAddress = await certificatePath.publicGatewayCert.calculateSubjectPrivateAddress();
+    internetGatewayId = await certificatePath.internetGatewayCert.calculateSubjectId();
   });
 
   let mockPrivateKeyStore: MockPrivateKeyStore;
   beforeEach(async () => {
     mockPrivateKeyStore = new MockPrivateKeyStore();
     await mockPrivateKeyStore.saveIdentityKey(
-      privateAddress,
-      certificatePath.publicGatewayPrivateKey,
+      internetGatewayId,
+      certificatePath.internetGatewayPrivateKey,
     );
   });
   mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
@@ -63,18 +64,19 @@ export function setUpCommonFixtures(): () => FixtureSet {
 
     const certificateStore = new MongoCertificateStore(connection);
     await certificateStore.save(
-      new CertificationPath(certificatePath.publicGatewayCert, []),
-      privateAddress,
+      new CertificationPath(certificatePath.internetGatewayCert, []),
+      internetGatewayId,
     );
 
     const config = new Config(connection);
-    await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+    await config.set(ConfigKey.CURRENT_ID, internetGatewayId);
   });
 
   const mockEnvVars = configureMockEnvVars();
   beforeEach(() => {
     mockEnvVars({
       GATEWAY_VERSION: '1.0.2',
+      PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
     });
   });
 

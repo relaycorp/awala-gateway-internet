@@ -15,21 +15,16 @@ export class MongoPublicKeyStore extends PublicKeyStore {
     });
   }
 
-  protected retrieveIdentityKeySerialized(_peerPrivateAddress: string): Promise<Buffer | null> {
+  protected retrieveIdentityKeySerialized(_peerId: string): Promise<Buffer | null> {
     throw new Error('Method not yet implemented');
   }
 
-  protected saveIdentityKeySerialized(
-    _keySerialized: Buffer,
-    _peerPrivateAddress: string,
-  ): Promise<void> {
+  protected saveIdentityKeySerialized(_keySerialized: Buffer, _peerId: string): Promise<void> {
     throw new Error('Method not yet implemented');
   }
 
-  protected async retrieveSessionKeyData(
-    peerPrivateAddress: string,
-  ): Promise<SessionPublicKeyData | null> {
-    const query = this.keyDataModel.findOne({ peerPrivateAddress });
+  protected async retrieveSessionKeyData(peerId: string): Promise<SessionPublicKeyData | null> {
+    const query = this.keyDataModel.findOne({ peerId });
     const keyData: null | PeerPublicKeyData = await query.exec();
     if (keyData === null) {
       return null;
@@ -41,16 +36,13 @@ export class MongoPublicKeyStore extends PublicKeyStore {
     };
   }
 
-  protected async saveSessionKeyData(
-    keyData: SessionPublicKeyData,
-    peerPrivateAddress: string,
-  ): Promise<void> {
+  protected async saveSessionKeyData(keyData: SessionPublicKeyData, peerId: string): Promise<void> {
     const dbData: PeerPublicKeyData = {
       creationDate: keyData.publicKeyCreationTime,
       keyDer: keyData.publicKeyDer,
       keyId: keyData.publicKeyId,
-      peerPrivateAddress,
+      peerId,
     };
-    await this.keyDataModel.updateOne({ peerPrivateAddress }, dbData, { upsert: true }).exec();
+    await this.keyDataModel.updateOne({ peerId }, dbData, { upsert: true }).exec();
   }
 }

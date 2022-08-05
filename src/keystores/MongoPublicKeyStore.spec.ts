@@ -4,7 +4,7 @@ import {
   derSerializePublicKey,
   generateECDHKeyPair,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import * as typegoose from '@typegoose/typegoose';
@@ -18,16 +18,16 @@ const STUB_CONNECTION: Connection = { what: 'the-stub-connection' } as any;
 
 let peerPublicKeyData: PeerPublicKeyData;
 let peerPublicKey: CryptoKey;
-let peerPrivateAddress: string;
+let peerId: string;
 beforeAll(async () => {
   const keyPair = await generateRSAKeyPair();
-  peerPrivateAddress = await getPrivateAddressFromIdentityKey(keyPair.publicKey);
+  peerId = await getIdFromIdentityKey(keyPair.publicKey);
 
   const sessionKeyPair = await generateECDHKeyPair();
   peerPublicKey = sessionKeyPair.publicKey;
 
   peerPublicKeyData = new PeerPublicKeyData();
-  peerPublicKeyData.peerPrivateAddress = peerPrivateAddress;
+  peerPublicKeyData.peerId = peerId;
   peerPublicKeyData.keyId = Buffer.from([1, 3, 5, 7]);
   peerPublicKeyData.keyDer = await derSerializePublicKey(sessionKeyPair.publicKey);
   peerPublicKeyData.creationDate = new Date();
@@ -57,7 +57,7 @@ describe('retrieveSessionKeyData', () => {
   test('Existing connection should be used', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    await store.retrieveLastSessionKey(peerPrivateAddress);
+    await store.retrieveLastSessionKey(peerId);
 
     expect(stubGetModelForClass).toBeCalledTimes(1);
     expect(stubGetModelForClass).toBeCalledWith(PeerPublicKeyData, {
@@ -68,16 +68,16 @@ describe('retrieveSessionKeyData', () => {
   test('Key should be looked up by the private node address of the peer', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    await store.retrieveLastSessionKey(peerPrivateAddress);
+    await store.retrieveLastSessionKey(peerId);
 
     expect(mockFindOne).toBeCalledTimes(1);
-    expect(mockFindOne).toBeCalledWith({ peerPrivateAddress });
+    expect(mockFindOne).toBeCalledWith({ peerId });
   });
 
   test('Existing key should be returned', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    const key = await store.retrieveLastSessionKey(peerPrivateAddress);
+    const key = await store.retrieveLastSessionKey(peerId);
 
     expect(key?.keyId).toEqual(peerPublicKeyData.keyId);
     expect(await derSerializePublicKey(key!.publicKey)).toEqual(peerPublicKeyData.keyDer);
@@ -87,7 +87,7 @@ describe('retrieveSessionKeyData', () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
     mockFindOneExec.mockResolvedValue(null);
 
-    await expect(store.retrieveLastSessionKey(peerPrivateAddress)).resolves.toBeNull();
+    await expect(store.retrieveLastSessionKey(peerId)).resolves.toBeNull();
   });
 });
 
@@ -105,7 +105,7 @@ describe('saveSessionKeyData', () => {
   test('Existing connection should be used', async () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
 
-    await store.saveSessionKey(PEER_SESSION_KEY, peerPrivateAddress, new Date());
+    await store.saveSessionKey(PEER_SESSION_KEY, peerId, new Date());
 
     expect(stubGetModelForClass).toBeCalledTimes(1);
     expect(stubGetModelForClass).toBeCalledWith(PeerPublicKeyData, {
@@ -117,11 +117,11 @@ describe('saveSessionKeyData', () => {
     const store = new MongoPublicKeyStore(STUB_CONNECTION);
     const creationDate = new Date();
 
-    await store.saveSessionKey(PEER_SESSION_KEY, peerPrivateAddress, creationDate);
+    await store.saveSessionKey(PEER_SESSION_KEY, peerId, creationDate);
 
     expect(mockUpdateOne).toBeCalledTimes(1);
     expect(mockUpdateOne).toBeCalledWith(
-      { peerPrivateAddress },
+      { peerId },
       { ...peerPublicKeyData, creationDate },
       { upsert: true },
     );

@@ -1,4 +1,3 @@
-import { initObjectStoreClient, ObjectStoreClient } from '@relaycorp/object-storage';
 import {
   generateRSAKeyPair,
   issueDeliveryAuthorization,
@@ -8,56 +7,24 @@ import {
   SessionKey,
 } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import { get as getEnvVar } from 'env-var';
-import { connect as stanConnect, Stan } from 'node-nats-streaming';
-import uuid from 'uuid-random';
 
-import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_LOCAL_PORT } from './services';
-
-export const IS_GITHUB = getEnvVar('IS_GITHUB').asBool();
-
-export const OBJECT_STORAGE_CLIENT = initObjectStoreClientFromEnv();
-export const OBJECT_STORAGE_BUCKET = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-
-export async function sleep(seconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, seconds * 1_000));
-}
-
-function initObjectStoreClientFromEnv(): ObjectStoreClient {
-  const endpoint = getEnvVar('OBJECT_STORE_ENDPOINT').required().asString();
-  const accessKeyId = getEnvVar('OBJECT_STORE_ACCESS_KEY_ID').required().asString();
-  const secretAccessKey = getEnvVar('OBJECT_STORE_SECRET_KEY').required().asString();
-  return initObjectStoreClient('minio', endpoint, accessKeyId, secretAccessKey, false);
-}
-
-export function connectToNatsStreaming(): Promise<Stan> {
-  return new Promise((resolve) => {
-    const stanConnection = stanConnect(
-      getEnvVar('NATS_CLUSTER_ID').required().asString(),
-      `functional-tests-${uuid()}`,
-      {
-        url: getEnvVar('NATS_SERVER_URL').required().asString(),
-      },
-    );
-    stanConnection.on('connect', resolve);
-  });
-}
+import { ExternalPdaChain } from '../../testUtils/pki';
+import { GW_POWEB_HOST_PORT } from './constants';
 
 export interface PrivateGatewayRegistration {
   readonly pdaChain: ExternalPdaChain;
-  readonly publicGatewaySessionKey: SessionKey;
+  readonly internetGatewaySessionKey: SessionKey;
 }
 
 export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayRegistration> {
   const privateGatewayKeyPair = await generateRSAKeyPair();
   const {
     privateNodeCertificate: privateGatewayCertificate,
-    gatewayCertificate: publicGatewayCert,
-    sessionKey: publicGatewaySessionKey,
+    gatewayCertificate: internetGatewayCert,
+    sessionKey: internetGatewaySessionKey,
   } = await registerPrivateGateway(
     privateGatewayKeyPair,
-    PoWebClient.initLocal(GW_POWEB_LOCAL_PORT),
+    PoWebClient.initLocal(GW_POWEB_HOST_PORT),
   );
 
   const peerEndpointKeyPair = await generateRSAKeyPair();
@@ -76,16 +43,16 @@ export async function createAndRegisterPrivateGateway(): Promise<PrivateGatewayR
     validityEndDate: peerEndpointCertificate.expiryDate,
   });
 
-  const pdaChain = {
+  const pdaChain: ExternalPdaChain = {
     pdaCert: pda,
     pdaGranteePrivateKey: pdaGranteeKeyPair.privateKey,
     peerEndpointCert: peerEndpointCertificate,
     peerEndpointPrivateKey: peerEndpointKeyPair.privateKey,
     privateGatewayCert: privateGatewayCertificate,
     privateGatewayPrivateKey: privateGatewayKeyPair.privateKey,
-    publicGatewayCert,
+    internetGatewayCert,
   };
-  return { pdaChain, publicGatewaySessionKey: publicGatewaySessionKey!! };
+  return { pdaChain, internetGatewaySessionKey: internetGatewaySessionKey!! };
 }
 
 export async function registerPrivateGateway(
@@ -93,9 +60,10 @@ export async function registerPrivateGateway(
   client: PoWebClient,
 ): Promise<PrivateNodeRegistration> {
   const authorizationSerialized = await client.preRegisterNode(privateGatewayKeyPair.publicKey);
-  const registrationRequest = new PrivateNodeRegistrationRequest(
+  const request = new PrivateNodeRegistrationRequest(
     privateGatewayKeyPair.publicKey,
     authorizationSerialized,
   );
-  return client.registerNode(await registrationRequest.serialize(privateGatewayKeyPair.privateKey));
+  const requestSerialized = await request.serialize(privateGatewayKeyPair.privateKey);
+  return client.registerNode(requestSerialized);
 }

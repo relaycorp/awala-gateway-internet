@@ -61,8 +61,8 @@ export default async function registerRoutes(
         return reply.code(400).send({ message: 'Parcel is malformed' });
       }
 
-      const peerGatewayAddress = await countersignerCertificate.calculateSubjectPrivateAddress();
-      const parcelAwareLogger = request.log.child({ parcelId: parcel.id, peerGatewayAddress });
+      const privatePeerId = await countersignerCertificate.calculateSubjectId();
+      const parcelAwareLogger = request.log.child({ parcelId: parcel.id, privatePeerId });
 
       parcelAwareLogger.debug('Parcel is well-formed');
 
@@ -71,10 +71,10 @@ export default async function registerRoutes(
       );
       let parcelObjectKey: string | null;
       try {
-        parcelObjectKey = await parcelStore.storeParcelFromPeerGateway(
+        parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
           parcel,
           request.body,
-          peerGatewayAddress,
+          privatePeerId,
           mongooseConnection,
           natsStreamingClient,
           parcelAwareLogger,

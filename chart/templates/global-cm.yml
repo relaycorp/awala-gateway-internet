@@ -7,6 +7,8 @@ metadata:
 data:
   GATEWAY_VERSION: {{ .Chart.Version }}
 
+  PUBLIC_ADDRESS: {{ .Values.internetAddress }}
+
   LOG_LEVEL: {{ .Values.logging.level | quote }}
   {{- if .Values.logging.target }}
   LOG_TARGET: {{ .Values.logging.target }}

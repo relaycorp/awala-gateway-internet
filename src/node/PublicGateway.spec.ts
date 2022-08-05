@@ -14,7 +14,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addMinutes } from 'date-fns';
 
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
-import { PublicGateway } from './PublicGateway';
+import { InternetGateway } from './InternetGateway';
 
 let keyPairSet: NodeKeyPairSet;
 let cdaChain: CDACertPath;
@@ -30,25 +30,25 @@ beforeEach(async () => {
   const peerSessionKeyPair = await SessionKeyPair.generate();
   await KEY_STORES.publicKeyStore.saveSessionKey(
     peerSessionKeyPair.sessionKey,
-    await cdaChain.privateGateway.calculateSubjectPrivateAddress(),
+    await cdaChain.privateGateway.calculateSubjectId(),
     new Date(),
   );
 });
 
-let publicGateway: PublicGateway;
+let internetGateway: InternetGateway;
 beforeAll(async () => {
-  publicGateway = new PublicGateway(
-    await cdaChain.publicGateway.calculateSubjectPrivateAddress(),
-    keyPairSet.publicGateway.privateKey,
+  internetGateway = new InternetGateway(
+    await cdaChain.internetGateway.calculateSubjectId(),
+    keyPairSet.internetGateway.privateKey,
     KEY_STORES,
     {},
   );
 });
 
 describe('getChannel', () => {
-  test('Public gateway private key should be passed on', async () => {
-    const channel = await publicGateway.getChannel(
-      cdaChain.publicGateway,
+  test('Internet gateway private key should be passed on', async () => {
+    const channel = await internetGateway.getChannel(
+      cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
@@ -58,34 +58,30 @@ describe('getChannel', () => {
       channel.generateCargoes(arrayToAsyncIterable([dummyCargoMessage])),
     );
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));
-    await expect(cargo.senderCertificate.calculateSubjectPrivateAddress()).resolves.toEqual(
-      publicGateway.privateAddress,
-    );
+    await expect(cargo.senderCertificate.calculateSubjectId()).resolves.toEqual(internetGateway.id);
   });
 
   test('PDA for private gateway should be passed on', async () => {
-    const channel = await publicGateway.getChannel(
-      cdaChain.publicGateway,
+    const channel = await internetGateway.getChannel(
+      cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
-    expect(cdaChain.publicGateway.isEqual(channel.nodeDeliveryAuth)).toBeTrue();
+    expect(cdaChain.internetGateway.isEqual(channel.nodeDeliveryAuth)).toBeTrue();
   });
 
-  test('Private gateway private address should be set', async () => {
-    const channel = await publicGateway.getChannel(
-      cdaChain.publicGateway,
+  test('Private gateway id should be set', async () => {
+    const channel = await internetGateway.getChannel(
+      cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
-    expect(channel.peerPrivateAddress).toEqual(
-      await cdaChain.privateGateway.calculateSubjectPrivateAddress(),
-    );
+    expect(channel.peerId).toEqual(await cdaChain.privateGateway.calculateSubjectId());
   });
 
   test('Private gateway public key should be set', async () => {
-    const channel = await publicGateway.getChannel(
-      cdaChain.publicGateway,
+    const channel = await internetGateway.getChannel(
+      cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 

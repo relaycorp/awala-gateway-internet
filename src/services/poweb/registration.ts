@@ -6,6 +6,7 @@ import {
   SessionKeyPair,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { initPrivateKeyStore } from '../../backingServices/keystore';
@@ -29,6 +30,8 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
   const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
 
+  const internetAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
+
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
     url: ENDPOINT_URL,
@@ -51,15 +54,15 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
       const mongooseConnection = (fastify as any).mongoose;
       const config = new Config(mongooseConnection);
-      const privateAddress = await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS);
-      const privateKey = await privateKeyStore.retrieveIdentityKey(privateAddress!!);
+      const internetGatewayId = await config.get(ConfigKey.CURRENT_ID);
+      const privateKey = await privateKeyStore.retrieveIdentityKey(internetGatewayId!!);
 
       const certificateStore = new MongoCertificateStore(mongooseConnection);
-      const publicGatewayCertificationPath = await certificateStore.retrieveLatest(
-        privateAddress!,
-        privateAddress!,
+      const internetGatewayCertPath = await certificateStore.retrieveLatest(
+        internetGatewayId!,
+        internetGatewayId!,
       );
-      const gatewayPublicKey = await publicGatewayCertificationPath!.leafCertificate.getPublicKey();
+      const gatewayPublicKey = await internetGatewayCertPath!.leafCertificate.getPublicKey();
 
       let registrationAuthorization: PrivateNodeRegistrationAuthorization;
       try {
@@ -87,18 +90,19 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const privateGatewayCertificate = await issuePrivateGatewayCertificate(
         registrationRequest.privateNodePublicKey,
         privateKey!,
-        publicGatewayCertificationPath!.leafCertificate,
+        internetGatewayCertPath!.leafCertificate,
       );
       const sessionKeyPair = await SessionKeyPair.generate();
       await privateKeyStore.saveSessionKey(
         sessionKeyPair.privateKey,
         sessionKeyPair.sessionKey.keyId,
-        privateAddress!,
-        await privateGatewayCertificate.calculateSubjectPrivateAddress(),
+        internetGatewayId!,
+        await privateGatewayCertificate.calculateSubjectId(),
       );
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
-        publicGatewayCertificationPath!.leafCertificate,
+        internetGatewayCertPath!.leafCertificate,
+        internetAddress,
         sessionKeyPair.sessionKey,
       );
       return reply

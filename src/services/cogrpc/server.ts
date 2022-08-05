@@ -9,7 +9,7 @@ import { configureExitHandling } from '../../utilities/exitHandling';
 
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import { makeLogger } from '../../utilities/logging';
-import { makeServiceImplementation } from './service';
+import { makeService } from './service';
 
 const NETLOC = '0.0.0.0:8080';
 
@@ -24,8 +24,6 @@ export async function runServer(logger?: Logger): Promise<void> {
   const baseLogger = logger ?? makeLogger();
   configureExitHandling(baseLogger);
 
-  const publicAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
-  const parcelStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
   const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
   const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
 
@@ -38,13 +36,11 @@ export async function runServer(logger?: Logger): Promise<void> {
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
 
-  const serviceImplementation = await makeServiceImplementation({
+  const serviceImplementation = await makeService({
     baseLogger,
     getMongooseConnection: createMongooseConnectionFromEnv,
     natsClusterId,
     natsServerUrl,
-    parcelStoreBucket,
-    publicAddress,
   });
   server.addService(CargoRelayService, serviceImplementation as any);
 

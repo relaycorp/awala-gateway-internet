@@ -3,7 +3,7 @@ import {
   CertificationPath,
   derSerializePublicKey,
   generateRSAKeyPair,
-  getPrivateAddressFromIdentityKey,
+  getIdFromIdentityKey,
   issueGatewayCertificate,
   MockPrivateKeyStore,
 } from '@relaycorp/relaynet-core';
@@ -25,10 +25,10 @@ import { Config, ConfigKey } from './utilities/config';
 const getMongooseConnection = setUpTestDBConnection();
 
 let identityKeyPair: CryptoKeyPair;
-let privateAddress: string;
+let gatewayId: string;
 beforeAll(async () => {
   identityKeyPair = await generateRSAKeyPair();
-  privateAddress = await getPrivateAddressFromIdentityKey(identityKeyPair.publicKey);
+  gatewayId = await getIdFromIdentityKey(identityKeyPair.publicKey);
 });
 
 let certificateStore: MongoCertificateStore;
@@ -38,7 +38,7 @@ beforeEach(async () => {
   certificateStore = new MongoCertificateStore(connection);
 
   const config = new Config(connection);
-  await config.set(ConfigKey.CURRENT_PRIVATE_ADDRESS, privateAddress);
+  await config.set(ConfigKey.CURRENT_ID, gatewayId);
 });
 
 describe('retrieveOwnCertificates', () => {
@@ -64,7 +64,7 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('A single certificate should be returned when there is one certificate', async () => {
-    await certificateStore.save(new CertificationPath(certificate1, []), privateAddress);
+    await certificateStore.save(new CertificationPath(certificate1, []), gatewayId);
 
     const certs = await retrieveOwnCertificates(getMongooseConnection());
 
@@ -73,8 +73,8 @@ describe('retrieveOwnCertificates', () => {
   });
 
   test('Multiple certificates should be returned when there are multiple certificates', async () => {
-    await certificateStore.save(new CertificationPath(certificate1, []), privateAddress);
-    await certificateStore.save(new CertificationPath(certificate2, []), privateAddress);
+    await certificateStore.save(new CertificationPath(certificate1, []), gatewayId);
+    await certificateStore.save(new CertificationPath(certificate2, []), gatewayId);
 
     const certs = await retrieveOwnCertificates(getMongooseConnection());
 
@@ -87,7 +87,7 @@ describe('retrieveOwnCertificates', () => {
 describe('rotateOwnCertificate', () => {
   const mockPrivateKeyStore = new MockPrivateKeyStore();
   beforeEach(async () => {
-    await mockPrivateKeyStore.saveIdentityKey(privateAddress, identityKeyPair.privateKey);
+    await mockPrivateKeyStore.saveIdentityKey(gatewayId, identityKeyPair.privateKey);
   });
   afterEach(() => {
     mockPrivateKeyStore.clear();
@@ -95,15 +95,11 @@ describe('rotateOwnCertificate', () => {
   mockSpy(jest.spyOn(keystore, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
 
   test('New certificate should be created if there are none', async () => {
-    await expect(
-      certificateStore.retrieveLatest(privateAddress, privateAddress),
-    ).resolves.toBeNull();
+    await expect(certificateStore.retrieveLatest(gatewayId, gatewayId)).resolves.toBeNull();
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    await expect(
-      certificateStore.retrieveLatest(privateAddress, privateAddress),
-    ).resolves.not.toBeNull();
+    await expect(certificateStore.retrieveLatest(gatewayId, gatewayId)).resolves.not.toBeNull();
   });
 
   test('New certificate should be created if latest expires in less than 180 days', async () => {
@@ -113,14 +109,11 @@ describe('rotateOwnCertificate', () => {
       subjectPublicKey: identityKeyPair.publicKey,
       validityEndDate: subSeconds(cutoffDate, 1),
     });
-    await certificateStore.save(new CertificationPath(oldCertificate, []), privateAddress);
+    await certificateStore.save(new CertificationPath(oldCertificate, []), gatewayId);
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    const newCertificationPath = await certificateStore.retrieveLatest(
-      privateAddress,
-      privateAddress,
-    );
+    const newCertificationPath = await certificateStore.retrieveLatest(gatewayId, gatewayId);
     expect(oldCertificate.isEqual(newCertificationPath!.leafCertificate)).toBeFalse();
   });
 
@@ -134,24 +127,18 @@ describe('rotateOwnCertificate', () => {
         10, // Be generous -- GitHub Actions are too slow
       ),
     });
-    await certificateStore.save(new CertificationPath(oldCertificate, []), privateAddress);
+    await certificateStore.save(new CertificationPath(oldCertificate, []), gatewayId);
 
     await expect(rotateOwnCertificate(getMongooseConnection())).resolves.toBeNull();
 
-    const newCertificationPath = await certificateStore.retrieveLatest(
-      privateAddress,
-      privateAddress,
-    );
+    const newCertificationPath = await certificateStore.retrieveLatest(gatewayId, gatewayId);
     expect(oldCertificate.isEqual(newCertificationPath!.leafCertificate)).toBeTrue();
   });
 
   test('New certificate should be output', async () => {
     const newCertificate = await rotateOwnCertificate(getMongooseConnection());
 
-    const latestCertificationPath = await certificateStore.retrieveLatest(
-      privateAddress,
-      privateAddress,
-    );
+    const latestCertificationPath = await certificateStore.retrieveLatest(gatewayId, gatewayId);
 
     expect(newCertificate!.isEqual(latestCertificationPath!.leafCertificate)).toBeTrue();
   });
@@ -159,14 +146,14 @@ describe('rotateOwnCertificate', () => {
   test('New certificate should be self-issued', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const certificationPath = await certificateStore.retrieveLatest(privateAddress, privateAddress);
-    expect(certificationPath!.leafCertificate.getIssuerPrivateAddress()).toEqual(privateAddress);
+    const certificationPath = await certificateStore.retrieveLatest(gatewayId, gatewayId);
+    expect(certificationPath!.leafCertificate.getIssuerId()).toEqual(gatewayId);
   });
 
   test('New certificate should use existing key pair', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const path = await certificateStore.retrieveLatest(privateAddress, privateAddress);
+    const path = await certificateStore.retrieveLatest(gatewayId, gatewayId);
     await expect(
       derSerializePublicKey(await path!.leafCertificate.getPublicKey()),
     ).resolves.toEqual(await derSerializePublicKey(identityKeyPair.publicKey));
@@ -177,7 +164,7 @@ describe('rotateOwnCertificate', () => {
 
     await rotateOwnCertificate(getMongooseConnection());
 
-    const path = await certificateStore.retrieveLatest(privateAddress, privateAddress);
+    const path = await certificateStore.retrieveLatest(gatewayId, gatewayId);
     expect(path!.leafCertificate.startDate).toBeAfter(subSeconds(expectedStartDate, 1));
     expect(path!.leafCertificate.startDate).toBeBeforeOrEqualTo(addSeconds(expectedStartDate, 10));
   });
@@ -185,7 +172,7 @@ describe('rotateOwnCertificate', () => {
   test('New certificate should expire in 360 days', async () => {
     await rotateOwnCertificate(getMongooseConnection());
 
-    const path = await certificateStore.retrieveLatest(privateAddress, privateAddress);
+    const path = await certificateStore.retrieveLatest(gatewayId, gatewayId);
     const expectedExpiryDate = addDays(new Date(), 360);
     expect(path!.leafCertificate.expiryDate).toBeBeforeOrEqualTo(expectedExpiryDate);
     expect(path!.leafCertificate.expiryDate).toBeAfter(subSeconds(expectedExpiryDate, 5));
@@ -199,9 +186,9 @@ describe('issuePrivateGatewayCertificate', () => {
     privateGatewayPublicKey = privateGatewayKeyPair.publicKey;
   });
 
-  let publicGatewayCertificate: Certificate;
+  let internetGatewayCertificate: Certificate;
   beforeAll(async () => {
-    publicGatewayCertificate = reSerializeCertificate(
+    internetGatewayCertificate = reSerializeCertificate(
       await issueGatewayCertificate({
         issuerPrivateKey: identityKeyPair.privateKey,
         subjectPublicKey: identityKeyPair.publicKey,
@@ -214,7 +201,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     await expect(
@@ -222,17 +209,17 @@ describe('issuePrivateGatewayCertificate', () => {
     ).resolves.toEqual(await derSerializePublicKey(privateGatewayPublicKey));
   });
 
-  test('Issuer should be public gateway', async () => {
+  test('Issuer should be Internet gateway', async () => {
     const privateGatewayCertificate = reSerializeCertificate(
       await issuePrivateGatewayCertificate(
         privateGatewayPublicKey,
         identityKeyPair.privateKey,
-        publicGatewayCertificate,
+        internetGatewayCertificate,
       ),
     );
 
     await expect(
-      privateGatewayCertificate.getCertificationPath([], [publicGatewayCertificate]),
+      privateGatewayCertificate.getCertificationPath([], [internetGatewayCertificate]),
     ).resolves.toHaveLength(2);
   });
 
@@ -241,7 +228,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     const expectedStartDate = subHours(dateBeforeIssuance, 3);
@@ -255,7 +242,7 @@ describe('issuePrivateGatewayCertificate', () => {
     const privateGatewayCertificate = await issuePrivateGatewayCertificate(
       privateGatewayPublicKey,
       identityKeyPair.privateKey,
-      publicGatewayCertificate,
+      internetGatewayCertificate,
     );
 
     const expectedExpiryDate = addDays(new Date(), 180);

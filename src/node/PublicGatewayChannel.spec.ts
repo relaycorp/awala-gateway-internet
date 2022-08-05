@@ -1,4 +1,4 @@
-import { getPrivateAddressFromIdentityKey, MockKeyStoreSet } from '@relaycorp/relaynet-core';
+import { getIdFromIdentityKey, MockKeyStoreSet, Recipient } from '@relaycorp/relaynet-core';
 import {
   CDACertPath,
   generateCDACertificationPath,
@@ -6,7 +6,7 @@ import {
   NodeKeyPairSet,
 } from '@relaycorp/relaynet-testing';
 
-import { PublicGatewayChannel } from './PublicGatewayChannel';
+import { InternetGatewayChannel } from './InternetGatewayChannel';
 
 let keyPairSet: NodeKeyPairSet;
 let cdaChain: CDACertPath;
@@ -15,20 +15,18 @@ beforeAll(async () => {
   cdaChain = await generateCDACertificationPath(keyPairSet);
 });
 
-describe('getOutboundRAMFAddress', () => {
+describe('getOutboundRAMFRecipient', () => {
   test('Address should be that of private gateway', async () => {
-    const peerPrivateAddress = await getPrivateAddressFromIdentityKey(
-      keyPairSet.privateGateway.publicKey,
-    );
-    const channel = new PublicGatewayChannel(
-      keyPairSet.publicGateway.privateKey,
-      cdaChain.publicGateway,
-      peerPrivateAddress,
+    const peerId = await getIdFromIdentityKey(keyPairSet.privateGateway.publicKey);
+    const channel = new InternetGatewayChannel(
+      keyPairSet.internetGateway.privateKey,
+      cdaChain.internetGateway,
+      peerId,
       keyPairSet.privateGateway.publicKey,
       new MockKeyStoreSet(),
       {},
     );
 
-    expect(channel.getOutboundRAMFAddress()).toEqual(peerPrivateAddress);
+    await expect(channel.getOutboundRAMFRecipient()).resolves.toEqual<Recipient>({ id: peerId });
   });
 });

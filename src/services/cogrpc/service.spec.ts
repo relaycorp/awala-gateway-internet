@@ -4,16 +4,16 @@ import { getMockInstance } from '../../testUtils/jest';
 
 import { partialPinoLog } from '../../testUtils/logging';
 import { setUpTestEnvironment } from './_test_utils';
-import { makeServiceImplementation } from './service';
+import { makeService } from './service';
 
 const { getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
 
-describe('makeServiceImplementation', () => {
+describe('makeService', () => {
   describe('Mongoose connection', () => {
     test('Connection should be created preemptively before any RPC', async () => {
       expect(getSvcImplOptions().getMongooseConnection).not.toBeCalled();
 
-      await makeServiceImplementation(getSvcImplOptions());
+      await makeService(getSvcImplOptions());
 
       expect(getSvcImplOptions().getMongooseConnection).toBeCalled();
     });
@@ -22,13 +22,13 @@ describe('makeServiceImplementation', () => {
       const error = new Error('Database credentials are wrong');
       getMockInstance(getSvcImplOptions().getMongooseConnection).mockRejectedValue(error);
 
-      await expect(makeServiceImplementation(getSvcImplOptions())).rejects.toEqual(error);
+      await expect(makeService(getSvcImplOptions())).rejects.toEqual(error);
     });
 
     test('Errors after establishing connection should be logged', async () => {
       const mockConnection = new EventEmitter();
       getMockInstance(getSvcImplOptions().getMongooseConnection).mockResolvedValue(mockConnection);
-      await makeServiceImplementation(getSvcImplOptions());
+      await makeService(getSvcImplOptions());
 
       const connectionError = await catchErrorEvent(mockConnection, () =>
         mockConnection.emit('error', new Error('Database credentials are wrong')),

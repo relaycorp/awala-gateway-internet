@@ -46,15 +46,9 @@ export default async function registerRoutes(
         return reply.code(400).send({ message: 'Payload is not a valid RAMF-serialized parcel' });
       }
 
-      if (!parcel.isRecipientAddressPrivate) {
-        return reply
-          .code(400)
-          .send({ message: 'Parcel recipient should be specified as a private address' });
-      }
-
       const natsClient = NatsStreamingClient.initFromEnv(`pohttp-req-${request.id}`);
       try {
-        await parcelStore.storeGatewayBoundParcel(
+        await parcelStore.storeParcelForPrivatePeer(
           parcel,
           request.body,
           (fastify as any).mongoose,

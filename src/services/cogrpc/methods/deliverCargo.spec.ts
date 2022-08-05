@@ -4,30 +4,38 @@ import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet
 
 import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
+import { GATEWAY_INTERNET_ADDRESS } from '../../../testUtils/awala';
 import { catchErrorEvent } from '../../../testUtils/errors';
 import { MockGrpcBidiCall } from '../../../testUtils/grpc';
 import { getMockInstance, mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
-import { setUpTestEnvironment, STUB_PUBLIC_ADDRESS_URL } from '../_test_utils';
-import { makeServiceImplementation } from '../service';
+import { setUpTestEnvironment } from '../_test_utils';
+import { makeService } from '../service';
 
 let pdaChain: PdaChain;
-let privateGatewayAddress: string;
+let privateGatewayId: string;
 beforeAll(async () => {
   pdaChain = await generatePdaChain();
-  privateGatewayAddress = await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress();
+  privateGatewayId = await pdaChain.privateGatewayCert.calculateSubjectId();
 });
 
 const { getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
 
 const DELIVERY_ID = 'the-id';
 
-let CARGO: Cargo;
-let CARGO_SERIALIZATION: Buffer;
+let cargo: Cargo;
+let cargoSerialization: Buffer;
 beforeAll(async () => {
-  CARGO = new Cargo(STUB_PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from('payload'));
-  CARGO_SERIALIZATION = Buffer.from(await CARGO.serialize(pdaChain.privateGatewayPrivateKey));
+  cargo = new Cargo(
+    {
+      id: await pdaChain.internetGatewayCert.calculateSubjectId(),
+      internetAddress: GATEWAY_INTERNET_ADDRESS,
+    },
+    pdaChain.privateGatewayCert,
+    Buffer.from('payload'),
+  );
+  cargoSerialization = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 });
 
 let NATS_CLIENT: natsStreaming.NatsStreamingClient;
@@ -56,7 +64,7 @@ const mockNatsClientClass = mockSpy(
 
 let SERVICE: CargoRelayServerMethodSet;
 beforeEach(async () => {
-  SERVICE = await makeServiceImplementation(getSvcImplOptions());
+  SERVICE = await makeService(getSvcImplOptions());
 });
 
 let CALL: MockGrpcBidiCall<CargoDeliveryAck, CargoDelivery>;
@@ -65,7 +73,7 @@ beforeEach(() => {
 });
 
 const RETRIEVE_OWN_CERTIFICATES_SPY = mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), () => [
-  pdaChain.publicGatewayCert,
+  pdaChain.internetGatewayCert,
 ]);
 
 test('NATS Streaming publisher should be initialized upfront', async () => {
@@ -90,7 +98,7 @@ describe('Cargo processing', () => {
     CALL.output.push(
       { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
       {
-        cargo: CARGO_SERIALIZATION,
+        cargo: cargoSerialization,
         id: DELIVERY_ID,
       },
     );
@@ -100,14 +108,14 @@ describe('Cargo processing', () => {
     expect(CALL.write).toBeCalledWith({ id: invalidDeliveryId });
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
-    expect(PUBLISHED_MESSAGES).toEqual([CARGO_SERIALIZATION]);
+    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
         err: expect.objectContaining({ type: RAMFSyntaxError.name }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: null,
+        privatePeerId: null,
       }),
     );
   });
@@ -115,7 +123,7 @@ describe('Cargo processing', () => {
   test('Well-formed yet invalid message should be ACKd but discarded', async () => {
     // The invalid message is followed by a valid one to check that processing continues
     const invalidCargo = new Cargo(
-      `https://${getSvcImplOptions().publicAddress}`,
+      cargo.recipient,
       pdaChain.peerEndpointCert,
       Buffer.from('payload'),
     );
@@ -124,7 +132,7 @@ describe('Cargo processing', () => {
     CALL.output.push(
       { cargo: Buffer.from(invalidCargoSerialized), id: invalidDeliveryId },
       {
-        cargo: CARGO_SERIALIZATION,
+        cargo: cargoSerialization,
         id: DELIVERY_ID,
       },
     );
@@ -135,44 +143,44 @@ describe('Cargo processing', () => {
     expect(CALL.write).toBeCalledWith({ id: invalidDeliveryId });
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
-    expect(PUBLISHED_MESSAGES).toEqual([CARGO_SERIALIZATION]);
+    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
         err: expect.objectContaining({ type: InvalidMessageError.name }),
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: await invalidCargo.senderCertificate.calculateSubjectPrivateAddress(),
+        privatePeerId: await invalidCargo.senderCertificate.calculateSubjectId(),
       }),
     );
   });
 
   test('Valid message should be ACKd and added to queue', async () => {
     CALL.output.push({
-      cargo: CARGO_SERIALIZATION,
+      cargo: cargoSerialization,
       id: DELIVERY_ID,
     });
 
     await SERVICE.deliverCargo(CALL.convertToGrpcStream());
 
-    expect(PUBLISHED_MESSAGES).toEqual([CARGO_SERIALIZATION]);
+    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
 
     expect(CALL.write).toBeCalledTimes(1);
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Processing valid cargo', {
-        cargoId: CARGO.id,
+        cargoId: cargo.id,
         grpcClient: CALL.getPeer(),
         grpcMethod: 'deliverCargo',
-        peerGatewayAddress: privateGatewayAddress,
+        privatePeerId: privateGatewayId,
       }),
     );
   });
 
   test('Successful completion should be logged and end the call', async () => {
     CALL.output.push({
-      cargo: CARGO_SERIALIZATION,
+      cargo: cargoSerialization,
       id: DELIVERY_ID,
     });
 
@@ -199,7 +207,7 @@ describe('Cargo processing', () => {
 
     getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(failToPublishMessage);
     CALL.output.push({
-      cargo: CARGO_SERIALIZATION,
+      cargo: cargoSerialization,
       id: DELIVERY_ID,
     });
 
@@ -243,14 +251,8 @@ describe('Cargo processing', () => {
     getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(publishFirstMessageThenFail);
     const undeliveredMessageId = 'undelivered';
     CALL.output.push(
-      {
-        cargo: CARGO_SERIALIZATION,
-        id: DELIVERY_ID,
-      },
-      {
-        cargo: CARGO_SERIALIZATION,
-        id: undeliveredMessageId,
-      },
+      { cargo: cargoSerialization, id: DELIVERY_ID },
+      { cargo: cargoSerialization, id: undeliveredMessageId },
     );
 
     await catchErrorEvent(CALL, () => SERVICE.deliverCargo(CALL.convertToGrpcStream()));
@@ -262,14 +264,8 @@ describe('Cargo processing', () => {
   test('Trusted certificates should be retrieved once in the lifetime of the call', async () => {
     // Even if multiple cargoes are received
     CALL.output.push(
-      {
-        cargo: CARGO_SERIALIZATION,
-        id: `${DELIVERY_ID}-1`,
-      },
-      {
-        cargo: CARGO_SERIALIZATION,
-        id: `${DELIVERY_ID}-2`,
-      },
+      { cargo: cargoSerialization, id: `${DELIVERY_ID}-1` },
+      { cargo: cargoSerialization, id: `${DELIVERY_ID}-2` },
     );
     await SERVICE.deliverCargo(CALL.convertToGrpcStream());
 

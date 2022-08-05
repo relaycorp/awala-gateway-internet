@@ -10,6 +10,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { FastifyInstance } from 'fastify';
 import LightMyRequest from 'light-my-request';
+import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 
 import { arrayBufferFrom } from '../../testUtils/buffers';
 import { sha256 } from '../../testUtils/crypto';
@@ -130,10 +131,10 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
   });
 
-  test('Private gateway certificate should be issued by public gateway', async () => {
+  test('Private gateway certificate should be issued by Internet gateway', async () => {
     const fixtures = getFixtures();
 
     const response = await completeRegistration(fixtures);
@@ -141,9 +142,9 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
     await expect(
-      registration.privateNodeCertificate.getCertificationPath([], [fixtures.publicGatewayCert]),
+      registration.privateNodeCertificate.getCertificationPath([], [fixtures.internetGatewayCert]),
     ).resolves.toHaveLength(2);
   });
 
@@ -186,13 +187,24 @@ describe('Successful registration', () => {
     const registration = await PrivateNodeRegistration.deserialize(
       bufferToArray(response.rawPayload),
     );
-    expect(registration.gatewayCertificate.isEqual(fixtures.publicGatewayCert)).toBeTrue();
+    expect(registration.gatewayCertificate.isEqual(fixtures.internetGatewayCert)).toBeTrue();
 
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
     const privateGatewayPublicKeySerialized = await derSerializePublicKey(privateGatewayPublicKey);
     await expect(
       derSerializePublicKey(await registration.privateNodeCertificate.getPublicKey()),
     ).resolves.toEqual(privateGatewayPublicKeySerialized);
+  });
+
+  test('Internet address should be included in registration', async () => {
+    const fixtures = getFixtures();
+
+    const response = await completeRegistration(fixtures);
+
+    const registration = await PrivateNodeRegistration.deserialize(
+      bufferToArray(response.rawPayload),
+    );
+    expect(registration.internetGatewayInternetAddress).toEqual(GATEWAY_INTERNET_ADDRESS);
   });
 
   test('Session key should be included in registration', async () => {
@@ -217,7 +229,7 @@ describe('Successful registration', () => {
     const keyData =
       fixtures.privateKeyStore.sessionKeys[registration.sessionKey!!.keyId.toString('hex')];
     expect(keyData).toMatchObject<Partial<SessionPrivateKeyData>>({
-      peerPrivateAddress: await fixtures.privateGatewayCert.calculateSubjectPrivateAddress(),
+      peerId: await fixtures.privateGatewayCert.calculateSubjectId(),
     });
   });
 
@@ -245,5 +257,5 @@ async function generatePNRA(privateGatewayPublicKeySerialized: Buffer): Promise<
     fiveSecondsInTheFuture,
     serverData,
   );
-  return authorization.serialize(fixtures.publicGatewayPrivateKey);
+  return authorization.serialize(fixtures.internetGatewayPrivateKey);
 }

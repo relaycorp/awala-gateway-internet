@@ -3,28 +3,44 @@ import { CogRPCClient, CogRPCError } from '@relaycorp/cogrpc';
 import {
   Cargo,
   CargoCollectionAuthorization,
+  Certificate,
   generateRSAKeyPair,
   issueGatewayCertificate,
+  MockPrivateKeyStore,
   Parcel,
-  RecipientAddressType,
+  ParcelCollectionAck,
+  Recipient,
 } from '@relaycorp/relaynet-core';
 import { deliverParcel } from '@relaycorp/relaynet-pohttp';
+import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { Message, Stan, Subscription } from 'node-nats-streaming';
+import uuid from 'uuid-random';
+import { GeneratedParcel } from '../testUtils/awala';
 
-import { expectBuffersToEqual } from '../testUtils/buffers';
 import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
-import { GW_COGRPC_URL, GW_POHTTP_URL, GW_PUBLIC_ADDRESS_URL } from './services';
-import { connectToNatsStreaming, createAndRegisterPrivateGateway, sleep } from './utils';
+import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
+import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
+import {
+  GW_COGRPC_HOST,
+  GW_INTERNET_ADDRESS,
+  GW_POHTTP_HOST_URL,
+  GW_POWEB_HOST_PORT,
+} from './utils/constants';
+import { connectToNatsStreaming } from './utils/nats';
+import { extractPong, makePingParcel } from './utils/ping';
+import { waitForNextParcel } from './utils/poweb';
 
 const TOMORROW = addDays(new Date(), 1);
 
+const POWEB_CLIENT = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
+
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.init(GW_COGRPC_URL);
+  cogRPCClient = await CogRPCClient.initLan(GW_COGRPC_HOST);
 });
 afterEach(() => {
   cogRPCClient.close();
@@ -33,7 +49,11 @@ afterEach(() => {
 describe('Cargo delivery', () => {
   test('Authorized cargo should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
-    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, pdaChain.privateGatewayCert, Buffer.from([]));
+    const cargo = new Cargo(
+      await getInternetGatewayRecipient(pdaChain.internetGatewayCert),
+      pdaChain.privateGatewayCert,
+      Buffer.from([]),
+    );
     const cargoSerialized = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 
     const deliveryId = 'random-delivery-id';
@@ -53,7 +73,11 @@ describe('Cargo delivery', () => {
       validityEndDate: TOMORROW,
     });
 
-    const cargo = new Cargo(GW_PUBLIC_ADDRESS_URL, unauthorizedCertificate, Buffer.from([]));
+    const cargo = new Cargo(
+      await getInternetGatewayRecipient(unauthorizedCertificate),
+      unauthorizedCertificate,
+      Buffer.from([]),
+    );
     const cargoSerialized = Buffer.from(
       await cargo.serialize(unauthorizedSenderKeyPair.privateKey),
     );
@@ -70,51 +94,50 @@ describe('Cargo delivery', () => {
 
 describe('Cargo collection', () => {
   test('Authorized CCA should be accepted', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
-    const parcelSerialized = await generateDummyParcel(pdaChain);
-    await deliverParcel(GW_POHTTP_URL, parcelSerialized);
-
-    await sleep(1);
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { parcel, parcelSerialized } = await generateDummyParcel(pdaChain);
+    await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
+    await waitForNextParcel(POWEB_CLIENT, pdaChain);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized, sessionPrivateKey } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      GW_INTERNET_ADDRESS,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
 
     await expect(collectedCargoes).toHaveLength(1);
-
-    const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
-    expect(cargo.recipientAddress).toEqual(
-      await pdaChain.privateGatewayCert.calculateSubjectPrivateAddress(),
+    const cargoMessages = await extractMessagesFromCargo(
+      collectedCargoes[0],
+      cdaChain.privateGatewayCert,
+      sessionPrivateKey,
     );
-    const { payload: cargoMessageSet } = await cargo.unwrapPayload(sessionPrivateKey);
-    expect(cargoMessageSet.messages).toHaveLength(1);
-    expectBuffersToEqual(cargoMessageSet.messages[0], parcelSerialized);
+    expect(cargoMessages).toHaveLength(1);
+    expect(cargoMessages[0]).toBeInstanceOf(Parcel);
+    expect((cargoMessages[0] as Parcel).id).toEqual(parcel.id);
   });
 
   test('Cargo should be signed with Cargo Delivery Authorization', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
-    await deliverParcel(GW_POHTTP_URL, await generateDummyParcel(pdaChain));
-
-    await sleep(1);
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { parcelSerialized } = await generateDummyParcel(pdaChain);
+    await deliverParcel(GW_POHTTP_HOST_URL, parcelSerialized, { useTls: false });
+    await waitForNextParcel(POWEB_CLIENT, pdaChain);
 
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      GW_INTERNET_ADDRESS,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
     const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
-    await cargo.validate(RecipientAddressType.PRIVATE, [cdaChain.privateGatewayCert]);
+    await cargo.validate([cdaChain.privateGatewayCert]);
   });
 
   test('Unauthorized CCA should be refused', async () => {
@@ -125,7 +148,7 @@ describe('Cargo collection', () => {
       validityEndDate: TOMORROW,
     });
     const cca = new CargoCollectionAuthorization(
-      GW_PUBLIC_ADDRESS_URL,
+      await getInternetGatewayRecipient(unauthorizedCertificate),
       unauthorizedCertificate,
       Buffer.from([]),
     );
@@ -140,12 +163,12 @@ describe('Cargo collection', () => {
   });
 
   test('CCAs should not be reusable', async () => {
-    const { pdaChain, publicGatewaySessionKey } = await createAndRegisterPrivateGateway();
+    const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
     const cdaChain = await generateCDAChain(pdaChain);
     const { ccaSerialized } = await generateCCA(
-      GW_PUBLIC_ADDRESS_URL,
-      publicGatewaySessionKey,
-      cdaChain.publicGatewayCert,
+      GW_INTERNET_ADDRESS,
+      internetGatewaySessionKey,
+      cdaChain.internetGatewayCert,
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
@@ -160,14 +183,70 @@ describe('Cargo collection', () => {
   });
 });
 
-async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<ArrayBuffer> {
+test('Sending pings and receiving pongs', async () => {
+  const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
+
+  const pingId = uuid();
+  const pingParcelData = await makePingParcel(pingId, pdaChain);
+
+  // Deliver the ping message encapsulated in a cargo
+  const privateGatewayKeyStore = new MockPrivateKeyStore();
+  const cargoSerialized = await encapsulateMessagesInCargo(
+    [pingParcelData.parcelSerialized],
+    pdaChain,
+    internetGatewaySessionKey,
+    privateGatewayKeyStore,
+  );
+  await asyncIterableToArray(
+    cogRPCClient.deliverCargo(
+      arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
+    ),
+  );
+  await waitForNextParcel(POWEB_CLIENT, pdaChain);
+
+  // Collect the pong message encapsulated in a cargo
+  const cdaChain = await generateCDAChain(pdaChain);
+  const { ccaSerialized } = await generateCCA(
+    GW_INTERNET_ADDRESS,
+    internetGatewaySessionKey,
+    cdaChain.internetGatewayCert,
+    pdaChain.privateGatewayCert,
+    pdaChain.privateGatewayPrivateKey,
+    privateGatewayKeyStore,
+  );
+  const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
+  expect(collectedCargoes).toHaveLength(1);
+  const collectedMessages = await extractMessagesFromCargo(
+    collectedCargoes[0],
+    cdaChain.privateGatewayCert,
+    privateGatewayKeyStore,
+  );
+  expect(collectedMessages).toHaveLength(2);
+  const collectionAck = collectedMessages[0];
+  expect(collectionAck).toBeInstanceOf(ParcelCollectionAck);
+  expect(collectionAck).toHaveProperty('parcelId', pingParcelData.parcelId);
+  const pongParcel = collectedMessages[1];
+  expect(pongParcel).toBeInstanceOf(Parcel);
+  await expect(extractPong(pongParcel as Parcel, pingParcelData.sessionKey)).resolves.toEqual(
+    pingId,
+  );
+});
+
+async function getInternetGatewayRecipient(
+  internetGatewayCertificate: Certificate,
+): Promise<Recipient> {
+  return { id: await internetGatewayCertificate.calculateSubjectId() };
+}
+
+async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<GeneratedParcel> {
   const parcel = new Parcel(
-    await pdaChain.peerEndpointCert.calculateSubjectPrivateAddress(),
+    { id: await pdaChain.peerEndpointCert.calculateSubjectId() },
     pdaChain.pdaCert,
     Buffer.from([]),
     { senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert] },
   );
-  return parcel.serialize(pdaChain.pdaGranteePrivateKey);
+  const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
+  return { parcel, parcelSerialized };
 }
 
 async function getLastQueueMessage(): Promise<Buffer | undefined> {

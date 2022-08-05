@@ -8,11 +8,11 @@ The overall system comprises a series of services, background queues and third-p
 
 [![](./diagrams/system.png)](./diagrams/system.png)
 
-All the services and background queues provided by this public gateway run on Node.js and share a common Docker image.
+All the services and background queues provided by this Internet gateway run on Node.js and share a common Docker image.
 
 ## Services
 
-This app implements the minimum set of services required for a Relaynet public gateway:
+This app implements the minimum set of services required for a Relaynet Internet gateway:
 
 ### PoWeb server
 
@@ -48,7 +48,7 @@ This queue delivers each parcel stored by the CogRPC and PoWeb services. This cl
 
 ## Backing services
 
-The components provided by this public gateway employ the following third-party backing services:
+The components provided by this Internet gateway employ the following third-party backing services:
 
 ### S3-compatible, object store server
 
@@ -64,7 +64,7 @@ This server is used to store parcels and cargoes under the following object key 
 
 [NAT Streaming](https://docs.nats.io/nats-streaming-concepts/intro) is used for inter-component communication using asynchronous messaging. The following channels are used:
 
-- `pdc-parcel.${localGatewayAddress}` where `${localGatewayAddress}` is the private address of the local gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
+- `pdc-parcel.${privateGatewayId}` where `${privateGatewayId}` is the id of the private gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
 - `internet-parcels`. Parcels bound for an internet.
 - `crc-cargo`. Cargo received via CRC (e.g., CogRPC) are published here.
 
@@ -74,4 +74,4 @@ This server is used to store parcels and cargoes under the following object key 
 
 ### MongoDB
 
-[MongoDB](https://www.mongodb.com/) is used to store the certificates owned by the public gateway instance, as well as transient metadata about private gateways (e.g., DH public keys, outgoing parcels).
+[MongoDB](https://www.mongodb.com/) is used to store the certificates owned by the Internet gateway instance, as well as transient metadata about private gateways (e.g., DH public keys, outgoing parcels).

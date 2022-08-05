@@ -14,11 +14,10 @@ logging:
 ingress:
   enableTls: false
 
-publicAddress: gateway.tld
+internetAddress: gateway.tld
 
 pdcQueue:
   replicas: 2
-  pohttpAddress: http://public-gateway-pohttp:8080
 
 mongo:
   uri: mongodb://mongodb

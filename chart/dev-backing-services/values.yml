@@ -45,14 +45,14 @@ stan:
     type: memory
 
 # Relaynet Pong dependencies
-relaynet-pong:
-  fullnameOverride: relaynet-pong
+pong:
+  fullnameOverride: pong
   pohttp_tls_required: false
-  public_endpoint_address: relaynet-pong-pohttp.default
+  internet_address: pong-pohttp.default
   vault:
     host: dev-backing-services-vault
     token: root
-    enable_secret: true
+    session_keys_mount_path: pong-keys
   redis:
     host: redis-headless
 redis:

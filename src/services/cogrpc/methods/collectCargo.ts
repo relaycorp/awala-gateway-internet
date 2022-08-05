@@ -8,7 +8,6 @@ import {
   CertificateRotation,
   CertificationPath,
   PrivateKeyStore,
-  RecipientAddressType,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
@@ -19,7 +18,7 @@ import uuid from 'uuid-random';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
 import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
-import { PublicGatewayManager } from '../../../node/PublicGatewayManager';
+import { InternetGatewayManager } from '../../../node/InternetGatewayManager';
 import { generatePCAs } from '../../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../../parcelStore';
 import { issuePrivateGatewayCertificate } from '../../../pki';
@@ -29,7 +28,6 @@ import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
 export default async function collectCargo(
   call: grpc.ServerDuplexStream<CargoDeliveryAck, CargoDelivery>,
   mongooseConnection: Connection,
-  ownPublicAddress: string,
   parcelStore: ParcelStore,
   privateKeyStore: PrivateKeyStore,
   baseLogger: Logger,
@@ -51,24 +49,22 @@ export default async function collectCargo(
   }
 
   const cca = ccaOrError;
-  const peerGatewayAddress = await cca.senderCertificate.calculateSubjectPrivateAddress();
-  const ccaAwareLogger = logger.child({ peerGatewayAddress });
+  const privatePeerId = await cca.senderCertificate.calculateSubjectId();
+  const ccaAwareLogger = logger.child({ privatePeerId });
 
   const config = new Config(mongooseConnection);
-  const publicGatewayPrivateAddress = (await config.get(ConfigKey.CURRENT_PRIVATE_ADDRESS))!!;
-  const publicGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(
-    publicGatewayPrivateAddress,
-  );
+  const internetGatewayId = (await config.get(ConfigKey.CURRENT_ID))!!;
+  const internetGatewayPrivateKey = await privateKeyStore.retrieveIdentityKey(internetGatewayId);
   const certificateStore = new MongoCertificateStore(mongooseConnection);
   const allCertificationPaths = await certificateStore.retrieveAll(
-    publicGatewayPrivateAddress,
-    publicGatewayPrivateAddress,
+    internetGatewayId,
+    internetGatewayId,
   );
   const allCertificates = allCertificationPaths.map((p) => p.leafCertificate);
   try {
-    await cca.validate(RecipientAddressType.PUBLIC, allCertificates);
+    await cca.validate(allCertificates);
   } catch (err) {
-    ccaAwareLogger.info({ ccaRecipientAddress: cca.recipientAddress, err }, 'Refusing invalid CCA');
+    ccaAwareLogger.info({ ccaRecipient: cca.recipient, err }, 'Refusing invalid CCA');
     call.emit('error', {
       code: grpc.status.UNAUTHENTICATED,
       message: 'CCA is invalid',
@@ -76,12 +72,8 @@ export default async function collectCargo(
     return;
   }
 
-  const ccaRecipientURL = new URL(cca.recipientAddress);
-  if (ccaRecipientURL.hostname !== ownPublicAddress) {
-    ccaAwareLogger.info(
-      { ccaRecipientAddress: cca.recipientAddress },
-      'Refusing CCA bound for another gateway',
-    );
+  if (cca.recipient.id !== internetGatewayId) {
+    ccaAwareLogger.info({ ccaRecipient: cca.recipient }, 'Refusing CCA bound for another gateway');
     call.emit('error', {
       code: grpc.status.INVALID_ARGUMENT,
       message: 'CCA recipient is a different gateway',
@@ -89,7 +81,7 @@ export default async function collectCargo(
     return;
   }
 
-  const gatewayManager = await PublicGatewayManager.init(mongooseConnection);
+  const gatewayManager = await InternetGatewayManager.init(mongooseConnection);
   const gateway = await gatewayManager.getCurrent();
 
   let ccr: CargoCollectionRequest;
@@ -135,14 +127,11 @@ export default async function collectCargo(
 
   const cargoMessageStream = await generateCargoMessageStream(
     cca,
-    peerGatewayAddress,
+    privatePeerId,
     parcelStore,
     mongooseConnection,
-    publicGatewayPrivateKey!,
-    (await certificateStore.retrieveLatest(
-      publicGatewayPrivateAddress,
-      publicGatewayPrivateAddress,
-    ))!.leafCertificate,
+    internetGatewayPrivateKey!,
+    (await certificateStore.retrieveLatest(internetGatewayId, internetGatewayId))!.leafCertificate,
     ccaAwareLogger,
   );
   try {
@@ -191,29 +180,26 @@ async function parseCCAFromMetadata(
 
 async function* generateCargoMessageStream(
   cca: CargoCollectionAuthorization,
-  peerGatewayAddress: string,
+  privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
+  internetGatewayPrivateKey: CryptoKey,
+  internetGatewayCertificate: Certificate,
   ccaAwareLogger: Logger,
 ): CargoMessageStream {
   const activeParcels = pipeline(
-    () => parcelStore.retrieveActiveParcelsForGateway(peerGatewayAddress, ccaAwareLogger),
+    () => parcelStore.retrieveParcelsForPrivatePeer(privatePeerId, ccaAwareLogger),
     convertParcelsToCargoMessageStream,
   );
-  yield* await concatMessageStreams(
-    generatePCAs(peerGatewayAddress, mongooseConnection),
-    activeParcels,
-  );
+  yield* await concatMessageStreams(generatePCAs(privatePeerId, mongooseConnection), activeParcels);
 
   const minCertTTL = addDays(new Date(), 90);
   if (cca.senderCertificate.expiryDate < minCertTTL) {
     ccaAwareLogger.info('Sending certificate rotation');
     const certificateRotation = await generateCertificateRotation(
       await cca.senderCertificate.getPublicKey(),
-      publicGatewayPrivateKey,
-      publicGatewayCertificate,
+      internetGatewayPrivateKey,
+      internetGatewayCertificate,
     );
     yield {
       expiryDate: certificateRotation.certificationPath.leafCertificate.expiryDate,
@@ -221,7 +207,7 @@ async function* generateCargoMessageStream(
     };
   } else {
     ccaAwareLogger.debug(
-      { peerGatewayCertificateExpiry: cca.senderCertificate.expiryDate },
+      { privatePeerCertificateExpiry: cca.senderCertificate.expiryDate },
       'Skipping certificate rotation',
     );
   }
@@ -229,16 +215,16 @@ async function* generateCargoMessageStream(
 
 async function generateCertificateRotation(
   privateGatewayPublicKey: CryptoKey,
-  publicGatewayPrivateKey: CryptoKey,
-  publicGatewayCertificate: Certificate,
+  internetGatewayPrivateKey: CryptoKey,
+  internetGatewayCertificate: Certificate,
 ): Promise<CertificateRotation> {
   const privateGatewayCertificate = await issuePrivateGatewayCertificate(
     privateGatewayPublicKey,
-    publicGatewayPrivateKey,
-    publicGatewayCertificate,
+    internetGatewayPrivateKey,
+    internetGatewayCertificate,
   );
   return new CertificateRotation(
-    new CertificationPath(privateGatewayCertificate, [publicGatewayCertificate]),
+    new CertificationPath(privateGatewayCertificate, [internetGatewayCertificate]),
   );
 }
 

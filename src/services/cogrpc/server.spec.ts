@@ -14,9 +14,7 @@ import * as logging from '../../utilities/logging';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 
-const makeServiceImplementationSpy = mockSpy(
-  jest.spyOn(cogrpcService, 'makeServiceImplementation'),
-);
+const makeServiceImplementationSpy = mockSpy(jest.spyOn(cogrpcService, 'makeService'));
 const mockServer = {
   addService: mockSpy(jest.fn()),
   bindAsync: mockSpy(jest.fn(), (_netloc, _credentials, cb) => cb()),
@@ -41,8 +39,6 @@ const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'
 const BASE_ENV_VARS = {
   NATS_CLUSTER_ID: 'nats-cluster-id',
   NATS_SERVER_URL: 'nats://example.com',
-  OBJECT_STORE_BUCKET: 'bucket-name',
-  PUBLIC_ADDRESS: 'gateway.com',
   SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
@@ -58,17 +54,14 @@ describe('runServer', () => {
     expect(mockExitHandler).toBeCalledWith(mockLogger);
   });
 
-  test.each([
-    'NATS_SERVER_URL',
-    'NATS_CLUSTER_ID',
-    'OBJECT_STORE_BUCKET',
-    'PUBLIC_ADDRESS',
-    'SERVER_IP_ADDRESS',
-  ])('Environment variable %s should be present', async (envVar) => {
-    mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
+  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'SERVER_IP_ADDRESS'])(
+    'Environment variable %s should be present',
+    async (envVar) => {
+      mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
 
-    await expect(runServer).rejects.toMatchObject(new RegExp(envVar));
-  });
+      await expect(runServer).rejects.toMatchObject(new RegExp(envVar));
+    },
+  );
 
   test('Server should accept the largest possible RAMF messages', async () => {
     const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
@@ -124,7 +117,7 @@ describe('runServer', () => {
     await runServer();
 
     expect(makeServiceImplementationSpy).toBeCalledTimes(1);
-    expect(makeServiceImplementationSpy).toBeCalledWith({
+    expect(makeServiceImplementationSpy).toBeCalledWith<[cogrpcService.ServiceOptions]>({
       baseLogger: expect.objectContaining<Partial<Logger>>({
         debug: expect.anything(),
         error: expect.anything(),
@@ -132,8 +125,6 @@ describe('runServer', () => {
       getMongooseConnection: createMongooseConnectionFromEnv,
       natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
       natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
-      parcelStoreBucket: BASE_ENV_VARS.OBJECT_STORE_BUCKET,
-      publicAddress: BASE_ENV_VARS.PUBLIC_ADDRESS,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

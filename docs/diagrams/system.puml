@@ -30,7 +30,7 @@ System_Boundary(c1, "Relaynet-Internet Gateway") {
 }
 
 System_Ext(public_endpoint, "Public endpoint", "E.g., api.twitter.com/relaynet")
-System_Ext(other_public_gateway, "Another public gateway")
+System_Ext(other_public_gateway, "Another Internet gateway")
 
 Rel_R(user, courier, "Exchanges parcels encapsulated in cargoes when the Internet is unavailable")
 

@@ -1,11 +1,10 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
-import { Parcel, RecipientAddressType } from '@relaycorp/relaynet-core';
+import { Parcel } from '@relaycorp/relaynet-core';
 import { get as getEnvVar } from 'env-var';
 import { Connection } from 'mongoose';
 import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
 import { pipeline } from 'streaming-iterables';
-import uuid from 'uuid-random';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from './backingServices/objectStorage';
@@ -42,36 +41,50 @@ export interface ParcelStreamMessage {
   readonly parcelSerialized: Buffer;
 }
 
+function makeParcelObjectKeyForInternetPeer(
+  privatePeerId: string,
+  senderId: string,
+  parcel: Parcel,
+): string {
+  return [privatePeerId, senderId, parcel.recipient.id, sha256Hex(parcel.id)].join('/');
+}
+
 export class ParcelStore {
   public static initFromEnv(): ParcelStore {
     const objectStoreClient = initObjectStoreFromEnv();
     const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-    return new ParcelStore(objectStoreClient, objectStoreBucket);
+    const internetAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
+    return new ParcelStore(objectStoreClient, objectStoreBucket, internetAddress);
   }
 
-  constructor(public objectStoreClient: ObjectStoreClient, public readonly bucket: string) {}
+  constructor(
+    public objectStoreClient: ObjectStoreClient,
+    public readonly bucket: string,
+    public internetAddress: string,
+  ) {}
 
   /**
-   * Output existing and new parcels for `peerGatewayAddress` until `abortSignal` is triggered.
+   * Output existing and new parcels for `privatePeerId` until `abortSignal` is triggered,
+   * excluding expired ones.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param natsStreamingClient
    * @param abortSignal
    * @param logger
    * @throws NatsStreamingSubscriptionError
    */
-  public async *liveStreamActiveParcelsForGateway(
-    peerGatewayAddress: string,
+  public async *liveStreamParcelsForPrivatePeer(
+    privatePeerId: string,
     natsStreamingClient: NatsStreamingClient,
     abortSignal: AbortSignal,
     logger: Logger,
   ): AsyncIterable<ParcelStreamMessage> {
-    const peerAwareLogger = logger.child({ peerGatewayAddress });
+    const peerAwareLogger = logger.child({ privatePeerId });
 
     const parcelMessages = natsStreamingClient.makeQueueConsumer(
-      calculatePeerGatewayNATSChannel(peerGatewayAddress),
+      makeInternetPeerNATSChannel(privatePeerId),
       'active-parcels',
-      peerGatewayAddress,
+      privatePeerId,
       abortSignal,
     );
 
@@ -104,15 +117,15 @@ export class ParcelStore {
   }
 
   /**
-   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * Output existing parcels bound for `privatePeerId`, ignoring new parcels received during
    * the lifespan of the function call, and giving the option to delete the parcel from each item
    * in the result.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param logger
    */
-  public async *streamActiveParcelsForGateway(
-    peerGatewayAddress: string,
+  public async *streamParcelsForPrivatePeer(
+    privatePeerId: string,
     logger: Logger,
   ): AsyncIterable<ParcelStreamMessage> {
     const objectStoreClient = this.objectStoreClient;
@@ -134,23 +147,23 @@ export class ParcelStore {
     }
 
     yield* await pipeline(
-      () => this.retrieveActiveParcelsForGateway(peerGatewayAddress, logger),
+      () => this.retrieveParcelsForPrivatePeer(privatePeerId, logger),
       buildStream,
     );
   }
 
   /**
-   * Output existing parcels bound for `peerGatewayAddress`, ignoring new parcels received during
+   * Output existing parcels bound for `privatePeerId`, ignoring new parcels received during
    * the lifespan of the function call.
    *
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param logger
    */
-  public async *retrieveActiveParcelsForGateway(
-    peerGatewayAddress: string,
+  public async *retrieveParcelsForPrivatePeer(
+    privatePeerId: string,
     logger: Logger,
   ): AsyncIterable<ParcelObject<null>> {
-    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${peerGatewayAddress}/`;
+    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${privatePeerId}/`;
     yield* await pipeline(
       () => this.objectStoreClient.listObjectKeys(prefix, this.bucket),
       buildParcelObjectMetadataFromString,
@@ -158,16 +171,19 @@ export class ParcelStore {
     );
   }
 
-  public async storeParcelFromPeerGateway(
+  public async storeParcelFromPrivatePeer(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    peerGatewayAddress: string,
+    privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingConnection: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {
-    if (parcel.isRecipientAddressPrivate) {
-      return this.storeGatewayBoundParcel(
+    const isForAnotherPrivatePeer =
+      !parcel.recipient.internetAddress ||
+      parcel.recipient.internetAddress === this.internetAddress;
+    if (isForAnotherPrivatePeer) {
+      return this.storeParcelForPrivatePeer(
         parcel,
         parcelSerialized,
         mongooseConnection,
@@ -175,10 +191,10 @@ export class ParcelStore {
         logger,
       );
     }
-    return this.storeEndpointBoundParcel(
+    return this.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
-      peerGatewayAddress,
+      privatePeerId,
       mongooseConnection,
       natsStreamingConnection,
       logger,
@@ -186,7 +202,7 @@ export class ParcelStore {
   }
 
   /**
-   * Store a parcel bound for a private endpoint served by a peer gateway.
+   * Store a parcel bound for a private endpoint served by a private peer.
    *
    * @param parcel
    * @param parcelSerialized
@@ -195,7 +211,7 @@ export class ParcelStore {
    * @param logger
    * @throws InvalidMessageException
    */
-  public async storeGatewayBoundParcel(
+  public async storeParcelForPrivatePeer(
     parcel: Parcel,
     parcelSerialized: Buffer,
     mongooseConnection: Connection,
@@ -203,18 +219,15 @@ export class ParcelStore {
     logger: BasicLogger,
   ): Promise<string> {
     const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
-    const certificationPath = (await parcel.validate(
-      RecipientAddressType.PRIVATE,
-      trustedCertificates,
-    ))!!;
+    const certificationPath = (await parcel.validate(trustedCertificates))!!;
     logger.debug('Parcel is valid');
 
     const recipientGatewayCert = certificationPath[certificationPath.length - 2];
-    const privateGatewayAddress = await recipientGatewayCert.calculateSubjectPrivateAddress();
-    const key = calculateGatewayBoundParcelObjectKey(
+    const privateGatewayAddress = await recipientGatewayCert.calculateSubjectId();
+    const key = makeParcelObjectKeyForPrivatePeer(
       parcel.id,
-      await parcel.senderCertificate.calculateSubjectPrivateAddress(),
-      parcel.recipientAddress,
+      await parcel.senderCertificate.calculateSubjectId(),
+      parcel.recipient.id,
       privateGatewayAddress,
     );
     const keyAwareLogger = logger.child({ parcelObjectKey: key });
@@ -231,7 +244,7 @@ export class ParcelStore {
 
     await natsStreamingClient.publishMessage(
       key,
-      calculatePeerGatewayNATSChannel(privateGatewayAddress),
+      makeInternetPeerNATSChannel(privateGatewayAddress),
     );
     keyAwareLogger.debug('Parcel storage was successfully published on NATS');
 
@@ -242,28 +255,28 @@ export class ParcelStore {
    * Delete specified parcel if it exists.
    *
    * @param parcelId
-   * @param senderPrivateAddress
+   * @param senderId
    * @param recipientAddress
    * @param recipientGatewayAddress
    */
-  public async deleteGatewayBoundParcel(
+  public async deleteParcelForPrivatePeer(
     parcelId: string,
-    senderPrivateAddress: string,
+    senderId: string,
     recipientAddress: string,
     recipientGatewayAddress: string,
   ): Promise<void> {
-    const parcelKey = calculateGatewayBoundParcelObjectKey(
+    const parcelKey = makeParcelObjectKeyForPrivatePeer(
       parcelId,
-      senderPrivateAddress,
+      senderId,
       recipientAddress,
       recipientGatewayAddress,
     );
     await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
   }
 
-  public async retrieveEndpointBoundParcel(parcelObjectKey: string): Promise<Buffer | null> {
+  public async retrieveParcelForInternetPeer(parcelObjectKey: string): Promise<Buffer | null> {
     const storeObject = await this.objectStoreClient.getObject(
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
     return storeObject?.body ?? null;
@@ -274,37 +287,37 @@ export class ParcelStore {
    *
    * @param parcel
    * @param parcelSerialized
-   * @param peerGatewayAddress
+   * @param privatePeerId
    * @param mongooseConnection
    * @param natsStreamingClient
    * @param logger
    * @throws InvalidMessageException
    */
-  public async storeEndpointBoundParcel(
+  public async storeParcelForInternetPeer(
     parcel: Parcel,
     parcelSerialized: Buffer,
-    peerGatewayAddress: string,
+    privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingClient: NatsStreamingClient,
     logger: BasicLogger,
   ): Promise<string | null> {
-    // Don't require the sender to be on a valid path from the current public gateway: Doing so
+    // Don't require the sender to be on a valid path from the current Internet gateway: Doing so
     // would only work if the recipient is also served by this gateway.
     await parcel.validate();
     logger.debug('Parcel is valid');
 
-    if (await wasParcelCollected(parcel, peerGatewayAddress, mongooseConnection)) {
+    if (await wasParcelCollected(parcel, privatePeerId, mongooseConnection)) {
       logger.debug('Parcel was previously processed');
       return null;
     }
 
-    const senderPrivateAddress = await parcel.senderCertificate.calculateSubjectPrivateAddress();
-    const parcelObjectKey = `${peerGatewayAddress}/${senderPrivateAddress}/${uuid()}`;
+    const senderId = await parcel.senderCertificate.calculateSubjectId();
+    const parcelObjectKey = makeParcelObjectKeyForInternetPeer(privatePeerId, senderId, parcel);
     const keyAwareLogger = logger.child({ parcelObjectKey });
 
     await this.objectStoreClient.putObject(
       { body: parcelSerialized, metadata: {} },
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
     keyAwareLogger.debug('Parcel object was successfully stored');
@@ -313,20 +326,20 @@ export class ParcelStore {
       deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
       parcelObjectKey,
-      parcelRecipientAddress: parcel.recipientAddress,
+      parcelRecipientAddress: parcel.recipient.internetAddress!,
     };
     await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'internet-parcels');
     keyAwareLogger.debug('Parcel storage was successfully published on NATS');
 
-    await recordParcelCollection(parcel, peerGatewayAddress, mongooseConnection);
+    await recordParcelCollection(parcel, privatePeerId, mongooseConnection);
     keyAwareLogger.debug('Parcel storage was successfully recorded');
 
     return parcelObjectKey;
   }
 
-  public async deleteEndpointBoundParcel(parcelObjectKey: string): Promise<void> {
+  public async deleteParcelForInternetPeer(parcelObjectKey: string): Promise<void> {
     await this.objectStoreClient.deleteObject(
-      makeFullInternetBoundObjectKey(parcelObjectKey),
+      makeFullObjectKeyForInternetPeer(parcelObjectKey),
       this.bucket,
     );
   }
@@ -416,17 +429,17 @@ function getDateFromTimestamp(timestampString: string): Date | null {
   return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
 }
 
-function makeFullInternetBoundObjectKey(parcelObjectKey: string): string {
+function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-function calculatePeerGatewayNATSChannel(peerGatewayAddress: string): string {
-  return `pdc-parcel.${peerGatewayAddress}`;
+function makeInternetPeerNATSChannel(privatePeerId: string): string {
+  return `pdc-parcel.${privatePeerId}`;
 }
 
-function calculateGatewayBoundParcelObjectKey(
+function makeParcelObjectKeyForPrivatePeer(
   parcelId: string,
-  senderPrivateAddress: string,
+  senderId: string,
   recipientAddress: string,
   recipientGatewayAddress: string,
 ): string {
@@ -434,7 +447,7 @@ function calculateGatewayBoundParcelObjectKey(
     GATEWAY_BOUND_OBJECT_KEY_PREFIX,
     recipientGatewayAddress,
     recipientAddress,
-    senderPrivateAddress,
+    senderId,
     sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
   ].join('/');
 }

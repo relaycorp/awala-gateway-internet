@@ -46,7 +46,7 @@
   },
   "devDependencies": {
     "@relaycorp/relaynet-poweb": "^1.6.31",
-    "@relaycorp/relaynet-testing": "^2.2.24",
+    "@relaycorp/relaynet-testing": "^2.2.25",
     "@relaycorp/shared-config": "^1.9.1",
     "@relaycorp/ws-mock": "^5.2.2",
     "@shelf/jest-mongodb": "^4.0.0",
@@ -62,7 +62,7 @@
     "prettier": "^2.7.1",
     "split2": "^4.1.0",
     "trash-cli": "^5.0.0",
-    "ts-jest": "^28.0.7",
+    "ts-jest": "^28.0.8",
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "tslint": "^6.1.3",

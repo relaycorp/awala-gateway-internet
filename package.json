@@ -17,10 +17,10 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.6.8",
-    "@relaycorp/awala-keystore-cloud": "^2.0.14",
+    "@relaycorp/awala-keystore-cloud": "^2.0.15",
     "@relaycorp/cogrpc": "^1.3.61",
     "@relaycorp/object-storage": "^1.4.43",
-    "@relaycorp/pino-cloud": "^1.0.21",
+    "@relaycorp/pino-cloud": "^1.0.22",
     "@relaycorp/relaynet-core": "^1.81.13",
     "@relaycorp/relaynet-pohttp": "^1.7.50",
     "@typegoose/typegoose": "^9.11.0",

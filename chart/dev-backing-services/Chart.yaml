@@ -24,7 +24,7 @@ dependencies:
 
   # Pong app
   - name: relaynet-pong
-    version: 3.0.27
+    version: 3.0.37
     repository: https://h.cfcr.io/relaycorp/public
     alias: pong
   - name: redis

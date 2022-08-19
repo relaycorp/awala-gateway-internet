@@ -14,11 +14,11 @@ dependencies:
 - name: stan
   repository: https://nats-io.github.io/k8s/helm/charts
   version: 0.7.2
-- name: pong
+- name: relaynet-pong
   repository: https://h.cfcr.io/relaycorp/public
-  version: 3.0.27
+  version: 3.0.37
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 16.12.2
-digest: sha256:c180827d676f97079ae49c6e19ca266a65927a20e1717ee56f7fb3d88876eb68
-generated: "2022-08-03T17:56:24.941672454+01:00"
+digest: sha256:7c2f79a8d9d07692e87b8812cdb92d010a06f2d523966c70236a22d91789b0b0
+generated: "2022-08-19T17:01:14.652985945+01:00"

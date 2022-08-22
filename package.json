@@ -50,7 +50,7 @@
     "@relaycorp/shared-config": "^1.9.1",
     "@relaycorp/ws-mock": "^5.2.2",
     "@shelf/jest-mongodb": "^4.0.0",
-    "@types/jest": "^28.1.6",
+    "@types/jest": "^28.1.7",
     "@types/mongoose": "^5.10.5",
     "@types/split2": "^3.2.1",
     "@types/verror": "^1.10.6",

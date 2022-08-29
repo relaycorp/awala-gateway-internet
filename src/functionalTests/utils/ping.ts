@@ -4,7 +4,7 @@ import {
   getIdFromIdentityKey,
   issueDeliveryAuthorization,
   Parcel,
-  PublicNodeConnectionParams,
+  NodeConnectionParams,
   ServiceMessage,
   SessionEnvelopedData,
 } from '@relaycorp/relaynet-core';
@@ -75,11 +75,11 @@ export async function extractPong(parcel: Parcel, sessionKey: CryptoKey): Promis
   return serviceMessageContent.toString();
 }
 
-async function getPongConnectionParams(): Promise<PublicNodeConnectionParams> {
+async function getPongConnectionParams(): Promise<NodeConnectionParams> {
   const connectionParamsSerialization = await downloadFileFromURL(
     `${PONG_LOCAL_URL}/connection-params.der`,
   );
-  return PublicNodeConnectionParams.deserialize(bufferToArray(connectionParamsSerialization));
+  return NodeConnectionParams.deserialize(bufferToArray(connectionParamsSerialization));
 }
 
 async function downloadFileFromURL(url: string): Promise<Buffer> {

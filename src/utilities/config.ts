@@ -4,7 +4,7 @@ import { Connection } from 'mongoose';
 import { ConfigItem } from '../models';
 
 export enum ConfigKey {
-  CURRENT_ID = 'current_private_address',
+  CURRENT_ID = 'current_id',
 }
 
 export class Config {

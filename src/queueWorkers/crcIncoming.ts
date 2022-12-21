@@ -15,7 +15,6 @@ import { pipeline } from 'streaming-iterables';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
-import { InternetGatewayError } from '../errors';
 import { InternetGateway } from '../node/InternetGateway';
 import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
@@ -85,10 +84,11 @@ async function processCargo(
     cargoMessageSet = await gateway.unwrapMessagePayload(cargo);
   } catch (err) {
     if (err instanceof KeyStoreError) {
-      throw new InternetGatewayError(err, 'Failed to use key store to unwrap message');
+      cargoAwareLogger.fatal({ err }, 'Failed to use key store to unwrap message');
+    } else {
+      cargoAwareLogger.info({ err }, 'Cargo payload is invalid');
+      message.ack();
     }
-    cargoAwareLogger.info({ err }, 'Cargo payload is invalid');
-    message.ack();
     return;
   }
 

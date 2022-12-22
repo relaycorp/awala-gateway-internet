@@ -19,7 +19,7 @@
     "@grpc/grpc-js": "^1.6.12",
     "@relaycorp/awala-keystore-cloud": "^2.0.22",
     "@relaycorp/cogrpc": "^1.3.65",
-    "@relaycorp/object-storage": "^1.4.61",
+    "@relaycorp/object-storage": "^1.4.62",
     "@relaycorp/pino-cloud": "^1.0.25",
     "@relaycorp/relaynet-core": "^1.81.18",
     "@relaycorp/relaynet-pohttp": "^1.7.54",

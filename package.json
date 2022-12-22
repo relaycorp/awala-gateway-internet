@@ -21,7 +21,7 @@
     "@relaycorp/cogrpc": "^1.3.65",
     "@relaycorp/object-storage": "^1.4.62",
     "@relaycorp/pino-cloud": "^1.0.25",
-    "@relaycorp/relaynet-core": "^1.81.18",
+    "@relaycorp/relaynet-core": "^1.82.3",
     "@relaycorp/relaynet-pohttp": "^1.7.54",
     "@typegoose/typegoose": "^9.11.2",
     "abortable-iterator": "^3.0.0",

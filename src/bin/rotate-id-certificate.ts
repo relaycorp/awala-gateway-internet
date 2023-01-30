@@ -1,8 +1,10 @@
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { rotateOwnCertificate } from '../pki';
+import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 
 const LOGGER = makeLogger();
+configureExitHandling(LOGGER);
 
 async function main(): Promise<void> {
   const connection = await createMongooseConnectionFromEnv();

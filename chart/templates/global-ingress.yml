@@ -1,6 +1,6 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName :=  include "relaynet-internet-gateway.fullname" . -}}
-apiVersion: {{ .Values.ingress.apiVersion }}
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullName }}
@@ -16,18 +16,30 @@ spec:
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-pohttp
-              servicePort: http
+              service:
+                name: {{ $fullName }}-pohttp
+                port:
+                  name: http
+            pathType: Prefix
+            path: /
     - host: {{ include "relaynet-internet-gateway.powebHost" . }}
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-poweb
-              servicePort: poweb
+              service:
+                name: {{ $fullName }}-poweb
+                port:
+                  name: poweb
+            pathType: Prefix
+            path: /
     - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-cogrpc
-              servicePort: cogrpc
+              service:
+                name: {{ $fullName }}-cogrpc
+                port:
+                  name: cogrpc
+            pathType: Prefix
+            path: /
   {{- end }}

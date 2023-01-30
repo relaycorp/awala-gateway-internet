@@ -26,6 +26,8 @@ minio:
 
 mongodb:
   fullnameOverride: mongodb
+  image:
+    tag: "4.4.15"
   auth:
     rootPassword: letmein
   persistence:

@@ -20,6 +20,7 @@ spec:
                 name: {{ $fullName }}-pohttp
                 port:
                   name: http
+            pathType: Prefix
     - host: {{ include "relaynet-internet-gateway.powebHost" . }}
       http:
         paths:
@@ -28,6 +29,7 @@ spec:
                 name: {{ $fullName }}-poweb
                 port:
                   name: poweb
+            pathType: Prefix
     - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
       http:
         paths:
@@ -36,4 +38,5 @@ spec:
                 name: {{ $fullName }}-cogrpc
                 port:
                   name: cogrpc
+            pathType: Prefix
   {{- end }}

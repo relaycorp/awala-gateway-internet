@@ -1,7 +1,3 @@
-import { GatewayChannel, Recipient } from '@relaycorp/relaynet-core';
+import { GatewayChannel } from '@relaycorp/relaynet-core';
 
-export class InternetGatewayChannel extends GatewayChannel {
-  async getOutboundRAMFRecipient(): Promise<Recipient> {
-    return { id: this.peerId };
-  }
-}
+export class InternetGatewayChannel extends GatewayChannel {}

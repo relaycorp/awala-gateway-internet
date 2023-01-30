@@ -21,6 +21,7 @@ spec:
                 port:
                   name: http
             pathType: Prefix
+            path: /
     - host: {{ include "relaynet-internet-gateway.powebHost" . }}
       http:
         paths:
@@ -30,6 +31,7 @@ spec:
                 port:
                   name: poweb
             pathType: Prefix
+            path: /
     - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
       http:
         paths:
@@ -39,4 +41,5 @@ spec:
                 port:
                   name: cogrpc
             pathType: Prefix
+            path: /
   {{- end }}

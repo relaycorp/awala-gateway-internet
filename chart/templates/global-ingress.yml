@@ -16,18 +16,24 @@ spec:
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-pohttp
-              servicePort: http
+              service:
+                name: {{ $fullName }}-pohttp
+                port:
+                  name: http
     - host: {{ include "relaynet-internet-gateway.powebHost" . }}
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-poweb
-              servicePort: poweb
+              service:
+                name: {{ $fullName }}-poweb
+                port:
+                  name: poweb
     - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
       http:
         paths:
           - backend:
-              serviceName: {{ $fullName }}-cogrpc
-              servicePort: cogrpc
+              service:
+                name: {{ $fullName }}-cogrpc
+                port:
+                  name: cogrpc
   {{- end }}

@@ -8,6 +8,7 @@ jobs:
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-server-ci.yml@main
     with:
       docker_image_local_name: public-gateway
+      kubernetes_version: "1.22.15"
 
   release:
     needs: ci

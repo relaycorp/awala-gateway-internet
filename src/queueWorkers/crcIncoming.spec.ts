@@ -20,14 +20,13 @@ import * as stan from 'node-nats-streaming';
 import * as mongo from '../backingServices/mongo';
 import { NatsStreamingClient } from '../backingServices/natsStreaming';
 import * as objectStorage from '../backingServices/objectStorage';
-import { InternetGatewayError } from '../errors';
 import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { GATEWAY_INTERNET_ADDRESS } from '../testUtils/awala';
 import { arrayBufferFrom } from '../testUtils/buffers';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { configureMockEnvVars } from '../testUtils/envVars';
-import { castMock, getMockInstance, getPromiseRejection, mockSpy } from '../testUtils/jest';
+import { castMock, getMockInstance, mockSpy } from '../testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from '../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../testUtils/pki';
 import { mockStanMessage } from '../testUtils/stan';
@@ -251,7 +250,7 @@ test('Cargo with invalid payload should be logged and ignored', async () => {
   expect(stanMessage.ack).toBeCalledTimes(1);
 });
 
-test('Keystore errors should be propagated and cargo should remain in the queue', async () => {
+test('Keystore errors should be logged and cargo should remain in the queue', async () => {
   const cargo = await generateCargo();
   const stanMessage = mockStanMessage(
     await cargo.serialize(certificateChain.privateGatewayPrivateKey),
@@ -269,13 +268,16 @@ test('Keystore errors should be propagated and cargo should remain in the queue'
       new InternetGatewayManager(connection, { ...mockKeyStores, privateKeyStore }),
   );
 
-  const error = await getPromiseRejection(
-    processIncomingCrcCargo(STUB_WORKER_NAME),
-    InternetGatewayError,
-  );
+  await processIncomingCrcCargo(STUB_WORKER_NAME);
 
-  expect(error.message).toStartWith('Failed to use key store to unwrap message:');
-  expect(error.cause()).toEqual(keyStoreError);
+  expect(mockLogging.logs).toContainEqual(
+    partialPinoLog('fatal', 'Failed to use key store to unwrap message', {
+      cargoId: cargo.id,
+      err: expect.objectContaining({ message: expect.stringMatching(keyStoreError.message) }),
+      privatePeerId: await cargo.senderCertificate.calculateSubjectId(),
+      worker: STUB_WORKER_NAME,
+    }),
+  );
   expect(stanMessage.ack).not.toBeCalled();
 });
 

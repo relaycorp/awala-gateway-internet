@@ -8,6 +8,7 @@ jobs:
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-server-ci.yml@main
     with:
       docker_image_local_name: public-gateway
+      nodejs_version: 18
       kubernetes_version: "1.22.15"
 
   release:
@@ -15,6 +16,7 @@ jobs:
     uses: relaycorp/shared-workflows/.github/workflows/nodejs-server-release.yml@main
     with:
       main_branch: master
+      nodejs_version: 18
     secrets:
       helm_repo_access_token: ${{ secrets.HELM_REPO_ACCESS_TOKEN }}
       ghcr_password: ${{ secrets.GH_CONTAINER_REGISTRY_PASSWORD }}

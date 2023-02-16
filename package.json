@@ -71,6 +71,6 @@
   },
   "prettier": "@relaycorp/shared-config/.prettierrc.json",
   "engines": {
-    "node": "16"
+    "node": "18"
   }
 }

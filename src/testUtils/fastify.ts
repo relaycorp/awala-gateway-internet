@@ -15,7 +15,7 @@ export function testDisallowedMethods(
   test.each(disallowedMethods)('%s requests should be refused', async (method) => {
     const fastify = await initFastify();
 
-    const response = await fastify.inject({ method, url: endpointURL });
+    const response = await fastify.inject({ method: method as any, url: endpointURL });
 
     expect(response).toHaveProperty('statusCode', 405);
     expect(response).toHaveProperty('headers.allow', allowedMethodsString);

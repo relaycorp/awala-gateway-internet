@@ -9,7 +9,7 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
 import { FastifyInstance } from 'fastify';
-import LightMyRequest from 'light-my-request';
+import { Response } from 'light-my-request';
 import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 
 import { arrayBufferFrom } from '../../testUtils/buffers';
@@ -233,7 +233,7 @@ describe('Successful registration', () => {
     });
   });
 
-  async function completeRegistration(fixtures: FixtureSet): Promise<LightMyRequest.Response> {
+  async function completeRegistration(fixtures: FixtureSet): Promise<Response> {
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
     const pnraSerialized = await generatePNRA(await derSerializePublicKey(privateGatewayPublicKey));
     const pnrr = new PrivateNodeRegistrationRequest(privateGatewayPublicKey, pnraSerialized);

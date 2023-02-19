@@ -1,7 +1,7 @@
 import { InvalidMessageError, Parcel, ParcelDeliverySigner } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
-import LightMyRequest, { Response as LightMyRequestResponse } from 'light-my-request';
+import { Response as LightMyRequestResponse } from 'light-my-request';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
@@ -113,7 +113,7 @@ describe('Authorization errors', () => {
     expect(fixtures.parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
-  function expectResponseToRequireAuthentication(response: LightMyRequest.Response): void {
+  function expectResponseToRequireAuthentication(response: LightMyRequestResponse): void {
     expect(response).toHaveProperty('statusCode', 401);
     expect(response).toHaveProperty('headers.www-authenticate', 'Relaynet-Countersignature');
     expect(JSON.parse(response.payload)).toHaveProperty(

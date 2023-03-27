@@ -30,7 +30,7 @@
     "env-var": "^7.1.1",
     "fastify": "^4.14.1",
     "fastify-plugin": "^4.5.0",
-    "grpc-js-health-check": "^1.0.2",
+    "grpc-js-health-check": "^1.1.0",
     "mongoose": "^6.10.2",
     "node-nats-streaming": "^0.3.2",
     "pino": "^8.11.0",

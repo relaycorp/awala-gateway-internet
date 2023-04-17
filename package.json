@@ -31,7 +31,7 @@
     "fastify": "^4.15.0",
     "fastify-plugin": "^4.5.0",
     "grpc-js-health-check": "^1.1.0",
-    "mongoose": "^6.10.2",
+    "mongoose": "^6.10.5",
     "node-nats-streaming": "^0.3.2",
     "pino": "^8.11.0",
     "selfsigned": "^2.1.1",

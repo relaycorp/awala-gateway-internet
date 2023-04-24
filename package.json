@@ -27,7 +27,7 @@
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "date-fns": "^2.29.2",
-    "env-var": "^7.1.1",
+    "env-var": "^7.3.1",
     "fastify": "^4.15.0",
     "fastify-plugin": "^4.5.0",
     "grpc-js-health-check": "^1.1.0",

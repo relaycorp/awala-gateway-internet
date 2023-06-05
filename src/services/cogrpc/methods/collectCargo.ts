@@ -1,4 +1,5 @@
 import * as grpc from '@grpc/grpc-js';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
 import {
   CargoCollectionAuthorization,
@@ -17,7 +18,6 @@ import { pipeline } from 'streaming-iterables';
 import uuid from 'uuid-random';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
-import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import { InternetGatewayManager } from '../../../node/InternetGatewayManager';
 import { generatePCAs } from '../../../parcelCollection';
 import { ParcelObject, ParcelStore } from '../../../parcelStore';

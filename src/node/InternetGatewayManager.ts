@@ -1,10 +1,9 @@
 import { GatewayManager, KeyStoreSet } from '@relaycorp/relaynet-core';
+import { MongoCertificateStore, MongoPublicKeyStore } from '@relaycorp/awala-keystore-mongodb';
 import { Connection } from 'mongoose';
 
 import { initPrivateKeyStore } from '../backingServices/keystore';
 import { InternetGatewayError } from '../errors';
-import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
-import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { Config, ConfigKey } from '../utilities/config';
 import { InternetGateway } from './InternetGateway';
 

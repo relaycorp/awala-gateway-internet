@@ -1,8 +1,8 @@
 import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import { Connection } from 'mongoose';
 
 import * as vault from '../../backingServices/keystore';
-import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { ParcelStore } from '../../parcelStore';
 import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 import { setUpTestDBConnection } from '../../testUtils/db';

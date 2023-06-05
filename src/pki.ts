@@ -8,8 +8,8 @@ import { addDays, subHours } from 'date-fns';
 import { Connection } from 'mongoose';
 import { initPrivateKeyStore } from './backingServices/keystore';
 
-import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import { Config, ConfigKey } from './utilities/config';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 
 /**
  * Number of hours in the past, when a gateway certificate's validity should start.

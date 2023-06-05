@@ -5,12 +5,12 @@ import {
   PrivateNodeRegistrationRequest,
   SessionKeyPair,
 } from '@relaycorp/relaynet-core';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { initPrivateKeyStore } from '../../backingServices/keystore';
-import { MongoCertificateStore } from '../../keystores/MongoCertificateStore';
 import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';

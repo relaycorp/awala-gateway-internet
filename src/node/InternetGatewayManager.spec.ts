@@ -1,16 +1,14 @@
 import { KeyStoreSet, MockKeyStoreSet } from '@relaycorp/relaynet-core';
+import { MongoCertificateStore, MongoPublicKeyStore } from '@relaycorp/awala-keystore-mongodb';
 
 import * as vault from '../backingServices/keystore';
 import { InternetGatewayError } from '../errors';
-import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
-import { MongoPublicKeyStore } from '../keystores/MongoPublicKeyStore';
 import { setUpTestDBConnection } from '../testUtils/db';
 import { mockSpy } from '../testUtils/jest';
 import { Config, ConfigKey } from '../utilities/config';
 import { InternetGatewayManager } from './InternetGatewayManager';
 
-jest.mock('../keystores/MongoCertificateStore');
-jest.mock('../keystores/MongoPublicKeyStore');
+jest.mock('@relaycorp/awala-keystore-mongodb');
 
 const getMongoConnection = setUpTestDBConnection();
 

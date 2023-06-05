@@ -10,7 +10,6 @@ import {
 import { addDays, addMinutes, addSeconds, setMilliseconds, subHours, subSeconds } from 'date-fns';
 
 import * as keystore from './backingServices/keystore';
-import { MongoCertificateStore } from './keystores/MongoCertificateStore';
 import {
   CERTIFICATE_TTL_DAYS,
   issuePrivateGatewayCertificate,
@@ -21,6 +20,7 @@ import { setUpTestDBConnection } from './testUtils/db';
 import { mockSpy } from './testUtils/jest';
 import { reSerializeCertificate } from './testUtils/pki';
 import { Config, ConfigKey } from './utilities/config';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 
 const getMongooseConnection = setUpTestDBConnection();
 

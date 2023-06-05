@@ -1,4 +1,5 @@
 import * as grpc from '@grpc/grpc-js';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import {
   Cargo,
@@ -29,7 +30,6 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays, addSeconds, subSeconds } from 'date-fns';
 
 import { recordCCAFulfillment, wasCCAFulfilled } from '../../../ccaFulfilments';
-import { MongoCertificateStore } from '../../../keystores/MongoCertificateStore';
 import * as parcelCollectionAck from '../../../parcelCollection';
 import { ParcelStore } from '../../../parcelStore';
 import { GATEWAY_INTERNET_ADDRESS } from '../../../testUtils/awala';

@@ -1,10 +1,10 @@
 import { CertificationPath, issueGatewayCertificate } from '@relaycorp/relaynet-core';
+import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import { addDays } from 'date-fns';
 import { Connection } from 'mongoose';
 
 import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
 import { initPrivateKeyStore } from '../backingServices/keystore';
-import { MongoCertificateStore } from '../keystores/MongoCertificateStore';
 import { CERTIFICATE_TTL_DAYS } from '../pki';
 import { Config, ConfigKey } from '../utilities/config';
 import { configureExitHandling } from '../utilities/exitHandling';

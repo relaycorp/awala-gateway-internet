@@ -24,7 +24,7 @@
     "@relaycorp/relaynet-core": "^1.82.6",
     "@relaycorp/relaynet-pohttp": "^1.7.54",
     "@typegoose/typegoose": "^10.3.4",
-    "abortable-iterator": "^3.0.0",
+    "abortable-iterator": "^5.0.1",
     "buffer-to-arraybuffer": "0.0.6",
     "date-fns": "^2.29.2",
     "env-var": "^7.3.1",

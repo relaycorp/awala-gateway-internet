@@ -48,7 +48,7 @@ const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
   deliveryAttempts: 0,
   parcelExpiryDate: addDays(new Date(), 1),
   parcelObjectKey: 'foo.parcel',
-  parcelRecipientAddress: 'https://endpoint.example/',
+  parcelRecipientAddress: 'endpoint.example.com',
 };
 const QUEUE_MESSAGE_DATA_SERIALIZED = Buffer.from(JSON.stringify(QUEUE_MESSAGE_DATA));
 
@@ -179,10 +179,12 @@ describe('processInternetBoundParcels', () => {
     MOCK_NATS_CLIENT.makeQueueConsumer.mockReturnValue(arrayToAsyncIterable([message]));
 
     await processInternetBoundParcels(WORKER_NAME);
+
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was successfully delivered', {
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,
       }),
     );
@@ -200,6 +202,7 @@ describe('processInternetBoundParcels', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Parcel was rejected as invalid', {
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         reason: err.message,
         worker: WORKER_NAME,
       }),
@@ -218,6 +221,7 @@ describe('processInternetBoundParcels', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Discarding parcel due to binding issue', {
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         reason: err.message,
         worker: WORKER_NAME,
       }),
@@ -236,6 +240,7 @@ describe('processInternetBoundParcels', () => {
       partialPinoLog('info', 'Failed to deliver parcel; will try again later', {
         err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,
       }),
     );
@@ -266,6 +271,7 @@ describe('processInternetBoundParcels', () => {
       partialPinoLog('info', 'Failed to deliver parcel again; will now give up', {
         err: expect.objectContaining({ type: err.name }),
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
+        parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,
       }),
     );

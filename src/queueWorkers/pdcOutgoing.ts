@@ -54,7 +54,10 @@ export async function processInternetBoundParcels(workerName: string): Promise<v
   async function deliverParcels(activeParcels: AsyncIterable<ActiveParcelData>): Promise<void> {
     const useTls = getEnvVar('POHTTP_USE_TLS').default('true').asBool();
     for await (const parcelData of activeParcels) {
-      const parcelAwareLogger = logger.child({ parcelObjectKey: parcelData.parcelObjectKey });
+      const parcelAwareLogger = logger.child({
+        parcelObjectKey: parcelData.parcelObjectKey,
+        parcelRecipientAddress: parcelData.parcelRecipientAddress,
+      });
       const parcelSerialized = await parcelStore.retrieveParcelForInternetPeer(
         parcelData.parcelObjectKey,
       );

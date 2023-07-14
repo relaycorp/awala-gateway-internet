@@ -16,7 +16,7 @@ dependencies:
     version: 12.1.20
     repository: https://charts.bitnami.com/bitnami
   - name: nats
-    version: 0.7.2
+    version: 0.8.0
     repository: https://nats-io.github.io/k8s/helm/charts
   - name: stan
     version: 0.7.2

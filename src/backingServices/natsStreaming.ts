@@ -2,7 +2,7 @@
 
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
-import { connect, Message, Stan } from 'node-nats-streaming';
+import { connect, Message, Stan, Subscription } from 'node-nats-streaming';
 import { PassThrough } from 'stream';
 import { pipeline } from 'streaming-iterables';
 import { promisify } from 'util';
@@ -91,20 +91,15 @@ export class NatsStreamingClient {
     const messagesStream = new PassThrough({ objectMode: true });
 
     const subscription = connection.subscribe(channel, queue, subscriptionOptions);
-    subscription.on('error', (error) =>
-      messagesStream.destroy(
-        new NatsStreamingSubscriptionError(error, 'Subscription for queue consumer failed'),
-      ),
-    );
+    subscription.once('closed', () => messagesStream.destroy());
     subscription.on('message', (msg) => messagesStream.write(msg));
+    await waitForSubscriptionToBeReady(subscription, connection, channel);
 
     const messages = abortSignal
       ? makeSourceAbortable(messagesStream, abortSignal, { returnOnAbort: true })
       : messagesStream;
     try {
-      for await (const msg of messages) {
-        yield msg;
-      }
+      yield* await messages;
     } finally {
       // Close the subscription. Do NOT "unsubscribe" from it -- Otherwise, the durable
       // subscription would be lost: https://docs.nats.io/developing-with-nats-streaming/durables
@@ -126,6 +121,24 @@ export class NatsStreamingClient {
       });
     });
   }
+}
+
+async function waitForSubscriptionToBeReady(
+  subscription: Subscription,
+  connection: Stan,
+  channel: string,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const subscriptionErrorHandler = (err: Error) => {
+      connection.close();
+      reject(new NatsStreamingSubscriptionError(err, `Failed to subscribe to channel ${channel}`));
+    };
+    subscription.once('ready', () => {
+      subscription.removeListener('error', subscriptionErrorHandler);
+      resolve();
+    });
+    subscription.once('error', subscriptionErrorHandler);
+  });
 }
 
 async function drainIterable(iterable: AsyncIterable<any>): Promise<void> {

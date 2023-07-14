@@ -476,7 +476,7 @@ describe('NatsStreamingClient', () => {
       expect(mockConnection.close).toBeCalled();
     });
 
-    test('Subscription and connection should be closed after a subscription error', async () => {
+    test('Failure to subscribe should propagate', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const stanError = new Error('cannot subscribe');
       setImmediate(() => {
@@ -490,10 +490,10 @@ describe('NatsStreamingClient', () => {
         asyncIterableToArray(consumer),
         NatsStreamingSubscriptionError,
       );
-      expect(error.message).toMatch(/^Subscription for queue consumer failed:/);
+      expect(error.message).toMatch(new RegExp(`Failed to subscribe to channel ${STUB_CHANNEL}:`));
       expect(error.cause()).toBe(stanError);
 
-      expect(mockSubscription.close).toBeCalled();
+      expect(mockSubscription.close).not.toBeCalled();
       expect(mockConnection.close).toBeCalled();
     });
 
@@ -508,6 +508,7 @@ describe('NatsStreamingClient', () => {
 
     function fakeConnection(): void {
       setImmediate(() => mockConnection.emit('connect'));
+      setImmediate(() => mockSubscription.emit('ready'));
     }
   });
 

@@ -91,7 +91,6 @@ export class NatsStreamingClient {
     const messagesStream = new PassThrough({ objectMode: true });
 
     const subscription = connection.subscribe(channel, queue, subscriptionOptions);
-    subscription.once('closed', () => messagesStream.destroy());
     subscription.on('message', (msg) => messagesStream.write(msg));
     await waitForSubscriptionToBeReady(subscription, connection, channel);
 

@@ -132,11 +132,10 @@ describe('receiveParcel', () => {
 
     expect(response).toHaveProperty('statusCode', 403);
     expect(JSON.parse(response.payload)).toEqual({
-      message: 'The parcel is invalid',
+      message: `Invalid parcel: ${error.message}`,
     });
 
-    // TODO: Find a way to spy on the error logger
-    // expect(pinoErrorLogSpy).toBeCalledWith('The parcel is invalid', { err: error });
+    // TODO: Find a way to check the logs
   });
 
   test('Failing to save parcel in object store should result in a 500 response', async () => {

@@ -55,11 +55,13 @@ export default async function registerRoutes(
           natsClient,
           request.log,
         );
-      } catch (error) {
-        if (error instanceof InvalidMessageError) {
-          return reply.code(403).send({ message: 'The parcel is invalid' });
+      } catch (err) {
+        if (err instanceof InvalidMessageError) {
+          request.log.info({ err }, 'Invalid parcel');
+          const message = `Invalid parcel: ${err.message}`;
+          return reply.code(403).send({ message });
         } else {
-          request.log.error({ err: error }, 'Failed to save parcel in object storage');
+          request.log.error({ err }, 'Failed to save parcel in object storage');
           return reply
             .code(500)
             .send({ message: 'Parcel could not be stored; please try again later' });

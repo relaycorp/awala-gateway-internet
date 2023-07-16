@@ -100,10 +100,15 @@ export class NatsStreamingClient {
     try {
       yield* await messages;
     } finally {
-      // Close the subscription. Do NOT "unsubscribe" from it -- Otherwise, the durable
-      // subscription would be lost: https://docs.nats.io/developing-with-nats-streaming/durables
-      subscription.close();
-
+      /*
+       * Close the connection directly. Do NOT do any of the following to the *subscription*:
+       *
+       * - Close it: We'd get uncaught errors like "Error: stan: invalid subscription"[1][2].
+       * - Unsubscribe from it: We'd lose the durable subscription.
+       *
+       * [1] https://github.com/nats-io/stan.js/blob/e48c74091b973d7f86350b8639d26cec7713a076/lib/stan.js#L858
+       * [2] https://console.cloud.google.com/errors/detail/CNzUjrq62b2GGw?project=gw-frankfurt-4065
+       */
       connection.close();
     }
   }

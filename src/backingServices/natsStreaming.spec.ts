@@ -8,9 +8,7 @@ import { configureMockEnvVars } from '../testUtils/envVars';
 import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 
-class MockNatsSubscription extends EventEmitter {
-  public readonly close = jest.fn();
-}
+class MockNatsSubscription extends EventEmitter {}
 
 class MockNatsConnection extends EventEmitter {
   public readonly close = jest.fn().mockImplementation(function (this: MockNatsConnection): void {
@@ -428,7 +426,7 @@ describe('NatsStreamingClient', () => {
       );
     });
 
-    test('Subscription and connection should be closed after abort signal', async () => {
+    test('Connection should be closed after abort signal', async () => {
       const controller = new AbortController();
       const consumer = stubClient.makeQueueConsumer(
         STUB_CHANNEL,
@@ -455,11 +453,10 @@ describe('NatsStreamingClient', () => {
       );
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
-      expect(mockSubscription.close).toBeCalled();
       expect(mockConnection.close).toBeCalled();
     });
 
-    test('Subscription and connection should be closed when sink breaks', async () => {
+    test('Connection should be closed when sink breaks', async () => {
       const consumer = stubClient.makeQueueConsumer(STUB_CHANNEL, STUB_QUEUE, STUB_DURABLE_NAME);
       const stubMessage1 = { number: 1 };
       const stubMessage2 = { number: 2 };
@@ -472,7 +469,6 @@ describe('NatsStreamingClient', () => {
       const outputMessages = pipeline(() => consumer, iterableTake(1));
 
       await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
-      expect(mockSubscription.close).toBeCalled();
       expect(mockConnection.close).toBeCalled();
     });
 
@@ -493,7 +489,6 @@ describe('NatsStreamingClient', () => {
       expect(error.message).toMatch(new RegExp(`Failed to subscribe to channel ${STUB_CHANNEL}:`));
       expect(error.cause()).toBe(stanError);
 
-      expect(mockSubscription.close).not.toBeCalled();
       expect(mockConnection.close).toBeCalled();
     });
 

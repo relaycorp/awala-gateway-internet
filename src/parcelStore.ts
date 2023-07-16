@@ -19,6 +19,7 @@ const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export interface QueuedInternetBoundParcelMessage {
+  readonly parcelId?: string; // Optional because it was introduced in July 2023
   readonly parcelObjectKey: string;
   readonly parcelRecipientAddress: string;
   readonly parcelExpiryDate: Date;
@@ -325,6 +326,7 @@ export class ParcelStore {
     const messageData: QueuedInternetBoundParcelMessage = {
       deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
+      parcelId: parcel.id,
       parcelObjectKey,
       parcelRecipientAddress: parcel.recipient.internetAddress!,
     };

@@ -47,6 +47,7 @@ beforeEach(() => {
 const QUEUE_MESSAGE_DATA: QueuedInternetBoundParcelMessage = {
   deliveryAttempts: 0,
   parcelExpiryDate: addDays(new Date(), 1),
+  parcelId: 'the parcel id',
   parcelObjectKey: 'foo.parcel',
   parcelRecipientAddress: 'endpoint.example.com',
 };
@@ -140,6 +141,7 @@ describe('processInternetBoundParcels', () => {
     expect(stanMessage.ack).toBeCalled();
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('warn', 'Parcel object could not be found', {
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         worker: WORKER_NAME,
       }),
@@ -183,6 +185,7 @@ describe('processInternetBoundParcels', () => {
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('debug', 'Parcel was successfully delivered', {
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,
@@ -201,6 +204,7 @@ describe('processInternetBoundParcels', () => {
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Parcel was rejected as invalid', {
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         reason: err.message,
@@ -220,6 +224,7 @@ describe('processInternetBoundParcels', () => {
     expectMessageToBeDiscarded(message);
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Discarding parcel due to binding issue', {
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         reason: err.message,
@@ -239,6 +244,7 @@ describe('processInternetBoundParcels', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Failed to deliver parcel; will try again later', {
         err: expect.objectContaining({ type: err.name }),
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,
@@ -270,6 +276,7 @@ describe('processInternetBoundParcels', () => {
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'Failed to deliver parcel again; will now give up', {
         err: expect.objectContaining({ type: err.name }),
+        parcelId: QUEUE_MESSAGE_DATA.parcelId,
         parcelObjectKey: QUEUE_MESSAGE_DATA.parcelObjectKey,
         parcelRecipientAddress: QUEUE_MESSAGE_DATA.parcelRecipientAddress,
         worker: WORKER_NAME,

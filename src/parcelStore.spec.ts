@@ -829,6 +829,7 @@ describe('storeParcelForInternetPeer', () => {
     const expectedMessageData: QueuedInternetBoundParcelMessage = {
       deliveryAttempts: 0,
       parcelExpiryDate: parcel.expiryDate,
+      parcelId: parcel.id,
       parcelObjectKey: parcelObjectKey!!,
       parcelRecipientAddress: PEER_INTERNET_ADDRESS,
     };

@@ -39,11 +39,10 @@ export async function processInternetBoundParcels(workerName: string): Promise<v
 
       const now = new Date();
       const parcelExpiryDate = new Date(messageData.parcelExpiryDate);
-      if (now < parcelExpiryDate) {
-        yield {
-          ...messageData,
-          ack: () => message.ack(),
-        };
+      const isParcelStillValid = now < parcelExpiryDate;
+      if (isParcelStillValid) {
+        const ack = () => message.ack();
+        yield { ...messageData, ack };
       } else {
         await parcelStore.deleteParcelForInternetPeer(messageData.parcelObjectKey);
         message.ack();
@@ -55,6 +54,7 @@ export async function processInternetBoundParcels(workerName: string): Promise<v
     const useTls = getEnvVar('POHTTP_USE_TLS').default('true').asBool();
     for await (const parcelData of activeParcels) {
       const parcelAwareLogger = logger.child({
+        parcelId: parcelData.parcelId,
         parcelObjectKey: parcelData.parcelObjectKey,
         parcelRecipientAddress: parcelData.parcelRecipientAddress,
       });

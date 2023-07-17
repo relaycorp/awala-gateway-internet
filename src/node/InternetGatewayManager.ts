@@ -21,7 +21,10 @@ export class InternetGatewayManager extends GatewayManager<undefined> {
 
   protected readonly defaultNodeConstructor = InternetGateway;
 
-  constructor(protected connection: Connection, keyStores: KeyStoreSet) {
+  constructor(
+    protected connection: Connection,
+    keyStores: KeyStoreSet,
+  ) {
     super(keyStores);
   }
 

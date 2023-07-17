@@ -1,3 +1,3 @@
 import { GatewayChannel } from '@relaycorp/relaynet-core';
 
-export class InternetGatewayChannel extends GatewayChannel {}
+export class InternetGatewayChannel extends GatewayChannel<undefined> {}

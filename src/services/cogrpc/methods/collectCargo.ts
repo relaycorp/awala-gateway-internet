@@ -106,7 +106,7 @@ export default async function collectCargo(
   }
 
   let cargoesCollected = 0;
-  const channel = await gateway.getChannel(
+  const channel = await gateway.getChannelFromCda(
     ccr.cargoDeliveryAuthorization,
     await cca.senderCertificate.getPublicKey(),
   );

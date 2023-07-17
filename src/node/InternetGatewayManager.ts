@@ -7,7 +7,7 @@ import { InternetGatewayError } from '../errors';
 import { Config, ConfigKey } from '../utilities/config';
 import { InternetGateway } from './InternetGateway';
 
-export class InternetGatewayManager extends GatewayManager<InternetGateway> {
+export class InternetGatewayManager extends GatewayManager<undefined> {
   public static async init(mongoConnection: Connection): Promise<InternetGatewayManager> {
     const certificateStore = new MongoCertificateStore(mongoConnection);
     const publicKeyStore = new MongoPublicKeyStore(mongoConnection);
@@ -31,7 +31,7 @@ export class InternetGatewayManager extends GatewayManager<InternetGateway> {
     if (!id) {
       throw new InternetGatewayError('Current id is unset');
     }
-    const gateway = await this.get(id);
+    const gateway = (await this.get(id)) as InternetGateway;
     if (!gateway) {
       throw new InternetGatewayError(`Internet gateway does not exist (id: ${id})`);
     }

@@ -1,9 +1,4 @@
-import {
-  Cargo,
-  derSerializePublicKey,
-  MockKeyStoreSet,
-  SessionKeyPair,
-} from '@relaycorp/relaynet-core';
+import { Cargo, MockKeyStoreSet, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
   CDACertPath,
   generateCDACertificationPath,
@@ -39,15 +34,15 @@ let internetGateway: InternetGateway;
 beforeAll(async () => {
   internetGateway = new InternetGateway(
     await cdaChain.internetGateway.calculateSubjectId(),
-    keyPairSet.internetGateway.privateKey,
+    keyPairSet.internetGateway,
     KEY_STORES,
     {},
   );
 });
 
-describe('getChannel', () => {
+describe('getChannelFromCda', () => {
   test('Internet gateway private key should be passed on', async () => {
-    const channel = await internetGateway.getChannel(
+    const channel = await internetGateway.getChannelFromCda(
       cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
@@ -61,32 +56,40 @@ describe('getChannel', () => {
     await expect(cargo.senderCertificate.calculateSubjectId()).resolves.toEqual(internetGateway.id);
   });
 
-  test('PDA for private gateway should be passed on', async () => {
-    const channel = await internetGateway.getChannel(
+  test('CDA for private gateway should be passed on', async () => {
+    const channel = await internetGateway.getChannelFromCda(
       cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
-    expect(cdaChain.internetGateway.isEqual(channel.nodeDeliveryAuth)).toBeTrue();
+    expect(cdaChain.internetGateway.isEqual(channel.deliveryAuthPath.leafCertificate)).toBeTrue();
+    expect(channel.deliveryAuthPath.certificateAuthorities).toBeEmpty();
   });
 
   test('Private gateway id should be set', async () => {
-    const channel = await internetGateway.getChannel(
+    const channel = await internetGateway.getChannelFromCda(
       cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
-    expect(channel.peerId).toEqual(await cdaChain.privateGateway.calculateSubjectId());
+    expect(channel.peer.id).toEqual(await cdaChain.privateGateway.calculateSubjectId());
   });
 
   test('Private gateway public key should be set', async () => {
-    const channel = await internetGateway.getChannel(
+    const channel = await internetGateway.getChannelFromCda(
       cdaChain.internetGateway,
       keyPairSet.privateGateway.publicKey,
     );
 
-    await expect(derSerializePublicKey(channel.peerPublicKey)).resolves.toEqual(
-      await derSerializePublicKey(keyPairSet.privateGateway.publicKey),
+    expect(channel.peer.identityPublicKey).toBe(keyPairSet.privateGateway.publicKey);
+  });
+
+  test('Private gateway Internet gateway should be unset', async () => {
+    const channel = await internetGateway.getChannelFromCda(
+      cdaChain.internetGateway,
+      keyPairSet.privateGateway.publicKey,
     );
+
+    expect(channel.peer.internetAddress).toBeUndefined();
   });
 });

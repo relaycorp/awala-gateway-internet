@@ -10,5 +10,5 @@ LABEL org.opencontainers.image.source="https://github.com/relaycorp/relaynet-int
 WORKDIR /opt/gw
 COPY --from=build /tmp/gw ./
 USER node
-ENTRYPOINT ["node", "--unhandled-rejections=strict"]
+ENTRYPOINT ["node", "--unhandled-rejections=strict", "--enable-source-maps"]
 EXPOSE 8080

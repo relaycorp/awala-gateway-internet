@@ -46,6 +46,8 @@ export default async function registerRoutes(
         return reply.code(400).send({ message: 'Payload is not a valid RAMF-serialized parcel' });
       }
 
+      const parcelAwareLogger = request.log.child({ parcelId: parcel.id });
+
       const natsClient = NatsStreamingClient.initFromEnv(`pohttp-req-${request.id}`);
       try {
         await parcelStore.storeParcelForPrivatePeer(
@@ -53,21 +55,22 @@ export default async function registerRoutes(
           request.body,
           (fastify as any).mongoose,
           natsClient,
-          request.log,
+          parcelAwareLogger,
         );
       } catch (err) {
         if (err instanceof InvalidMessageError) {
-          request.log.info({ err }, 'Invalid parcel');
+          parcelAwareLogger.info({ err }, 'Invalid parcel');
           const message = `Invalid parcel: ${err.message}`;
           return reply.code(403).send({ message });
         } else {
-          request.log.error({ err }, 'Failed to save parcel in object storage');
+          parcelAwareLogger.error({ err }, 'Failed to save parcel in object storage');
           return reply
             .code(500)
             .send({ message: 'Parcel could not be stored; please try again later' });
         }
       }
 
+      parcelAwareLogger.info('Parcel accepted');
       return reply.code(202).send({});
     },
   });

@@ -148,7 +148,7 @@ describe('receiveParcel', () => {
       message: 'Parcel could not be stored; please try again later',
     });
 
-    // TODO: Find a way to spy on the error logger
+    // TODO: Find a way to check the logs
     // expect(pinoErrorLogSpy).toBeCalledWith('Failed to queue ping message', { err: error });
   });
 
@@ -170,6 +170,7 @@ describe('receiveParcel', () => {
 
     expect(response).toHaveProperty('statusCode', 202);
     expect(JSON.parse(response.payload)).toEqual({});
+    // TODO: Find a way to check the logs
   });
 
   test('Current request id should be part of the client id in the NATS connection', async () => {

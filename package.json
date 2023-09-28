@@ -47,7 +47,7 @@
   "devDependencies": {
     "@relaycorp/relaynet-poweb": "^1.6.35",
     "@relaycorp/relaynet-testing": "^2.2.28",
-    "@relaycorp/shared-config": "^1.9.4",
+    "@relaycorp/shared-config": "^1.14.1",
     "@relaycorp/ws-mock": "^5.2.6",
     "@shelf/jest-mongodb": "^4.1.7",
     "@types/jest": "^28.1.7",

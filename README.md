@@ -6,7 +6,7 @@ This is the reference implementation of a Relaynet-Internet Gateway, whose respo
 
 To use this app locally and be able to update the source code, you need the following system dependencies:
 
-- Node.js v18+.
+- Node.js v20+.
 - Kubernetes v1.22+.
 - [Skaffold](https://skaffold.dev/) v1.16+.
 - [Helm](https://helm.sh/) v3.4+.

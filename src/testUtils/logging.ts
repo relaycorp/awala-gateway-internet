@@ -19,9 +19,15 @@ export function makeMockLogging(): MockLogging {
   return { logger, logs };
 }
 
-export function partialPinoLogger(bindings: { readonly [key: string]: any }): object {
+export function partialPinoLogger(expectedBindings: { readonly [key: string]: any }): object {
   return expect.objectContaining({
-    [PinoSymbols.formattersSym]: { bindings },
+    [PinoSymbols.chindingsSym]: expect.toSatisfy((bindingsRaw) => {
+      const bindingsJson = `{${bindingsRaw.substring(1)}}`;
+      const bindings = JSON.parse(bindingsJson);
+      return Object.entries(expectedBindings).every(([key, value]) => {
+        return bindings[key] === value;
+      });
+    }),
   });
 }
 

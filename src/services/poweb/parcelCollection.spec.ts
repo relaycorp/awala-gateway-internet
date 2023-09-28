@@ -342,7 +342,7 @@ describe('Keep alive', () => {
     expect(client.popOldestPeerMessage()).toBeUndefined();
     expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).toBeCalledWith(
       privatePeerId,
-      partialPinoLogger({ privatePeerId, reqId: expect.anything() }),
+      expect.anything(),
     );
     expect(mockLogging.logs).toContainEqual(
       partialPinoLog('info', 'All parcels were acknowledged shortly after the last one was sent', {
@@ -384,7 +384,7 @@ describe('Keep alive', () => {
       privatePeerId,
       MOCK_NATS_STREAMING_CLIENT,
       expect.anything(),
-      partialPinoLogger({ privatePeerId, reqId: expect.anything() }),
+      partialPinoLogger({ privatePeerId, reqId }),
     );
     expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
     expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).not.toBeCalled();

@@ -1,11 +1,18 @@
 /* tslint:disable:max-classes-per-file */
 import envVar from 'env-var';
 import { PassThrough } from 'stream';
-import { createClient } from '@redis/client';
+import { createClient, type RedisClientType } from '@redis/client';
 
 import { InternetGatewayError } from '../errors';
 
 export class RedisPubSubError extends InternetGatewayError {}
+
+type PublishFunction = (message: string, channel: string) => Promise<void>;
+
+export interface RedisPubSubPublisher {
+  publish: PublishFunction;
+  close(): Promise<void>;
+}
 
 /**
  * High-level client for Redis' PubSub functionality.
@@ -27,8 +34,7 @@ export class RedisPubSubClient {
    * @param channel
    */
   public async *subscribe(channel: string): AsyncIterable<string> {
-    const redisClient = createClient({ url: this.redisUrl });
-    await redisClient.connect();
+    const redisClient = await this.connect();
 
     const stream = new PassThrough({ objectMode: true });
     redisClient.once('error', (error) =>
@@ -37,5 +43,41 @@ export class RedisPubSubClient {
     stream.once('close', () => redisClient.quit());
     await redisClient.subscribe(channel, (message) => stream.write(message));
     yield* stream;
+  }
+
+  /**
+   * Create a publisher that also offers the ability to close the connection when done.
+   */
+  public async makePublisher(): Promise<RedisPubSubPublisher> {
+    const redisClient = await this.connect();
+
+    let connectionError: Error | undefined;
+    redisClient.once('error', (error) => {
+      connectionError = error;
+    });
+
+    async function publish(message: string, channel: string): Promise<void> {
+      if (connectionError) {
+        throw new RedisPubSubError(connectionError, 'Redis connection closed unexpectedly');
+      }
+      if (!redisClient.isOpen) {
+        throw new RedisPubSubError('Redis connection is already closed');
+      }
+      await redisClient.publish(channel, message);
+    }
+
+    async function close(): Promise<void> {
+      if (redisClient.isOpen) {
+        await redisClient.quit();
+      }
+    }
+
+    return { publish, close };
+  }
+
+  private async connect(): Promise<RedisClientType> {
+    const redisClient = createClient({ url: this.redisUrl });
+    await redisClient.connect();
+    return redisClient as RedisClientType;
   }
 }

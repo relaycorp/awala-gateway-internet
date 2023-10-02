@@ -109,7 +109,7 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipeline(
+    yield* pipeline(
       () => parcelMessages,
       buildParcelObjectMetadataFromNATSMessage,
       this.makeActiveParcelRetriever(peerAwareLogger),
@@ -147,10 +147,7 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipeline(
-      () => this.retrieveParcelsForPrivatePeer(privatePeerId, logger),
-      buildStream,
-    );
+    yield* pipeline(() => this.retrieveParcelsForPrivatePeer(privatePeerId, logger), buildStream);
   }
 
   /**
@@ -165,7 +162,7 @@ export class ParcelStore {
     logger: Logger,
   ): AsyncIterable<ParcelObject<null>> {
     const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${privatePeerId}/`;
-    yield* await pipeline(
+    yield* pipeline(
       () => this.objectStoreClient.listObjectKeys(prefix, this.bucket),
       buildParcelObjectMetadataFromString,
       this.makeActiveParcelRetriever(logger),

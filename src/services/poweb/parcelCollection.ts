@@ -226,7 +226,7 @@ async function* streamActiveParcels(
   if (keepAlive) {
     const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
     try {
-      yield* await parcelStore.liveStreamParcelsForPrivatePeer(
+      yield* parcelStore.liveStreamParcelsForPrivatePeer(
         privatePeerId,
         natsStreamingClient,
         abortSignal,
@@ -241,7 +241,7 @@ async function* streamActiveParcels(
       tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
     }
   } else {
-    yield* await parcelStore.streamParcelsForPrivatePeer(privatePeerId, logger);
+    yield* parcelStore.streamParcelsForPrivatePeer(privatePeerId, logger);
   }
 }
 

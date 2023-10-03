@@ -14,9 +14,6 @@ minio:
   buckets:
     - name: public-gateway
       policy: none
-  makeBucketJob:
-    annotations:
-      "helm.sh/hook-delete-policy": hook-succeeded
   persistence:
     enabled: false
   resources:

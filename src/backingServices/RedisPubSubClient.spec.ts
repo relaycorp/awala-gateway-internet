@@ -14,8 +14,7 @@ jest.mock('@redis/client', () => ({
   createClient: mockCreateClient,
 }));
 import { RedisPubSubClient, RedisPubSubError } from './RedisPubSubClient';
-
-const REDIS_URL = 'redis://redis.example:6379';
+import { REDIS_URL } from '../testUtils/redis';
 
 describe('RedisPubSubClient', () => {
   const mockEnvVars = configureMockEnvVars({ REDIS_URL });

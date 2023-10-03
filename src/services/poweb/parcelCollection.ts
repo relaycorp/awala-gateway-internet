@@ -18,13 +18,10 @@ import WebSocket, {
   ServerOptions as WSServerOptions,
 } from 'ws';
 
-import {
-  NatsStreamingClient,
-  NatsStreamingSubscriptionError,
-} from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import { retrieveOwnCertificates } from '../../pki';
 import { WebSocketCode } from './websockets';
+import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
 
 /**
  * Maximum size of each incoming message.
@@ -73,14 +70,19 @@ export function makeWebSocketServer(
     path: '/v1/parcel-collection',
     ...serverOptions,
   });
+  const redisPubSubClient = RedisPubSubClient.init();
 
-  wsServer.on('connection', makeConnectionHandler(mongooseConnection, requestIdHeader, baseLogger));
+  wsServer.on(
+    'connection',
+    makeConnectionHandler(mongooseConnection, redisPubSubClient, requestIdHeader, baseLogger),
+  );
 
   return wsServer;
 }
 
 function makeConnectionHandler(
   mongooseConnection: Connection,
+  redisPubSubClient: RedisPubSubClient,
   requestIdHeader: string,
   baseLogger: Logger,
 ): (ws: WebSocket, request: IncomingMessage) => void {
@@ -126,7 +128,7 @@ function makeConnectionHandler(
           parcelStore,
           privatePeerId,
           peerAwareLogger,
-          reqId,
+          redisPubSubClient,
           request.headers,
           abortController.signal,
           tracker,
@@ -215,7 +217,7 @@ async function* streamActiveParcels(
   parcelStore: ParcelStore,
   privatePeerId: string,
   logger: Logger,
-  requestId: string,
+  redisPubSubClient: RedisPubSubClient,
   requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
   tracker: CollectionTracker,
@@ -224,20 +226,15 @@ async function* streamActiveParcels(
   const keepAlive = requestHeaders['x-relaynet-streaming-mode'] !== 'close-upon-completion';
 
   if (keepAlive) {
-    const natsStreamingClient = NatsStreamingClient.initFromEnv(`parcel-collection-${requestId}`);
     try {
       yield* parcelStore.liveStreamParcelsForPrivatePeer(
         privatePeerId,
-        natsStreamingClient,
+        redisPubSubClient,
         abortSignal,
         logger,
       );
     } catch (err) {
-      if (err instanceof NatsStreamingSubscriptionError) {
-        logger.warn({ err }, 'Failed to subscribe to NATS queue to live stream active parcels');
-      } else {
-        logger.error({ err }, 'Failed to live stream parcels');
-      }
+      logger.error({ err }, 'Failed to live stream parcels');
       tracker.setCloseFrameCode(WebSocketCode.SERVER_ERROR);
     }
   } else {

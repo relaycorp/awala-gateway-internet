@@ -26,7 +26,7 @@ export class RedisPubSubClient {
     return new RedisPubSubClient(redisUrl);
   }
 
-  protected constructor(protected readonly redisUrl: string) {}
+  constructor(protected readonly redisUrl: string) {}
 
   /**
    * Stream messages published to the `channel`.

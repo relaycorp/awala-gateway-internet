@@ -23,7 +23,7 @@ import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/loggin
 import { generatePdaChain, PdaChain } from './testUtils/pki';
 import { mockRedisPubSubClient } from './testUtils/redis';
 import { MockObjectStoreClient } from './testUtils/MockObjectStoreClient';
-import { RedisPublishFunction } from './backingServices/RedisPubSubClient.js';
+import { RedisPublishFunction } from './backingServices/RedisPubSubClient';
 
 const BUCKET = 'the-bucket-name';
 

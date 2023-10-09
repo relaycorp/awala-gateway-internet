@@ -17,7 +17,7 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.8.21",
     "@relaycorp/awala-keystore-cloud": "^2.1.17",
-    "@relaycorp/awala-keystore-mongodb": "^1.1.11",
+    "@relaycorp/awala-keystore-mongodb": "^1.1.19",
     "@relaycorp/cogrpc": "^1.3.75",
     "@relaycorp/object-storage": "^1.4.91",
     "@relaycorp/pino-cloud": "^1.0.28",

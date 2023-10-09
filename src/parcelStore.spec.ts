@@ -2,7 +2,7 @@ import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel, Recipient } from '@relaycorp/relaynet-core';
 import { EnvVarError } from 'env-var';
 import { Connection } from 'mongoose';
-import { collect, consume, pipeline } from 'streaming-iterables';
+import { collect, consume, pipeline, take } from 'streaming-iterables';
 
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
@@ -17,7 +17,7 @@ import * as pki from './pki';
 import { GATEWAY_INTERNET_ADDRESS, PEER_INTERNET_ADDRESS } from './testUtils/awala';
 import { sha256Hex } from './testUtils/crypto';
 import { configureMockEnvVars } from './testUtils/envVars';
-import { arrayToAsyncIterable, iterableTake } from './testUtils/iter';
+import { arrayToAsyncIterable } from './testUtils/iter';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
 import { generatePdaChain, PdaChain } from './testUtils/pki';
@@ -98,7 +98,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -120,7 +120,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -148,7 +148,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -174,7 +174,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(2),
+      take(2),
       collect,
     );
 
@@ -221,7 +221,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
             abortController.signal,
             mockLogging.logger,
           ),
-        iterableTake(1),
+        take(1),
         collect,
       );
 

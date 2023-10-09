@@ -2,10 +2,10 @@
 
 import { EventEmitter } from 'events';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
-import { collect, pipeline } from 'streaming-iterables';
+import { collect, pipeline, take } from 'streaming-iterables';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
-import { arrayToAsyncIterable, iterableTake } from '../testUtils/iter';
+import { arrayToAsyncIterable } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 
 class MockNatsSubscription extends EventEmitter {}
@@ -461,7 +461,7 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipeline(() => consumer, iterableTake(1));
+      const outputMessages = pipeline(() => consumer, take(1));
 
       await expect(collect(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockConnection.close).toBeCalled();

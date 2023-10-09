@@ -43,7 +43,16 @@ stan:
   store:
     type: memory
 
-# Relaynet Pong dependencies
+redis:
+  fullnameOverride: redis
+  auth:
+    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      enabled: false
+
+# Awala Pong dependencies
 pong:
   fullnameOverride: pong
   pohttp_tls_required: false
@@ -54,11 +63,3 @@ pong:
     session_keys_mount_path: pong-keys
   redis:
     host: redis-headless
-redis:
-  fullnameOverride: redis
-  auth:
-    enabled: false
-  architecture: standalone
-  master:
-    persistence:
-      enabled: false

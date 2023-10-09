@@ -20,6 +20,8 @@ data:
   NATS_SERVER_URL: {{ .Values.nats.serverUrl }}
   NATS_CLUSTER_ID: {{ .Values.nats.clusterId }}
 
+  REDIS_URL: {{ .Values.redis.url }}
+
   OBJECT_STORE_BACKEND: {{ .Values.objectStore.backend }}
   OBJECT_STORE_BUCKET: {{ .Values.objectStore.bucket }}
   {{- if .Values.objectStore.endpoint }}

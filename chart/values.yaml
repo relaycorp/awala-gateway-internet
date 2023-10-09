@@ -84,6 +84,7 @@ crcQueue:
 mongo: {}
 
 nats: {}
+redis: {}
 
 objectStore:
   tlsEnabled: true

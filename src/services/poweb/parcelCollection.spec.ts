@@ -15,10 +15,6 @@ import { EventEmitter } from 'events';
 import uuid from 'uuid-random';
 import WS, { Server as WSServer } from 'ws';
 
-import {
-  NatsStreamingClient,
-  NatsStreamingSubscriptionError,
-} from '../../backingServices/natsStreaming';
 import { ParcelStore, ParcelStreamMessage } from '../../parcelStore';
 import * as certs from '../../pki';
 import { arrayBufferFrom, expectBuffersToEqual } from '../../testUtils/buffers';
@@ -72,9 +68,6 @@ beforeEach(() => {
   const fixtures = getFixtures();
   MOCK_PARCEL_STORE = fixtures.parcelStore;
 });
-
-const MOCK_NATS_STREAMING_CLIENT = new NatsStreamingClient(null as any, null as any, null as any);
-jest.spyOn(NatsStreamingClient, 'initFromEnv').mockReturnValue(MOCK_NATS_STREAMING_CLIENT);
 
 const parcelSerialization = Buffer.from('This is supposed to be a RAMF serialization');
 
@@ -334,6 +327,7 @@ describe('Handshake', () => {
 describe('Keep alive', () => {
   test('Connection should be closed if Keep-Alive is off and there are no parcels', async () => {
     const client = new MockPoWebClient(mockWSServer);
+    const redisSubscribeSpy = jest.spyOn(getFixtures().redisPubSubClient, 'subscribe');
 
     await client.useWithHandshake(async () => {
       await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
@@ -352,7 +346,7 @@ describe('Keep alive', () => {
     );
 
     expect(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).not.toBeCalled();
-    expect(NatsStreamingClient.initFromEnv).not.toBeCalled();
+    expect(redisSubscribeSpy).not.toBeCalled();
   });
 
   test('Connection should be closed upon completion if Keep-Alive is off', async () => {
@@ -382,11 +376,10 @@ describe('Keep alive', () => {
 
     expect(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).toBeCalledWith(
       privatePeerId,
-      MOCK_NATS_STREAMING_CLIENT,
+      getFixtures().redisPubSubClient,
       expect.anything(),
       partialPinoLogger({ privatePeerId, reqId }),
     );
-    expect(NatsStreamingClient.initFromEnv).toBeCalledWith(`parcel-collection-${reqId}`);
     expect(MOCK_PARCEL_STORE.streamParcelsForPrivatePeer).not.toBeCalled();
   });
 
@@ -400,29 +393,7 @@ describe('Keep alive', () => {
     });
   });
 
-  test('Connection should be closed if NATS subscription failed', async () => {
-    const error = new NatsStreamingSubscriptionError('too many subscribers');
-    getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
-      appendErrorToAsyncIterable(error, []),
-    );
-    const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
-
-    await client.useWithHandshake(async () => {
-      await expect(client.waitForPeerClosure()).resolves.toEqual<CloseFrame>({
-        code: WebSocketCode.SERVER_ERROR,
-      });
-    });
-
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('warn', 'Failed to subscribe to NATS queue to live stream active parcels', {
-        err: expect.objectContaining({ message: error.message }),
-        privatePeerId,
-        reqId: UUID4_REGEX,
-      }),
-    );
-  });
-
-  test('Non-NATS-related failure should close connection and be logged as error', async () => {
+  test('Streaming failure should close connection and be logged as error', async () => {
     const error = new Error('this has nothing to do with NATS');
     getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
       appendErrorToAsyncIterable(error, []),
@@ -704,7 +675,7 @@ describe('Pings', () => {
   test('Pings should stop when connection is closed', async () => {
     const client = new MockPoWebClient(mockWSServer, StreamingMode.KEEP_ALIVE);
     await client.connect();
-    await client.close();
+    client.close();
 
     jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
     expect(client.incomingPings).toHaveLength(0);

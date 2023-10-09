@@ -21,6 +21,8 @@ mongo:
 nats:
   serverUrl: nats://nats.example.com:4222
   clusterId: example-stan
+redis:
+  url: redis://redis.example.com:6379
 objectStore:
   endpoint: minio.example.com:9000
   bucket: public-gateway
@@ -101,6 +103,7 @@ Each gateway component has the following options:
 | `mongo.password` | string | | MongoDB user password |
 | `nats.serverUrl` | string | | Connection URI for NATS Streaming |
 | `nats.clusterId` | string | | NATS Streaming cluster id |
+| `redis.url` | string | | Connection URI for Redis |
 | `objectStore.endpoint` | string | | Host name and port number for the object store server |
 | `objectStore.bucket` | string | | Bucket name |
 | `objectStore.accessKeyId` | string | | Access key id to the object store |

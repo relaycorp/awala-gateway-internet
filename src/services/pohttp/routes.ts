@@ -2,9 +2,9 @@ import { InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { registerDisallowedMethods } from '../fastify';
+import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
 
 export default async function registerRoutes(
   fastify: FastifyInstance,
@@ -31,6 +31,9 @@ export default async function registerRoutes(
     },
   });
 
+  const redisPublisher = await RedisPubSubClient.init().makePublisher();
+  fastify.addHook('onClose', async () => redisPublisher.close());
+
   fastify.route<{ readonly Body: Buffer }>({
     method: 'POST',
     url: '/',
@@ -48,13 +51,12 @@ export default async function registerRoutes(
 
       const parcelAwareLogger = request.log.child({ parcelId: parcel.id });
 
-      const natsClient = NatsStreamingClient.initFromEnv(`pohttp-req-${request.id}`);
       try {
         await parcelStore.storeParcelForPrivatePeer(
           parcel,
           request.body,
           (fastify as any).mongoose,
-          natsClient,
+          redisPublisher.publish,
           parcelAwareLogger,
         );
       } catch (err) {

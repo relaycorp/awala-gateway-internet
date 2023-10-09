@@ -1,10 +1,10 @@
 import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel } from '@relaycorp/relaynet-core';
+import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
 import { Connection } from 'mongoose';
-import { Message } from 'node-nats-streaming';
 import { Logger } from 'pino';
-import { pipeline } from 'streaming-iterables';
+import { concat, pipeline } from 'streaming-iterables';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from './backingServices/objectStorage';
@@ -13,6 +13,7 @@ import { retrieveOwnCertificates } from './pki';
 import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';
+import { RedisPubSubClient, type RedisPublishFunction } from './backingServices/RedisPubSubClient';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
@@ -26,12 +27,8 @@ export interface QueuedInternetBoundParcelMessage {
   readonly deliveryAttempts: number;
 }
 
-export interface ParcelObjectMetadata<Extra> {
+export interface ParcelObject {
   readonly key: string;
-  readonly extra: Extra;
-}
-
-export interface ParcelObject<Extra> extends ParcelObjectMetadata<Extra> {
   readonly body: Buffer;
   readonly expiryDate: Date;
 }
@@ -69,38 +66,40 @@ export class ParcelStore {
    * excluding expired ones.
    *
    * @param privatePeerId
-   * @param natsStreamingClient
+   * @param redisPubSubClient
    * @param abortSignal
    * @param logger
-   * @throws NatsStreamingSubscriptionError
    */
   public async *liveStreamParcelsForPrivatePeer(
     privatePeerId: string,
-    natsStreamingClient: NatsStreamingClient,
+    redisPubSubClient: RedisPubSubClient,
     abortSignal: AbortSignal,
     logger: Logger,
   ): AsyncIterable<ParcelStreamMessage> {
     const peerAwareLogger = logger.child({ privatePeerId });
 
-    const parcelMessages = natsStreamingClient.makeQueueConsumer(
-      makeInternetPeerNATSChannel(privatePeerId),
-      'active-parcels',
+    const existingParcelObjectKeys = listParcelObjectKeysFromPrivateKey(
+      this.objectStoreClient,
+      this.bucket,
       privatePeerId,
-      abortSignal,
     );
+    const newParcelObjectKeys = redisPubSubClient.subscribe(
+      getInternetPeerChannelName(privatePeerId),
+    );
+    const parcelObjectKeys = concat(existingParcelObjectKeys, newParcelObjectKeys);
 
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
 
     async function* buildStream(
-      parcelObjects: AsyncIterable<ParcelObject<Message>>,
+      parcelObjects: AsyncIterable<ParcelObject>,
     ): AsyncIterable<ParcelStreamMessage> {
-      for await (const { extra: natsMessage, key, body } of parcelObjects) {
+      const abortableParcelObjects = makeSourceAbortable(parcelObjects, abortSignal, {
+        returnOnAbort: true,
+      });
+      for await (const { key, body } of abortableParcelObjects) {
         yield {
           async ack(): Promise<void> {
-            // Make sure not to keep a reference to the parcel serialization to let the garbage
-            // collector do its magic.
-            natsMessage.ack();
             await objectStoreClient.deleteObject(key, bucket);
           },
           parcelObjectKey: key,
@@ -109,9 +108,8 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipeline(
-      () => parcelMessages,
-      buildParcelObjectMetadataFromNATSMessage,
+    yield* pipeline(
+      () => parcelObjectKeys,
       this.makeActiveParcelRetriever(peerAwareLogger),
       buildStream,
     );
@@ -132,7 +130,7 @@ export class ParcelStore {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
     async function* buildStream(
-      parcelObjects: AsyncIterable<ParcelObject<null>>,
+      parcelObjects: AsyncIterable<ParcelObject>,
     ): AsyncIterable<ParcelStreamMessage> {
       for await (const { key, body } of parcelObjects) {
         yield {
@@ -147,10 +145,7 @@ export class ParcelStore {
       }
     }
 
-    yield* await pipeline(
-      () => this.retrieveParcelsForPrivatePeer(privatePeerId, logger),
-      buildStream,
-    );
+    yield* pipeline(() => this.retrieveParcelsForPrivatePeer(privatePeerId, logger), buildStream);
   }
 
   /**
@@ -163,11 +158,9 @@ export class ParcelStore {
   public async *retrieveParcelsForPrivatePeer(
     privatePeerId: string,
     logger: Logger,
-  ): AsyncIterable<ParcelObject<null>> {
-    const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${privatePeerId}/`;
-    yield* await pipeline(
-      () => this.objectStoreClient.listObjectKeys(prefix, this.bucket),
-      buildParcelObjectMetadataFromString,
+  ): AsyncIterable<ParcelObject> {
+    yield* pipeline(
+      () => listParcelObjectKeysFromPrivateKey(this.objectStoreClient, this.bucket, privatePeerId),
       this.makeActiveParcelRetriever(logger),
     );
   }
@@ -178,6 +171,7 @@ export class ParcelStore {
     privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingConnection: NatsStreamingClient,
+    redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
   ): Promise<string | null> {
     const isForAnotherPrivatePeer =
@@ -188,7 +182,7 @@ export class ParcelStore {
         parcel,
         parcelSerialized,
         mongooseConnection,
-        natsStreamingConnection,
+        redisPublisher,
         logger,
       );
     }
@@ -208,7 +202,7 @@ export class ParcelStore {
    * @param parcel
    * @param parcelSerialized
    * @param mongooseConnection
-   * @param natsStreamingClient
+   * @param redisPublisher
    * @param logger
    * @throws InvalidMessageException
    */
@@ -216,7 +210,7 @@ export class ParcelStore {
     parcel: Parcel,
     parcelSerialized: Buffer,
     mongooseConnection: Connection,
-    natsStreamingClient: NatsStreamingClient,
+    redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
   ): Promise<string> {
     const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
@@ -243,11 +237,8 @@ export class ParcelStore {
     );
     keyAwareLogger.debug('Parcel object was stored successfully');
 
-    await natsStreamingClient.publishMessage(
-      key,
-      makeInternetPeerNATSChannel(privateGatewayAddress),
-    );
-    keyAwareLogger.debug('Parcel storage was successfully published on NATS');
+    await redisPublisher(key, getInternetPeerChannelName(privateGatewayAddress));
+    keyAwareLogger.debug('Parcel storage was successfully published on Redis PubSub');
 
     return key;
   }
@@ -346,34 +337,32 @@ export class ParcelStore {
     );
   }
 
-  public makeActiveParcelRetriever<E>(
+  public makeActiveParcelRetriever(
     logger: Logger,
-  ): (
-    parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
-  ) => AsyncIterable<ParcelObject<E>> {
+  ): (parcelObjectKeys: AsyncIterable<string>) => AsyncIterable<ParcelObject> {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
 
     async function* retrieveObjects(
-      parcelObjectsMetadata: AsyncIterable<ParcelObjectMetadata<E>>,
-    ): AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }> {
-      for await (const parcelObjectMetadata of parcelObjectsMetadata) {
-        const parcelObject = await objectStoreClient.getObject(parcelObjectMetadata.key, bucket);
+      parcelObjectKeys: AsyncIterable<string>,
+    ): AsyncIterable<{ readonly key: string; readonly object: StoreObject }> {
+      for await (const parcelObjectKey of parcelObjectKeys) {
+        const parcelObject = await objectStoreClient.getObject(parcelObjectKey, bucket);
         if (!parcelObject) {
           logger.info(
-            { parcelObjectKey: parcelObjectMetadata.key },
+            { parcelObjectKey },
             'Parcel object could not be found; it could have been deleted since keys were retrieved',
           );
           continue;
         }
 
-        yield { ...parcelObjectMetadata, object: parcelObject };
+        yield { key: parcelObjectKey, object: parcelObject };
       }
     }
 
     async function* filterActiveParcels(
-      objects: AsyncIterable<ParcelObjectMetadata<E> & { readonly object: StoreObject }>,
-    ): AsyncIterable<ParcelObject<E>> {
+      objects: AsyncIterable<{ readonly key: string; readonly object: StoreObject }>,
+    ): AsyncIterable<ParcelObject> {
       for await (const parcelObject of objects) {
         const parcelExpiryDate = getDateFromTimestamp(
           parcelObject.object.metadata[EXPIRY_METADATA_KEY],
@@ -394,30 +383,13 @@ export class ParcelStore {
         yield {
           body: parcelObject.object.body,
           expiryDate: parcelExpiryDate,
-          extra: parcelObject.extra,
           key: parcelObject.key,
         };
       }
     }
 
-    return (parcelObjectsMetadata) =>
-      pipeline(() => parcelObjectsMetadata, retrieveObjects, filterActiveParcels);
-  }
-}
-
-async function* buildParcelObjectMetadataFromNATSMessage(
-  messages: AsyncIterable<Message>,
-): AsyncIterable<ParcelObjectMetadata<Message>> {
-  for await (const message of messages) {
-    yield { key: message.getRawData().toString(), extra: message };
-  }
-}
-
-async function* buildParcelObjectMetadataFromString(
-  objectKeys: AsyncIterable<string>,
-): AsyncIterable<ParcelObjectMetadata<null>> {
-  for await (const key of objectKeys) {
-    yield { key, extra: null };
+    return (parcelObjectKeys) =>
+      pipeline(() => parcelObjectKeys, retrieveObjects, filterActiveParcels);
   }
 }
 
@@ -435,7 +407,7 @@ function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
   return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
-function makeInternetPeerNATSChannel(privatePeerId: string): string {
+function getInternetPeerChannelName(privatePeerId: string): string {
   return `pdc-parcel.${privatePeerId}`;
 }
 
@@ -452,4 +424,13 @@ function makeParcelObjectKeyForPrivatePeer(
     senderId,
     sha256Hex(parcelId), // Use the digest to avoid using potentially illegal characters
   ].join('/');
+}
+
+async function* listParcelObjectKeysFromPrivateKey(
+  objectStoreClient: ObjectStoreClient,
+  bucket: string,
+  privatePeerId: string,
+): AsyncIterable<string> {
+  const prefix = `${GATEWAY_BOUND_OBJECT_KEY_PREFIX}/${privatePeerId}/`;
+  yield* objectStoreClient.listObjectKeys(prefix, bucket);
 }

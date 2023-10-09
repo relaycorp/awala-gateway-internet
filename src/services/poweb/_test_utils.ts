@@ -11,15 +11,18 @@ import { arrayToAsyncIterable } from '../../testUtils/iter';
 import { mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
+import { mockRedisPubSubClient, MockRedisPubSubClient } from '../../testUtils/redis';
 
 export interface FixtureSet extends PdaChain {
   readonly getMongooseConnection: () => Connection;
   readonly parcelStore: ParcelStore;
   readonly privateKeyStore: MockPrivateKeyStore;
+  readonly redisPubSubClient: MockRedisPubSubClient;
 }
 
 export function setUpCommonFixtures(): () => FixtureSet {
   const getMongooseConnection = setUpTestDBConnection();
+  const redisPubSubClient = mockRedisPubSubClient();
 
   const mockParcelStore: ParcelStore = {
     liveStreamParcelsForPrivatePeer: mockSpy(
@@ -84,6 +87,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     getMongooseConnection,
     parcelStore: mockParcelStore,
     privateKeyStore: mockPrivateKeyStore,
+    redisPubSubClient,
     ...certificatePath,
   });
 }

@@ -29,6 +29,9 @@ nats:
   serverUrl: nats://nats:4222
   clusterId: stan
 
+redis:
+  url: redis://redis-headless:6379
+
 objectStore:
   backend: minio
   endpoint: minio:9000

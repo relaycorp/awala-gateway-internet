@@ -195,6 +195,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     await fixtures.privateGatewayCert.calculateSubjectId(),
     fixtures.getMongooseConnection(),
     mockNatsStreamingConnection,
+    fixtures.redisPubSubClient.publishers[0].publish,
     expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
   );
   expect(logging.logs).toContainEqual(
@@ -257,6 +258,17 @@ test('NATS Streaming connection should use the right arguments', async () => {
   expect(mockNatsStreamingInit).toBeCalledWith(
     expect.stringMatching(/^poweb-parcel-delivery-req-\d+$/),
   );
+});
+
+test('Redis connection should be closed when server ends', async () => {
+  const fastify = await makeServer();
+  const { redisPubSubClient } = getFixtures();
+  const publisher = redisPubSubClient.publishers[0];
+  expect(publisher.close).not.toBeCalled();
+
+  await fastify.close();
+
+  expect(publisher.close).toBeCalled();
 });
 
 async function postParcel(

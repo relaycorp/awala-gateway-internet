@@ -7,6 +7,7 @@
     "pdcQueue",
     "mongo",
     "nats",
+    "redis",
     "keystore"
   ],
   "properties": {
@@ -129,6 +130,16 @@
         },
         "clusterId": {
           "type": "string"
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
         }
       }
     },

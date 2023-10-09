@@ -21,12 +21,12 @@ dependencies:
   - name: stan
     version: 0.7.2
     repository: https://nats-io.github.io/k8s/helm/charts
+  - name: redis
+    version: 16.12.2
+    repository: https://charts.bitnami.com/bitnami
 
   # Pong app
   - name: relaynet-pong
     version: 3.0.37
     repository: https://h.cfcr.io/relaycorp/public
     alias: pong
-  - name: redis
-    version: 16.12.2
-    repository: https://charts.bitnami.com/bitnami

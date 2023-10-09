@@ -62,11 +62,16 @@ This server is used to store parcels and cargoes under the following object key 
 
 ### NATS Streaming
 
-[NAT Streaming](https://docs.nats.io/nats-streaming-concepts/intro) is used for inter-component communication using asynchronous messaging. The following channels are used:
+[NAT Streaming](https://docs.nats.io/nats-streaming-concepts/intro) is used for inter-component communication using asynchronous messaging, when we need messages to be persisted until a subscriber processes them. The following channels are used:
 
-- `pdc-parcel.${privateGatewayId}` where `${privateGatewayId}` is the id of the private gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
 - `internet-parcels`. Parcels bound for an internet.
 - `crc-cargo`. Cargo received via CRC (e.g., CogRPC) are published here.
+
+### Redis
+
+[Redis PubSub](https://redis.io/docs/interact/pubsub/) is used for inter-component communication using asynchronous messaging, when we don't need messages to be persisted. The following channels are used:
+
+- `pdc-parcel.${privateGatewayId}` where `${privateGatewayId}` is the id of the private gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
 
 ### HashiCorp Vault
 

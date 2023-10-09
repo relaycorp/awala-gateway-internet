@@ -229,7 +229,7 @@ async function generateCertificateRotation(
 }
 
 async function* convertParcelsToCargoMessageStream(
-  parcelObjects: AsyncIterable<ParcelObject<null>>,
+  parcelObjects: AsyncIterable<ParcelObject>,
 ): CargoMessageStream {
   for await (const parcelObject of parcelObjects) {
     yield { expiryDate: parcelObject.expiryDate, message: parcelObject.body };

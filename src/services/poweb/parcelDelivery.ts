@@ -14,6 +14,7 @@ import { retrieveOwnCertificates } from '../../pki';
 import { registerDisallowedMethods } from '../fastify';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
+import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
 
 const ENDPOINT_URL = '/v1/parcels';
 
@@ -30,6 +31,9 @@ export default async function registerRoutes(
     { parseAs: 'buffer' },
     async (_req: any, rawBody: Buffer) => rawBody,
   );
+
+  const redisPublisher = await RedisPubSubClient.init().makePublisher();
+  fastify.addHook('onClose', async () => redisPublisher.close());
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -77,6 +81,7 @@ export default async function registerRoutes(
           privatePeerId,
           mongooseConnection,
           natsStreamingClient,
+          redisPublisher.publish,
           parcelAwareLogger,
         );
       } catch (err) {

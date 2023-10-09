@@ -2,7 +2,6 @@ import { Certificate, InvalidMessageError, Parcel } from '@relaycorp/relaynet-co
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { setUpTestDBConnection } from '../../testUtils/db';
 import { configureMockEnvVars } from '../../testUtils/envVars';
@@ -10,6 +9,7 @@ import { testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { makeServer } from './server';
+import { mockRedisPubSubClient } from '../../testUtils/redis';
 
 jest.mock('../../utilities/exitHandling');
 
@@ -49,27 +49,15 @@ beforeAll(async () => {
     payload.byteLength.toString();
 });
 
-const STUB_NATS_SERVER_URL = 'nats://example.com';
-const STUB_NATS_CLUSTER_ID = 'nats-cluster-id';
-const mockNatsClient: NatsStreamingClient = {
-  what: 'The NATS Streaming client',
-} as any;
-const mockNatsClientInit = mockSpy(
-  jest.spyOn(NatsStreamingClient, 'initFromEnv'),
-  () => mockNatsClient,
-);
-
 const mockParcelStore: ParcelStore = {
   storeParcelForPrivatePeer: mockSpy(jest.fn(), async () => undefined),
 } as any;
 jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 
 describe('receiveParcel', () => {
-  configureMockEnvVars({
-    GATEWAY_VERSION: '1.0.2',
-    NATS_CLUSTER_ID: STUB_NATS_CLUSTER_ID,
-    NATS_SERVER_URL: STUB_NATS_SERVER_URL,
-  });
+  configureMockEnvVars({ GATEWAY_VERSION: '1.0.2' });
+
+  const redisPubSubClient = mockRedisPubSubClient();
 
   let serverInstance: FastifyInstance;
   beforeEach(async () => {
@@ -160,7 +148,7 @@ describe('receiveParcel', () => {
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
       getMongooseConnection(),
-      mockNatsClient,
+      redisPubSubClient.publishers[0].publish,
       expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
     );
   });
@@ -173,11 +161,13 @@ describe('receiveParcel', () => {
     // TODO: Find a way to check the logs
   });
 
-  test('Current request id should be part of the client id in the NATS connection', async () => {
-    await serverInstance.inject(validRequestOptions);
+  test('Redis connection should be closed when server ends', async () => {
+    const publisher = redisPubSubClient.publishers[0];
+    expect(publisher.close).not.toBeCalled();
 
-    expect(mockNatsClientInit).toBeCalledTimes(1);
-    expect(mockNatsClientInit).toBeCalledWith(expect.stringMatching(/^pohttp-req-req-\w+$/));
+    await serverInstance.close();
+
+    expect(publisher.close).toBeCalled();
   });
 });
 

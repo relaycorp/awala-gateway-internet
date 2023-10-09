@@ -30,7 +30,7 @@ nats:
   clusterId: stan
 
 redis:
-  url: redis://dev-backing-services-redis-headless:6379
+  url: redis://redis-headless:6379
 
 objectStore:
   backend: minio

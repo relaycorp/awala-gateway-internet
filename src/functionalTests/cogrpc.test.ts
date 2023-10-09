@@ -19,7 +19,7 @@ import { Message, Stan, Subscription } from 'node-nats-streaming';
 import uuid from 'uuid-random';
 import { GeneratedParcel } from '../testUtils/awala';
 
-import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
+import { arrayToAsyncIterable } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pki';
 import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
@@ -33,6 +33,7 @@ import {
 import { connectToNatsStreaming } from './utils/nats';
 import { extractPong, makePingParcel } from './utils/ping';
 import { waitForNextParcel } from './utils/poweb';
+import { collect } from 'streaming-iterables';
 
 const TOMORROW = addDays(new Date(), 1);
 
@@ -61,7 +62,7 @@ describe('Cargo delivery', () => {
       arrayToAsyncIterable([{ localId: deliveryId, cargo: cargoSerialized }]),
     );
 
-    await expect(asyncIterableToArray(ackDeliveryIds)).resolves.toEqual([deliveryId]);
+    await expect(collect(ackDeliveryIds)).resolves.toEqual([deliveryId]);
     await expect(getLastQueueMessage()).resolves.toEqual(cargoSerialized);
   });
 
@@ -82,7 +83,7 @@ describe('Cargo delivery', () => {
       await cargo.serialize(unauthorizedSenderKeyPair.privateKey),
     );
 
-    await asyncIterableToArray(
+    await collect(
       await cogRPCClient.deliverCargo(
         arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
       ),
@@ -107,7 +108,7 @@ describe('Cargo collection', () => {
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
+    const collectedCargoes = await collect(cogRPCClient.collectCargo(ccaSerialized));
 
     await expect(collectedCargoes).toHaveLength(1);
     const cargoMessages = await extractMessagesFromCargo(
@@ -134,7 +135,7 @@ describe('Cargo collection', () => {
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
+    const collectedCargoes = await collect(cogRPCClient.collectCargo(ccaSerialized));
 
     const cargo = await Cargo.deserialize(bufferToArray(collectedCargoes[0]));
     await cargo.validate([cdaChain.privateGatewayCert]);
@@ -155,7 +156,7 @@ describe('Cargo collection', () => {
     const ccaSerialized = Buffer.from(await cca.serialize(unauthorizedSenderKeyPair.privateKey));
 
     const error = await getPromiseRejection(
-      asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+      collect(cogRPCClient.collectCargo(ccaSerialized)),
       CogRPCError,
     );
 
@@ -172,10 +173,10 @@ describe('Cargo collection', () => {
       pdaChain.privateGatewayCert,
       pdaChain.privateGatewayPrivateKey,
     );
-    await expect(asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized))).toResolve();
+    await expect(collect(cogRPCClient.collectCargo(ccaSerialized))).toResolve();
 
     const error = await getPromiseRejection(
-      asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized)),
+      collect(cogRPCClient.collectCargo(ccaSerialized)),
       CogRPCError,
     );
 
@@ -197,7 +198,7 @@ test('Sending pings and receiving pongs', async () => {
     internetGatewaySessionKey,
     privateGatewayKeyStore,
   );
-  await asyncIterableToArray(
+  await collect(
     cogRPCClient.deliverCargo(
       arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
     ),
@@ -214,7 +215,7 @@ test('Sending pings and receiving pongs', async () => {
     pdaChain.privateGatewayPrivateKey,
     privateGatewayKeyStore,
   );
-  const collectedCargoes = await asyncIterableToArray(cogRPCClient.collectCargo(ccaSerialized));
+  const collectedCargoes = await collect(cogRPCClient.collectCargo(ccaSerialized));
   expect(collectedCargoes).toHaveLength(1);
   const collectedMessages = await extractMessagesFromCargo(
     collectedCargoes[0],

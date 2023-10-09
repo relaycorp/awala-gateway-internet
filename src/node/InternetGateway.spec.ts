@@ -8,8 +8,9 @@ import {
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addMinutes } from 'date-fns';
 
-import { arrayToAsyncIterable, asyncIterableToArray } from '../testUtils/iter';
+import { arrayToAsyncIterable } from '../testUtils/iter';
 import { InternetGateway } from './InternetGateway';
+import { collect } from 'streaming-iterables';
 
 let keyPairSet: NodeKeyPairSet;
 let cdaChain: CDACertPath;
@@ -49,7 +50,7 @@ describe('getChannelFromCda', () => {
 
     // We can't just read the private key, so we have to use it:
     const dummyCargoMessage = { message: Buffer.from([]), expiryDate: addMinutes(new Date(), 1) };
-    const [cargoSerialized] = await asyncIterableToArray(
+    const [cargoSerialized] = await collect(
       channel.generateCargoes(arrayToAsyncIterable([dummyCargoMessage])),
     );
     const cargo = await Cargo.deserialize(bufferToArray(cargoSerialized));

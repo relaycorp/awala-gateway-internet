@@ -2,7 +2,7 @@ import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { InvalidMessageError, Parcel, Recipient } from '@relaycorp/relaynet-core';
 import { EnvVarError } from 'env-var';
 import { Connection } from 'mongoose';
-import { collect, consume, pipeline } from 'streaming-iterables';
+import { collect, consume, pipeline, take } from 'streaming-iterables';
 
 import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
@@ -17,7 +17,7 @@ import * as pki from './pki';
 import { GATEWAY_INTERNET_ADDRESS, PEER_INTERNET_ADDRESS } from './testUtils/awala';
 import { sha256Hex } from './testUtils/crypto';
 import { configureMockEnvVars } from './testUtils/envVars';
-import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from './testUtils/iter';
+import { arrayToAsyncIterable } from './testUtils/iter';
 import { getMockInstance, mockSpy } from './testUtils/jest';
 import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/logging';
 import { generatePdaChain, PdaChain } from './testUtils/pki';
@@ -98,7 +98,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -120,7 +120,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -148,7 +148,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(1),
+      take(1),
       collect,
     );
 
@@ -174,7 +174,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
           abortController.signal,
           mockLogging.logger,
         ),
-      iterableTake(2),
+      take(2),
       collect,
     );
 
@@ -221,7 +221,7 @@ describe('liveStreamParcelsForPrivatePeer', () => {
             abortController.signal,
             mockLogging.logger,
           ),
-        iterableTake(1),
+        take(1),
         collect,
       );
 
@@ -292,7 +292,7 @@ describe('streamParcelsForPrivatePeer', () => {
 
     const activeParcels = store.streamParcelsForPrivatePeer(privateGatewayId, mockLogging.logger);
 
-    await expect(asyncIterableToArray(activeParcels)).resolves.toEqual([
+    await expect(collect(activeParcels)).resolves.toEqual([
       { ack: expect.any(Function), parcelObjectKey: parcelObject.key, parcelSerialized },
     ]);
     expect(parcelRetrieverSpy).toBeCalledWith(privateGatewayId, mockLogging.logger);
@@ -305,7 +305,7 @@ describe('streamParcelsForPrivatePeer', () => {
         .spyOn(store, 'retrieveParcelsForPrivatePeer')
         .mockReturnValue(arrayToAsyncIterable([parcelObject]));
 
-      const [message] = await asyncIterableToArray(
+      const [message] = await collect(
         store.streamParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
       );
 
@@ -320,9 +320,7 @@ describe('retrieveParcelsForPrivatePeer', () => {
   const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 
   test('Parcels should be limited to those for the specified gateway', async () => {
-    await asyncIterableToArray(
-      store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
-    );
+    await collect(store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger));
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(
       `parcels/gateway-bound/${privateGatewayId}/`,
@@ -339,9 +337,7 @@ describe('retrieveParcelsForPrivatePeer', () => {
     };
     setMockParcelObjectStore(objectsByKey);
 
-    await asyncIterableToArray(
-      store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
-    );
+    await collect(store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger));
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledTimes(1);
     expect(MOCK_OBJECT_STORE_CLIENT.listObjectKeys).toBeCalledWith(expect.anything(), BUCKET);
     expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledTimes(1);
@@ -365,11 +361,11 @@ describe('retrieveParcelsForPrivatePeer', () => {
       },
     });
 
-    const activeParcels = await asyncIterableToArray(
+    const activeParcels = await collect(
       store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
     );
 
-    expect(activeParcels).toEqual([
+    expect(activeParcels).toStrictEqual([
       { key: parcel1Key, expiryDate: parcel1ExpiryDate, body: parcelSerialized },
       { key: parcel2Key, expiryDate: parcel2ExpiryDate, body: parcel2Body },
     ]);
@@ -384,9 +380,7 @@ describe('retrieveParcelsForPrivatePeer', () => {
     });
 
     await expect(
-      asyncIterableToArray(
-        store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger),
-      ),
+      collect(store.retrieveParcelsForPrivatePeer(privateGatewayId, mockLogging.logger)),
     ).resolves.toHaveLength(0);
   });
 
@@ -979,7 +973,7 @@ describe('makeActiveParcelRetriever', () => {
       pipeline(
         () => arrayToAsyncIterable([parcelObjectKey]),
         store.makeActiveParcelRetriever(mockLogging.logger),
-        asyncIterableToArray,
+        collect,
       ),
     ).resolves.toEqual([{ key: parcelObjectKey, body: parcelSerialized, expiryDate }]);
   });
@@ -998,7 +992,7 @@ describe('makeActiveParcelRetriever', () => {
       pipeline(
         () => arrayToAsyncIterable([parcelObjectKey]),
         store.makeActiveParcelRetriever(mockLogging.logger),
-        asyncIterableToArray,
+        collect,
       ),
     ).resolves.toHaveLength(0);
 
@@ -1023,7 +1017,7 @@ describe('makeActiveParcelRetriever', () => {
       pipeline(
         () => arrayToAsyncIterable([parcelObjectKey]),
         store.makeActiveParcelRetriever(mockLogging.logger),
-        asyncIterableToArray,
+        collect,
       ),
     ).resolves.toHaveLength(0);
 
@@ -1047,7 +1041,7 @@ describe('makeActiveParcelRetriever', () => {
       pipeline(
         () => arrayToAsyncIterable([parcelObjectKey]),
         store.makeActiveParcelRetriever(mockLogging.logger),
-        asyncIterableToArray,
+        collect,
       ),
     ).resolves.toHaveLength(0);
 
@@ -1066,7 +1060,7 @@ describe('makeActiveParcelRetriever', () => {
       pipeline(
         () => arrayToAsyncIterable([parcelObjectKey]),
         store.makeActiveParcelRetriever(mockLogging.logger),
-        asyncIterableToArray,
+        collect,
       ),
     ).resolves.toHaveLength(0);
 

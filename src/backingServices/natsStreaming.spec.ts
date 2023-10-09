@@ -2,10 +2,10 @@
 
 import { EventEmitter } from 'events';
 import { AckHandlerCallback, Message, SubscriptionOptions } from 'node-nats-streaming';
-import { pipeline } from 'streaming-iterables';
+import { collect, pipeline, take } from 'streaming-iterables';
 
 import { configureMockEnvVars } from '../testUtils/envVars';
-import { arrayToAsyncIterable, asyncIterableToArray, iterableTake } from '../testUtils/iter';
+import { arrayToAsyncIterable } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
 
 class MockNatsSubscription extends EventEmitter {}
@@ -133,7 +133,7 @@ describe('NatsStreamingClient', () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
+      await collect(publisher([STUB_MESSAGE_1]));
 
       expect(mockConnection.publish).toBeCalledTimes(1);
       expect(mockConnection.publish).toBeCalledWith(
@@ -152,9 +152,7 @@ describe('NatsStreamingClient', () => {
         (_channel: any, _data: any, cb: AckHandlerCallback) => cb(error, ''),
       );
 
-      await expect(
-        asyncIterableToArray(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2])),
-      ).rejects.toEqual(error);
+      await expect(collect(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]))).rejects.toEqual(error);
 
       // Two messages were passed, but publishing should've stopped with the first failure
       expect(mockConnection.publish).toBeCalledTimes(1);
@@ -164,7 +162,7 @@ describe('NatsStreamingClient', () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await asyncIterableToArray(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]));
+      await collect(publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]));
 
       expect(mockConnection.publish).toBeCalledTimes(2);
       expect(mockConnection.publish).toBeCalledWith(
@@ -185,17 +183,14 @@ describe('NatsStreamingClient', () => {
 
       const publishedIds = await publisher([STUB_MESSAGE_1, STUB_MESSAGE_2]);
 
-      await expect(asyncIterableToArray(publishedIds)).resolves.toEqual([
-        STUB_MESSAGE_1.id,
-        STUB_MESSAGE_2.id,
-      ]);
+      await expect(collect(publishedIds)).resolves.toEqual([STUB_MESSAGE_1.id, STUB_MESSAGE_2.id]);
     });
 
     test('Publishing multiple messages from an async iterable should be supported', async () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await asyncIterableToArray(publisher(arrayToAsyncIterable([STUB_MESSAGE_1, STUB_MESSAGE_2])));
+      await collect(publisher(arrayToAsyncIterable([STUB_MESSAGE_1, STUB_MESSAGE_2])));
 
       expect(mockConnection.publish).toBeCalledTimes(2);
       expect(mockConnection.publish).toBeCalledWith(
@@ -214,7 +209,7 @@ describe('NatsStreamingClient', () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await asyncIterableToArray(publisher([STUB_MESSAGE_1]));
+      await collect(publisher([STUB_MESSAGE_1]));
 
       expect(mockConnection.close).toBeCalled();
     });
@@ -226,7 +221,7 @@ describe('NatsStreamingClient', () => {
       const publisher = stubClient.makePublisher(STUB_CHANNEL);
       setImmediate(() => mockConnection.emit('connect'));
 
-      await expect(asyncIterableToArray(publisher([STUB_MESSAGE_1]))).toReject();
+      await expect(collect(publisher([STUB_MESSAGE_1]))).toReject();
 
       expect(mockConnection.close).toBeCalled();
     });
@@ -452,7 +447,7 @@ describe('NatsStreamingClient', () => {
         },
       );
 
-      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
+      await expect(collect(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockConnection.close).toBeCalled();
     });
 
@@ -466,9 +461,9 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('message', stubMessage2);
       });
 
-      const outputMessages = pipeline(() => consumer, iterableTake(1));
+      const outputMessages = pipeline(() => consumer, take(1));
 
-      await expect(asyncIterableToArray(outputMessages)).resolves.toEqual([stubMessage1]);
+      await expect(collect(outputMessages)).resolves.toEqual([stubMessage1]);
       expect(mockConnection.close).toBeCalled();
     });
 
@@ -482,10 +477,7 @@ describe('NatsStreamingClient', () => {
         mockSubscription.emit('error', stanError);
       });
 
-      const error = await getPromiseRejection(
-        asyncIterableToArray(consumer),
-        NatsStreamingSubscriptionError,
-      );
+      const error = await getPromiseRejection(collect(consumer), NatsStreamingSubscriptionError);
       expect(error.message).toMatch(new RegExp(`Failed to subscribe to channel ${STUB_CHANNEL}:`));
       expect(error.cause()).toBe(stanError);
 
@@ -494,7 +486,7 @@ describe('NatsStreamingClient', () => {
 
     async function consumeQueue(consumer: AsyncIterable<Message>): Promise<readonly Message[]> {
       return new Promise((resolve, reject) => {
-        asyncIterableToArray(consumer).then(resolve).catch(reject);
+        collect(consumer).then(resolve).catch(reject);
 
         fakeConnection();
         abortController.abort();

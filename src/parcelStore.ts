@@ -13,7 +13,7 @@ import { retrieveOwnCertificates } from './pki';
 import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';
-import { RedisPubSubClient } from './backingServices/RedisPubSubClient';
+import { RedisPubSubClient, type RedisPublishFunction } from './backingServices/RedisPubSubClient';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
 const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
@@ -171,6 +171,7 @@ export class ParcelStore {
     privatePeerId: string,
     mongooseConnection: Connection,
     natsStreamingConnection: NatsStreamingClient,
+    redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
   ): Promise<string | null> {
     const isForAnotherPrivatePeer =
@@ -181,7 +182,7 @@ export class ParcelStore {
         parcel,
         parcelSerialized,
         mongooseConnection,
-        natsStreamingConnection,
+        redisPublisher,
         logger,
       );
     }
@@ -201,7 +202,7 @@ export class ParcelStore {
    * @param parcel
    * @param parcelSerialized
    * @param mongooseConnection
-   * @param natsStreamingClient
+   * @param redisPublisher
    * @param logger
    * @throws InvalidMessageException
    */
@@ -209,7 +210,7 @@ export class ParcelStore {
     parcel: Parcel,
     parcelSerialized: Buffer,
     mongooseConnection: Connection,
-    natsStreamingClient: NatsStreamingClient,
+    redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
   ): Promise<string> {
     const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
@@ -236,11 +237,8 @@ export class ParcelStore {
     );
     keyAwareLogger.debug('Parcel object was stored successfully');
 
-    await natsStreamingClient.publishMessage(
-      key,
-      getInternetPeerChannelName(privateGatewayAddress),
-    );
-    keyAwareLogger.debug('Parcel storage was successfully published on NATS');
+    await redisPublisher(key, getInternetPeerChannelName(privateGatewayAddress));
+    keyAwareLogger.debug('Parcel storage was successfully published on Redis PubSub');
 
     return key;
   }

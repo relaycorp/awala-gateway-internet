@@ -23,6 +23,7 @@ import { makeMockLogging, MockLogging, partialPinoLog } from './testUtils/loggin
 import { generatePdaChain, PdaChain } from './testUtils/pki';
 import { mockRedisPubSubClient } from './testUtils/redis';
 import { MockObjectStoreClient } from './testUtils/MockObjectStoreClient';
+import { RedisPublishFunction } from './backingServices/RedisPubSubClient.js';
 
 const BUCKET = 'the-bucket-name';
 
@@ -65,6 +66,8 @@ let mockLogging: MockLogging;
 beforeEach(() => {
   mockLogging = makeMockLogging();
 });
+
+const mockRedisPublish = mockSpy(jest.fn()) as unknown as RedisPublishFunction;
 
 describe('liveStreamParcelsForPrivatePeer', () => {
   const objectStore = new MockObjectStoreClient();
@@ -419,6 +422,7 @@ describe('storeParcelFromPrivatePeer', () => {
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockRedisPublish,
         mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
@@ -427,7 +431,7 @@ describe('storeParcelFromPrivatePeer', () => {
       parcelForPrivateGateway,
       parcelForPrivateGatewaySerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
   });
@@ -454,6 +458,7 @@ describe('storeParcelFromPrivatePeer', () => {
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockRedisPublish,
         mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
@@ -462,7 +467,7 @@ describe('storeParcelFromPrivatePeer', () => {
       parcelForPrivateGateway,
       parcelForPrivateGatewaySerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
   });
@@ -490,6 +495,7 @@ describe('storeParcelFromPrivatePeer', () => {
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
         MOCK_NATS_CLIENT,
+        mockRedisPublish,
         mockLogging.logger,
       ),
     ).resolves.toEqual(dummyObjectKey);
@@ -522,7 +528,7 @@ describe('storeParcelForPrivatePeer', () => {
         parcel,
         parcelSerialized,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
+        mockRedisPublish,
         mockLogging.logger,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
@@ -534,7 +540,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -546,7 +552,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -566,7 +572,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -582,7 +588,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -600,7 +606,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -619,7 +625,7 @@ describe('storeParcelForPrivatePeer', () => {
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
@@ -630,22 +636,19 @@ describe('storeParcelForPrivatePeer', () => {
     );
   });
 
-  test('Parcel object key should be published to right NATS Streaming channel', async () => {
+  test('Parcel object key should be published to right Red PubSub channel', async () => {
     const parcelObjectKey = await store.storeParcelForPrivatePeer(
       parcel,
       parcelSerialized,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
+      mockRedisPublish,
       mockLogging.logger,
     );
 
-    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledTimes(1);
-    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
-      parcelObjectKey,
-      `pdc-parcel.${privateGatewayId}`,
-    );
+    expect(mockRedisPublish).toBeCalledTimes(1);
+    expect(mockRedisPublish).toBeCalledWith(parcelObjectKey, `pdc-parcel.${privateGatewayId}`);
     expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Parcel storage was successfully published on NATS', {
+      partialPinoLog('debug', 'Parcel storage was successfully published on Redis PubSub', {
         parcelObjectKey,
       }),
     );

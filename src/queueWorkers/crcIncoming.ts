@@ -20,6 +20,7 @@ import { InternetGatewayManager } from '../node/InternetGatewayManager';
 import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
+import { RedisPublishFunction, RedisPubSubClient } from '../backingServices/RedisPubSubClient';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
@@ -49,6 +50,9 @@ function makeCargoProcessor(
 
     const parcelStore = ParcelStore.initFromEnv();
 
+    const redisClient = RedisPubSubClient.init();
+    const redisPublisher = await redisClient.makePublisher();
+
     try {
       for await (const message of messages) {
         await processCargo(
@@ -58,10 +62,12 @@ function makeCargoProcessor(
           parcelStore,
           mongooseConnection,
           natsStreamingClient,
+          redisPublisher.publish,
         );
       }
     } finally {
       await mongooseConnection.close();
+      await redisPublisher.close();
     }
   };
 }
@@ -73,6 +79,7 @@ async function processCargo(
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
+  redisPublish: RedisPublishFunction,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
   const privatePeerId = await cargo.senderCertificate.calculateSubjectId();
@@ -108,6 +115,7 @@ async function processCargo(
         parcelStore,
         mongooseConnection,
         natsStreamingClient,
+        redisPublish,
         cargoAwareLogger.child({ parcelId: item.id }),
       );
     } else if (item instanceof ParcelCollectionAck) {
@@ -133,6 +141,7 @@ async function processParcel(
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
   natsStreamingClient: NatsStreamingClient,
+  redisPublish: RedisPublishFunction,
   parcelAwareLogger: Logger,
 ): Promise<void> {
   let parcelObjectKey: string | null;
@@ -143,6 +152,7 @@ async function processParcel(
       privatePeerId,
       mongooseConnection,
       natsStreamingClient,
+      redisPublish,
       parcelAwareLogger,
     );
   } catch (err) {

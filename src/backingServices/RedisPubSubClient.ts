@@ -7,10 +7,10 @@ import { InternetGatewayError } from '../errors';
 
 export class RedisPubSubError extends InternetGatewayError {}
 
-type PublishFunction = (message: string, channel: string) => Promise<void>;
+export type RedisPublishFunction = (message: string, channel: string) => Promise<void>;
 
-export interface RedisPubSubPublisher {
-  publish: PublishFunction;
+export interface RedisPublisher {
+  publish: RedisPublishFunction;
   close(): Promise<void>;
 }
 
@@ -48,7 +48,7 @@ export class RedisPubSubClient {
   /**
    * Create a publisher that also offers the ability to close the connection when done.
    */
-  public async makePublisher(): Promise<RedisPubSubPublisher> {
+  public async makePublisher(): Promise<RedisPublisher> {
     const redisClient = await this.connect();
 
     let connectionError: Error | undefined;

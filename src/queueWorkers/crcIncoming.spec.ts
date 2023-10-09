@@ -34,6 +34,7 @@ import { Config, ConfigKey } from '../utilities/config';
 import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';
+import { mockRedisPubSubClient } from '../testUtils/redis';
 
 //region Stan-related fixtures
 
@@ -58,6 +59,10 @@ const mockNatsInitFromEnv = mockSpy(
   jest.spyOn(NatsStreamingClient, 'initFromEnv'),
   () => mockNatsClient,
 );
+
+// Redis-related fixtures
+
+const mockRedisClient = mockRedisPubSubClient();
 
 //region Mongoose-related fixtures
 
@@ -328,6 +333,7 @@ describe('Parcel processing', () => {
       await certificateChain.privateGatewayCert.calculateSubjectId(),
       getMongoConnection(),
       mockNatsClient,
+      mockRedisClient.publishers[0].publish,
       expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );
     expect(mockLogging.logs).toContainEqual(
@@ -507,6 +513,16 @@ test('Mongoose connection should be closed when the queue ends', async () => {
   await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).toReject();
 
   expect(getMongoConnection().readyState).toEqual(0);
+});
+
+test('Redis connection should be closed when the queue ends', async () => {
+  const stanMessage = mockStanMessage(arrayBufferFrom('This is malformed'));
+  mockQueueMessages = [stanMessage];
+
+  await expect(processIncomingCrcCargo(STUB_WORKER_NAME)).toReject();
+
+  const publisher = mockRedisClient.publishers[0];
+  expect(publisher.close).toHaveBeenCalledOnce();
 });
 
 async function generateCargo(...items: readonly ArrayBuffer[]): Promise<Cargo> {

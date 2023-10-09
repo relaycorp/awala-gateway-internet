@@ -4,20 +4,11 @@ export async function* arrayToAsyncIterable<T>(array: readonly T[]): AsyncIterab
   }
 }
 
-export async function asyncIterableToArray<T>(iterable: AsyncIterable<T>): Promise<readonly T[]> {
-  // tslint:disable-next-line:readonly-array
-  const values = [];
-  for await (const item of iterable) {
-    values.push(item);
-  }
-  return values;
-}
-
 export async function* appendErrorToAsyncIterable<T>(
   error: Error,
   array: readonly T[],
 ): AsyncIterable<T> {
-  yield* await arrayToAsyncIterable(array);
+  yield* arrayToAsyncIterable(array);
   throw error;
 }
 

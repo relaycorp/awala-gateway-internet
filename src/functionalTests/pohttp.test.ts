@@ -9,10 +9,9 @@ import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-poh
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { addDays } from 'date-fns';
 import { Stan } from 'node-nats-streaming';
-import { pipeline } from 'streaming-iterables';
+import { collect, pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
-import { asyncIterableToArray } from '../testUtils/iter';
 import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
 import { GW_POHTTP_HOST_URL, GW_POWEB_HOST_PORT } from './utils/constants';
 import { connectToNatsStreaming } from './utils/nats';
@@ -52,7 +51,7 @@ describe('PoHTTP server', () => {
           await collection.ack();
         }
       },
-      asyncIterableToArray,
+      collect,
     );
     expect(incomingParcels).toHaveLength(1);
     expectBuffersToEqual(parcelSerialized, incomingParcels[0]);

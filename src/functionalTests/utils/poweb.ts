@@ -1,8 +1,8 @@
 import { Parcel, ParcelCollectionHandshakeSigner, StreamingMode } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
-import { pipeline } from 'streaming-iterables';
+import { collect, pipeline } from 'streaming-iterables';
 
-import { asyncIterableToArray, iterableTake } from '../../testUtils/iter';
+import { iterableTake } from '../../testUtils/iter';
 import { ExternalPdaChain } from '../../testUtils/pki';
 
 /**
@@ -19,7 +19,7 @@ export async function waitForNextParcel(
   await pipeline(
     () => client.collectParcels([signer], StreamingMode.KEEP_ALIVE),
     iterableTake(1),
-    asyncIterableToArray,
+    collect,
   );
 }
 
@@ -44,7 +44,7 @@ export async function collectNextParcel(
       }
     },
     iterableTake(1),
-    asyncIterableToArray,
+    collect,
   );
   expect(incomingParcels).toHaveLength(1);
   return incomingParcels[0];

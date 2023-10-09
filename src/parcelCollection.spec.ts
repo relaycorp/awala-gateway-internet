@@ -4,9 +4,10 @@ import { Connection } from 'mongoose';
 
 import { ParcelCollection } from './models';
 import { generatePCAs, recordParcelCollection, wasParcelCollected } from './parcelCollection';
-import { arrayToAsyncIterable, asyncIterableToArray } from './testUtils/iter';
+import { arrayToAsyncIterable } from './testUtils/iter';
 import { mockSpy } from './testUtils/jest';
 import { generateStubEndpointCertificate } from './testUtils/pki';
+import { collect } from 'streaming-iterables';
 
 const PEER_GATEWAY_ID = '0deadbeef';
 
@@ -101,7 +102,7 @@ describe('generatePCAs', () => {
   beforeEach(() => MOCK_GET_MODEL_FOR_CLASS.mockReturnValue({ find: MOCK_MONGOOSE_FIND } as any));
 
   test('Existing connection should be used', async () => {
-    await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
+    await collect(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledTimes(1);
     expect(MOCK_GET_MODEL_FOR_CLASS).toBeCalledWith(ParcelCollection, {
@@ -110,7 +111,7 @@ describe('generatePCAs', () => {
   });
 
   test('PCAs should be limited to specified peer', async () => {
-    await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
+    await collect(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     expect(MOCK_MONGOOSE_FIND).toBeCalledTimes(1);
     expect(MOCK_MONGOOSE_FIND).toBeCalledWith({
@@ -119,7 +120,7 @@ describe('generatePCAs', () => {
   });
 
   test('No PCAs should be output if there is none to return', async () => {
-    const results = await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
+    const results = await collect(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     expect(results).toHaveLength(0);
   });
@@ -127,7 +128,7 @@ describe('generatePCAs', () => {
   test('Results should include PCA serialized', async () => {
     MOCK_MONGOOSE_FIND.mockReturnValue(arrayToAsyncIterable([PARCEL_COLLECTION]));
 
-    const results = await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
+    const results = await collect(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     const expectedPca = new ParcelCollectionAck(
       PARCEL_COLLECTION.senderEndpointId,
@@ -141,7 +142,7 @@ describe('generatePCAs', () => {
   test('Results should include expiry date of corresponding parcel', async () => {
     MOCK_MONGOOSE_FIND.mockReturnValue(arrayToAsyncIterable([PARCEL_COLLECTION]));
 
-    const results = await asyncIterableToArray(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
+    const results = await collect(generatePCAs(PEER_GATEWAY_ID, MOCK_CONNECTION));
 
     expect(results).toHaveLength(1);
     expect(results[0].expiryDate).toEqual(PARCEL_COLLECTION.parcelExpiryDate);

@@ -32,8 +32,7 @@ export default async function registerRoutes(
     async (_req: any, rawBody: Buffer) => rawBody,
   );
 
-  const redisClient = RedisPubSubClient.init();
-  const redisPublisher = await redisClient.makePublisher();
+  const redisPublisher = await RedisPubSubClient.init().makePublisher();
   fastify.addHook('onClose', async () => redisPublisher.close());
 
   fastify.route<{ readonly Body: Buffer }>({

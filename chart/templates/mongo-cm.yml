@@ -5,6 +5,6 @@ metadata:
   labels:
     {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
 data:
-  MONGO_URI: {{ .Values.mongo.uri }}
-  MONGO_DB: {{ .Values.mongo.db }}
-  MONGO_USER: {{ .Values.mongo.user }}
+  MONGODB_URI: {{ .Values.mongo.uri }}
+  MONGODB_DB: {{ .Values.mongo.db }}
+  MONGODB_USER: {{ .Values.mongo.user }}

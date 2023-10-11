@@ -15,9 +15,9 @@ const getFixtures = makePoWebTestServer();
 testDisallowedMethods(['POST'], ENDPOINT_URL, makeServer);
 
 test('HTTP 415 should be returned if the request Content-Type is not text/plain', async () => {
-  const fastify = await makeServer();
+  const { server } = getFixtures();
 
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': 'application/json' },
     method: 'POST',
     payload: '{}',

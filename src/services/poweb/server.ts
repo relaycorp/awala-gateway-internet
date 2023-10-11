@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
-import { Logger } from 'pino';
+import type { BaseLogger } from 'pino';
 
-import { configureFastify } from '../fastify';
+import { configureFastify } from '../../utilities/fastify/server';
 import healthcheck from './healthcheck';
 import parcelCollection from './parcelCollection';
 import parcelDelivery from './parcelDelivery';
@@ -22,6 +22,6 @@ const ROUTES: ReadonlyArray<FastifyPluginCallback<RouteOptions>> = [
  *
  * This function doesn't call .listen() so we can use .inject() for testing purposes.
  */
-export async function makeServer(logger?: Logger): Promise<FastifyInstance> {
+export async function makeServer(logger?: BaseLogger): Promise<FastifyInstance> {
   return configureFastify(ROUTES, {}, logger);
 }

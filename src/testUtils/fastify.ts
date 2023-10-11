@@ -1,6 +1,43 @@
 import { FastifyInstance, HTTPMethods } from 'fastify';
+import { Connection } from 'mongoose';
 
-import { HTTP_METHODS } from '../services/fastify';
+import { HTTP_METHODS } from '../utilities/fastify/server';
+import { makeMockLogging, MockLogSet } from './logging';
+import { configureMockEnvVars, EnvVarMocker, EnvVarSet } from './envVars';
+import type { ServerMaker } from '../utilities/fastify/ServerMaker';
+import { setUpTestDBConnection } from './db';
+
+export interface TestServerFixture {
+  readonly server: FastifyInstance;
+  readonly dbConnection: Connection;
+  readonly logs: MockLogSet;
+  readonly envVarMocker: EnvVarMocker;
+}
+
+export function makeTestServer(
+  serverMaker: ServerMaker,
+  envVars: EnvVarSet,
+): () => TestServerFixture {
+  const envVarMocker = configureMockEnvVars(envVars);
+  const mockLogging = makeMockLogging();
+  const getConnection = setUpTestDBConnection();
+
+  let server: FastifyInstance;
+  beforeEach(async () => {
+    server = await serverMaker(mockLogging.logger);
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  return () => ({
+    server,
+    dbConnection: getConnection(),
+    logs: mockLogging.logs,
+    envVarMocker,
+  });
+}
 
 export function testDisallowedMethods(
   allowedMethods: readonly HTTPMethods[],

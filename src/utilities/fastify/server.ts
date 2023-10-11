@@ -6,12 +6,11 @@ import {
   FastifyPluginOptions,
   HTTPMethods,
 } from 'fastify';
-import { Logger } from 'pino';
+import type { BaseLogger } from 'pino';
 
-import { createMongooseConnectionFromEnv } from '../backingServices/mongo';
-import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
-import { configureExitHandling } from '../utilities/exitHandling';
-import { makeLogger } from '../utilities/logging';
+import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
+import { configureExitHandling } from '../exitHandling';
+import { makeLogger } from '../logging';
 import fastifyMongoose from './fastifyMongoose';
 
 const DEFAULT_REQUEST_ID_HEADER = 'X-Request-Id';
@@ -55,7 +54,7 @@ export function registerDisallowedMethods(
 export async function configureFastify<RouteOptions extends FastifyPluginOptions = {}>(
   routes: ReadonlyArray<FastifyPluginCallback<RouteOptions>>,
   routeOptions?: RouteOptions,
-  customLogger?: Logger,
+  customLogger?: BaseLogger,
 ): Promise<FastifyInstance> {
   const logger = customLogger ?? makeLogger();
   configureExitHandling(logger);
@@ -70,8 +69,7 @@ export async function configureFastify<RouteOptions extends FastifyPluginOptions
     trustProxy: true,
   });
 
-  const mongooseConnection = await createMongooseConnectionFromEnv();
-  await server.register(fastifyMongoose, { connection: mongooseConnection });
+  await server.register(fastifyMongoose);
 
   await Promise.all(routes.map((route) => server.register(route, routeOptions)));
 

@@ -10,7 +10,7 @@ import deliverCargo from './methods/deliverCargo';
 
 export interface ServiceOptions {
   readonly baseLogger: Logger;
-  readonly getMongooseConnection: () => Promise<Connection>;
+  readonly getMongooseConnection: () => Connection;
   readonly natsServerUrl: string;
   readonly natsClusterId: string;
 }
@@ -18,10 +18,7 @@ export interface ServiceOptions {
 export async function makeService(options: ServiceOptions): Promise<CargoRelayServerMethodSet> {
   const parcelStore = ParcelStore.initFromEnv();
 
-  const mongooseConnection = await options.getMongooseConnection();
-  mongooseConnection.on('error', (err) =>
-    options.baseLogger.error({ err }, 'Mongoose connection error'),
-  );
+  const mongooseConnection = options.getMongooseConnection();
 
   const privateKeyStore = initPrivateKeyStore(mongooseConnection);
 

@@ -11,7 +11,7 @@ import { Connection } from 'mongoose';
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { retrieveOwnCertificates } from '../../pki';
-import { registerDisallowedMethods } from '../fastify';
+import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';

@@ -3,7 +3,7 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { ParcelStore } from '../../parcelStore';
-import { registerDisallowedMethods } from '../fastify';
+import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
 
 export default async function registerRoutes(

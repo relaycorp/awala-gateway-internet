@@ -6,10 +6,9 @@ import {
   ParcelDelivery,
 } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { FastifyInstance } from 'fastify';
+import { type FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { IncomingHttpHeaders, IncomingMessage, Server as HTTPServer } from 'http';
 import { Connection } from 'mongoose';
-import { Logger } from 'pino';
 import { pipeline, writeToStream } from 'streaming-iterables';
 import uuid from 'uuid-random';
 import WebSocket, {
@@ -49,7 +48,7 @@ export default async function (
   makeWebSocketServer(
     fastifyTypeless.mongoose,
     fastifyTypeless.initialConfig.requestIdHeader,
-    fastify.log as Logger,
+    fastify.log,
     fastify.server,
   );
   done();
@@ -58,7 +57,7 @@ export default async function (
 export function makeWebSocketServer(
   mongooseConnection: Connection,
   requestIdHeader: string,
-  baseLogger: Logger,
+  baseLogger: FastifyBaseLogger,
   httpServer?: HTTPServer,
 ): WSServer {
   const serverOptions: Partial<WSServerOptions> = httpServer
@@ -84,7 +83,7 @@ function makeConnectionHandler(
   mongooseConnection: Connection,
   redisPubSubClient: RedisPubSubClient,
   requestIdHeader: string,
-  baseLogger: Logger,
+  baseLogger: FastifyBaseLogger,
 ): (ws: WebSocket, request: IncomingMessage) => void {
   const parcelStore = ParcelStore.initFromEnv();
 
@@ -144,7 +143,7 @@ function makeConnectionHandler(
   };
 }
 
-function makeAbortController(wsConnection: WebSocket, logger: Logger): AbortController {
+function makeAbortController(wsConnection: WebSocket, logger: FastifyBaseLogger): AbortController {
   const abortController = new AbortController();
   wsConnection.once('close', (closeCode, closeReason) => {
     logger.info({ closeCode, closeReason }, 'Closing connection');
@@ -160,7 +159,7 @@ function makeAbortController(wsConnection: WebSocket, logger: Logger): AbortCont
 async function doHandshake(
   wsConnection: WebSocket,
   mongooseConnection: Connection,
-  logger: Logger,
+  logger: FastifyBaseLogger,
 ): Promise<string | null> {
   const nonce = bufferToArray(uuid.bin() as Buffer);
 
@@ -216,7 +215,7 @@ async function doHandshake(
 async function* streamActiveParcels(
   parcelStore: ParcelStore,
   privatePeerId: string,
-  logger: Logger,
+  logger: FastifyBaseLogger,
   redisPubSubClient: RedisPubSubClient,
   requestHeaders: IncomingHttpHeaders,
   abortSignal: AbortSignal,
@@ -245,7 +244,7 @@ async function* streamActiveParcels(
 function makeDeliveryStream(
   wsConnection: WebSocket,
   tracker: CollectionTracker,
-  logger: Logger,
+  logger: FastifyBaseLogger,
 ): (parcelMessages: AsyncIterable<ParcelStreamMessage>) => AsyncIterable<Buffer> {
   return async function* (
     parcelMessages: AsyncIterable<ParcelStreamMessage>,
@@ -276,7 +275,7 @@ function makeDeliveryStream(
 function makeACKProcessor(
   wsConnection: WebSocket,
   tracker: CollectionTracker,
-  logger: Logger,
+  logger: FastifyBaseLogger,
 ): (ackMessages: AsyncIterable<string>) => Promise<void> {
   return async (ackMessages: AsyncIterable<string>) => {
     for await (const ackMessage of ackMessages) {

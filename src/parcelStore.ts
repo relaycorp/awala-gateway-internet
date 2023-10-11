@@ -2,8 +2,8 @@ import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel } from '@relaycorp/relaynet-core';
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
+import { FastifyBaseLogger } from 'fastify';
 import { Connection } from 'mongoose';
-import { Logger } from 'pino';
 import { concat, pipeline } from 'streaming-iterables';
 
 import { NatsStreamingClient } from './backingServices/natsStreaming';
@@ -74,7 +74,7 @@ export class ParcelStore {
     privatePeerId: string,
     redisPubSubClient: RedisPubSubClient,
     abortSignal: AbortSignal,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelStreamMessage> {
     const peerAwareLogger = logger.child({ privatePeerId });
 
@@ -125,7 +125,7 @@ export class ParcelStore {
    */
   public async *streamParcelsForPrivatePeer(
     privatePeerId: string,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelStreamMessage> {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
@@ -157,7 +157,7 @@ export class ParcelStore {
    */
   public async *retrieveParcelsForPrivatePeer(
     privatePeerId: string,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelObject> {
     yield* pipeline(
       () => listParcelObjectKeysFromPrivateKey(this.objectStoreClient, this.bucket, privatePeerId),
@@ -338,7 +338,7 @@ export class ParcelStore {
   }
 
   public makeActiveParcelRetriever(
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): (parcelObjectKeys: AsyncIterable<string>) => AsyncIterable<ParcelObject> {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;

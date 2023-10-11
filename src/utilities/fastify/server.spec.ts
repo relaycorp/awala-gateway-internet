@@ -1,13 +1,12 @@
 import { fastify, FastifyInstance, FastifyPluginCallback } from 'fastify';
 import pino from 'pino';
 
-import { MAX_RAMF_MESSAGE_SIZE } from '../constants';
-import { setUpTestDBConnection } from '../testUtils/db';
-import { configureMockEnvVars } from '../testUtils/envVars';
-import { getMockContext, getMockInstance, mockSpy } from '../testUtils/jest';
-import * as exitHandling from '../utilities/exitHandling';
-import * as logging from '../utilities/logging';
-import { configureFastify, runFastify } from './fastify';
+import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
+import { configureMockEnvVars } from '../../testUtils/envVars';
+import { getMockContext, getMockInstance, mockSpy } from '../../testUtils/jest';
+import * as exitHandling from '../exitHandling';
+import * as logging from '../logging';
+import { configureFastify, runFastify } from './server';
 import fastifyMongoose from './fastifyMongoose';
 
 const mockFastify: FastifyInstance = {
@@ -30,8 +29,6 @@ const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'));
 const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
 
 const dummyRoutes: FastifyPluginCallback = () => null;
-
-const getConnection = setUpTestDBConnection();
 
 describe('configureFastify', () => {
   test('Logger should be enabled by default', () => {
@@ -115,7 +112,7 @@ describe('configureFastify', () => {
   test('The fastify-mongoose plugin should be configured', async () => {
     await configureFastify([dummyRoutes]);
 
-    expect(mockFastify.register).toBeCalledWith(fastifyMongoose, { connection: getConnection() });
+    expect(mockFastify.register).toBeCalledWith(fastifyMongoose);
   });
 
   test('It should wait for the Fastify server to be ready', async () => {

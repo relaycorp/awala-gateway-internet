@@ -2,7 +2,7 @@ import { PrivateNodeRegistrationAuthorization } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { testDisallowedMethods } from '../../testUtils/fastify';
 
-import { setUpCommonFixtures } from './_test_utils';
+import { makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
 
@@ -10,7 +10,7 @@ jest.mock('../../utilities/exitHandling');
 
 const ENDPOINT_URL = '/v1/pre-registrations';
 
-const getFixtures = setUpCommonFixtures();
+const getFixtures = makePoWebTestServer();
 
 testDisallowedMethods(['POST'], ENDPOINT_URL, makeServer);
 
@@ -30,10 +30,10 @@ test('HTTP 415 should be returned if the request Content-Type is not text/plain'
 test.each([63, 65])(
   'HTTP 400 should be returned if the request body has %s octets',
   async (octetCount) => {
-    const fastify = await makeServer();
+    const { server } = getFixtures();
     const requestBody = Buffer.from('a'.repeat(octetCount));
 
-    const response = await fastify.inject({
+    const response = await server.inject({
       headers: { 'content-type': 'text/plain' },
       method: 'POST',
       payload: requestBody,
@@ -50,10 +50,10 @@ test.each([63, 65])(
 );
 
 test('A valid authorization should be issued if the request if valid', async () => {
-  const fastify = await makeServer();
+  const { server } = getFixtures();
   const privateGatewayPublicKeyDigest = Buffer.from('a'.repeat(64), 'hex');
 
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': 'text/plain' },
     method: 'POST',
     payload: privateGatewayPublicKeyDigest.toString('hex'),

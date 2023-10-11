@@ -1,6 +1,6 @@
-import { Logger } from 'pino';
+import type { BaseLogger } from 'pino';
 
-export function configureExitHandling(logger: Logger): void {
+export function configureExitHandling(logger: BaseLogger): void {
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'uncaughtException');
 

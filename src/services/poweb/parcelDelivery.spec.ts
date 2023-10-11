@@ -7,16 +7,17 @@ import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
 import { testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
-import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
-import { setUpCommonFixtures } from './_test_utils';
+import { partialPinoLog } from '../../testUtils/logging';
+import { makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
+import { Connection } from 'mongoose';
 
 jest.mock('../../utilities/exitHandling');
 
 const ENDPOINT_URL = '/v1/parcels';
 
-const getFixtures = setUpCommonFixtures();
+const getFixtures = makePoWebTestServer();
 
 const mockNatsStreamingConnection: NatsStreamingClient = {} as any;
 const mockNatsStreamingInit = mockSpy(
@@ -45,9 +46,9 @@ describe('Disallowed methods', () => {
 });
 
 test('Invalid request Content-Type should be refused with an HTTP 415 response', async () => {
-  const fastify = await makeServer();
+  const { server } = getFixtures();
 
-  const response = await postParcel(Buffer.from([]), fastify, undefined, 'text/plain');
+  const response = await postParcel(Buffer.from([]), server, undefined, 'text/plain');
 
   expect(response).toHaveProperty('statusCode', 415);
   expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
@@ -55,62 +56,60 @@ test('Invalid request Content-Type should be refused with an HTTP 415 response',
 
 describe('Authorization errors', () => {
   test('Requests without Authorization header should result in HTTP 401', async () => {
-    const fastify = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await postParcel(Buffer.from([]), fastify);
+    const response = await postParcel(Buffer.from([]), server);
 
     expectResponseToRequireAuthentication(response);
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Requests with the wrong Authorization type should result in HTTP 401', async () => {
-    const fastify = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await postParcel(Buffer.from([]), fastify, 'Bearer 123');
+    const response = await postParcel(Buffer.from([]), server, 'Bearer 123');
 
     expectResponseToRequireAuthentication(response);
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Requests with missing Authorization value should result in HTTP 401', async () => {
-    const fastify = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await postParcel(Buffer.from([]), fastify, 'Relaynet-Countersignature ');
+    const response = await postParcel(Buffer.from([]), server, 'Relaynet-Countersignature ');
 
     expectResponseToRequireAuthentication(response);
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Malformed base64-encoded countersignatures should result in HTTP 401', async () => {
-    const fastify = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await postParcel(Buffer.from([]), fastify, 'Relaynet-Countersignature .');
+    const response = await postParcel(Buffer.from([]), server, 'Relaynet-Countersignature .');
 
     expectResponseToRequireAuthentication(response);
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Invalid parcel delivery countersignatures should result in HTTP 401', async () => {
-    const logging = makeMockLogging();
-    const fastify = await makeServer(logging.logger);
-    const fixtures = getFixtures();
+    const { server, peerEndpointCert, privateGatewayPrivateKey, logs, parcelStore } = getFixtures();
     const signer = new ParcelDeliverySigner(
-      fixtures.peerEndpointCert, // Wrong certificate
-      fixtures.privateGatewayPrivateKey,
+      peerEndpointCert, // Wrong certificate
+      privateGatewayPrivateKey,
     );
     const countersignature = await signer.sign(PARCEL_SERIALIZED);
 
     const response = await postParcel(
       Buffer.from([]),
-      fastify,
+      server,
       makeAuthorizationHeaderValue(countersignature),
     );
 
     expectResponseToRequireAuthentication(response);
-    expect(logging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Invalid countersignature', { err: expect.anything() }),
     );
-    expect(fixtures.parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
+    expect(parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   function expectResponseToRequireAuthentication(response: LightMyRequestResponse): void {
@@ -124,7 +123,7 @@ describe('Authorization errors', () => {
 });
 
 test('Malformed parcels should be refused with an HTTP 400 response', async () => {
-  const fastify = await makeServer();
+  const { server } = getFixtures();
   const fixtures = getFixtures();
   const invalidParcelSerialization = Buffer.from('I am a "parcel". MUA HA HA HA!');
   const signer = new ParcelDeliverySigner(
@@ -135,7 +134,7 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 
   const response = await postParcel(
     invalidParcelSerialization,
-    fastify,
+    server,
     makeAuthorizationHeaderValue(countersignature),
   );
 
@@ -145,89 +144,81 @@ test('Malformed parcels should be refused with an HTTP 400 response', async () =
 });
 
 test('Well-formed yet invalid parcels should be refused with an HTTP 422 response', async () => {
-  const logging = makeMockLogging();
-  const fastify = await makeServer(logging.logger);
-  const fixtures = getFixtures();
-  const signer = new ParcelDeliverySigner(
-    fixtures.privateGatewayCert,
-    fixtures.privateGatewayPrivateKey,
-  );
+  const { server, privateGatewayCert, privateGatewayPrivateKey, parcelStore, logs } = getFixtures();
+  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
   const error = new InvalidMessageError('Whoops');
-  getMockInstance(fixtures.parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
+  getMockInstance(parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
 
   const response = await postParcel(
     PARCEL_SERIALIZED,
-    fastify,
+    server,
     makeAuthorizationHeaderValue(countersignature),
   );
 
   expect(response).toHaveProperty('statusCode', 422);
   expect(JSON.parse(response.payload)).toHaveProperty('message', 'Parcel is invalid');
-  expect(logging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Invalid parcel', {
       err: expect.objectContaining({ message: error.message }),
-      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
 
 test('Valid parcels should result in an HTTP 202 response', async () => {
-  const logging = makeMockLogging();
-  const fastify = await makeServer(logging.logger);
-  const fixtures = getFixtures();
-  const signer = new ParcelDeliverySigner(
-    fixtures.privateGatewayCert,
-    fixtures.privateGatewayPrivateKey,
-  );
+  const {
+    server,
+    privateGatewayCert,
+    privateGatewayPrivateKey,
+    parcelStore,
+    logs,
+    redisPubSubClient,
+  } = getFixtures();
+  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
 
   const response = await postParcel(
     PARCEL_SERIALIZED,
-    fastify,
+    server,
     makeAuthorizationHeaderValue(countersignature),
   );
 
   expect(response).toHaveProperty('statusCode', 202);
-  expect(fixtures.parcelStore.storeParcelFromPrivatePeer).toBeCalledWith(
+  expect(parcelStore.storeParcelFromPrivatePeer).toBeCalledWith(
     expect.objectContaining({ id: PARCEL.id }),
     Buffer.from(PARCEL_SERIALIZED),
-    await fixtures.privateGatewayCert.calculateSubjectId(),
-    fixtures.getMongooseConnection(),
+    await privateGatewayCert.calculateSubjectId(),
+    expect.any(Connection),
     mockNatsStreamingConnection,
-    fixtures.redisPubSubClient.publishers[0].publish,
-    expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
+    redisPubSubClient.publishers[0].publish,
+    expect.anything(),
   );
-  expect(logging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('debug', 'Parcel is well-formed', {
       parcelId: PARCEL.id,
-      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
-  expect(logging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Parcel was successfully stored', {
       parcelId: PARCEL.id,
       parcelObjectKey: expect.stringContaining(PARCEL.id),
-      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
 
 test('Failing to save a valid parcel should result in an HTTP 500 response', async () => {
-  const logging = makeMockLogging();
-  const fastify = await makeServer(logging.logger);
-  const fixtures = getFixtures();
-  const signer = new ParcelDeliverySigner(
-    fixtures.privateGatewayCert,
-    fixtures.privateGatewayPrivateKey,
-  );
+  const { server, logs, privateGatewayPrivateKey, privateGatewayCert, parcelStore } = getFixtures();
+  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
   const error = new Error('Whoops');
-  getMockInstance(fixtures.parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
+  getMockInstance(parcelStore.storeParcelFromPrivatePeer).mockRejectedValue(error);
 
   const response = await postParcel(
     PARCEL_SERIALIZED,
-    fastify,
+    server,
     makeAuthorizationHeaderValue(countersignature),
   );
 
@@ -236,24 +227,20 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
     'message',
     'Could not save parcel. Please try again later.',
   );
-  expect(logging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('error', 'Failed to save parcel', {
       err: expect.objectContaining({ message: error.message }),
-      privatePeerId: await fixtures.privateGatewayCert.calculateSubjectId(),
+      privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
 });
 
 test('NATS Streaming connection should use the right arguments', async () => {
-  const fastify = await makeServer();
-  const fixtures = getFixtures();
-  const signer = new ParcelDeliverySigner(
-    fixtures.privateGatewayCert,
-    fixtures.privateGatewayPrivateKey,
-  );
+  const { server, privateGatewayPrivateKey, privateGatewayCert } = getFixtures();
+  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
   const countersignature = await signer.sign(PARCEL_SERIALIZED);
 
-  await postParcel(PARCEL_SERIALIZED, fastify, makeAuthorizationHeaderValue(countersignature));
+  await postParcel(PARCEL_SERIALIZED, server, makeAuthorizationHeaderValue(countersignature));
 
   expect(mockNatsStreamingInit).toBeCalledWith(
     expect.stringMatching(/^poweb-parcel-delivery-req-\d+$/),
@@ -261,23 +248,23 @@ test('NATS Streaming connection should use the right arguments', async () => {
 });
 
 test('Redis connection should be closed when server ends', async () => {
-  const fastify = await makeServer();
+  const { server } = getFixtures();
   const { redisPubSubClient } = getFixtures();
   const publisher = redisPubSubClient.publishers[0];
   expect(publisher.close).not.toBeCalled();
 
-  await fastify.close();
+  await server.close();
 
   expect(publisher.close).toBeCalled();
 });
 
 async function postParcel(
   parcelSerialized: Buffer | ArrayBuffer,
-  fastify: FastifyInstance,
+  server: FastifyInstance,
   authorizationHeaderValue?: string,
   contentType = CONTENT_TYPES.PARCEL,
 ): Promise<LightMyRequestResponse> {
-  return fastify.inject({
+  return server.inject({
     headers: {
       'content-type': contentType,
       ...(authorizationHeaderValue && { authorization: authorizationHeaderValue }),

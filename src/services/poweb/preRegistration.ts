@@ -4,7 +4,7 @@ import { FastifyInstance, FastifyReply } from 'fastify';
 import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { Config, ConfigKey } from '../../utilities/config';
 
-import { registerDisallowedMethods } from '../fastify';
+import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/pre-registrations';

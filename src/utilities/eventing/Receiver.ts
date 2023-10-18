@@ -1,8 +1,8 @@
-import { makeReceiver, type Receiver as CeReceiver } from '@relaycorp/cloudevents-transport';
+import type { Receiver as CeReceiver } from '@relaycorp/cloudevents-transport';
+import { CloudEventV1, Headers } from 'cloudevents';
 import envVar from 'env-var';
 
 import { DEFAULT_TRANSPORT } from './transport';
-import { CloudEventV1, Headers } from 'cloudevents';
 
 export class Receiver {
   protected static cache: Receiver | undefined = undefined;
@@ -18,6 +18,7 @@ export class Receiver {
     if (Receiver.cache) {
       return Receiver.cache;
     }
+    const { makeReceiver } = await import('@relaycorp/cloudevents-transport');
 
     const transport = envVar.get('CE_TRANSPORT').default(DEFAULT_TRANSPORT).asString();
     const ceReceiver = await makeReceiver(transport);

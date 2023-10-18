@@ -14,10 +14,12 @@ export interface TestServerFixture {
   readonly envVarMocker: EnvVarMocker;
 }
 
+export type TestServerFixtureRetriever = () => TestServerFixture;
+
 export function makeTestServer(
   serverMaker: ServerMaker,
   envVars: EnvVarSet,
-): () => TestServerFixture {
+): TestServerFixtureRetriever {
   const envVarMocker = configureMockEnvVars(envVars);
   const mockLogging = makeMockLogging();
   const getConnection = setUpTestDBConnection();

@@ -2,6 +2,7 @@ import { InvalidMessageError, Parcel, ParcelDeliverySigner } from '@relaycorp/re
 import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
+import { Connection } from 'mongoose';
 
 import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
@@ -11,7 +12,6 @@ import { partialPinoLog } from '../../testUtils/logging';
 import { makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
-import { Connection } from 'mongoose';
 
 jest.mock('../../utilities/exitHandling');
 

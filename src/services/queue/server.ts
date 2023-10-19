@@ -20,7 +20,18 @@ async function makeQueueRoute(fastify: FastifyInstance): Promise<void> {
     next(null, payload);
   });
 
-  registerDisallowedMethods(['POST'], '/', fastify);
+  registerDisallowedMethods(['GET', 'HEAD', 'POST'], '/', fastify);
+
+  fastify.route({
+    method: ['HEAD', 'GET'],
+    url: '/',
+    async handler(_req, reply): Promise<void> {
+      reply
+        .code(200)
+        .header('Content-Type', 'text/plain')
+        .send('Success! The background queue works.');
+    },
+  });
 
   const eventReceiver = await Receiver.init();
   fastify.post('/', async (request, reply) => {

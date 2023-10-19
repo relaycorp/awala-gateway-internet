@@ -22,7 +22,30 @@ describe('makeQueueServer', () => {
   configureMockEnvVars(QUEUE_ENV_VARS);
 
   describe('Disallowed methods', () => {
-    testDisallowedMethods(['POST'], '/', makeQueueServer);
+    testDisallowedMethods(['GET', 'HEAD', 'POST'], '/', makeQueueServer);
+  });
+
+  describe('Health checks', () => {
+    test('A plain simple HEAD request should provide some diagnostic information', async () => {
+      const server = await makeQueueServer();
+
+      const response = await server.inject({ method: 'HEAD', url: '/' });
+      await server.close();
+
+      expect(response).toHaveProperty('statusCode', 200);
+      expect(response).toHaveProperty('headers.content-type', 'text/plain');
+    });
+
+    test('A plain simple GET request should provide some diagnostic information', async () => {
+      const server = await makeQueueServer();
+
+      const response = await server.inject({ method: 'GET', url: '/' });
+      await server.close();
+
+      expect(response).toHaveProperty('statusCode', 200);
+      expect(response).toHaveProperty('headers.content-type', 'text/plain');
+      expect(response.payload).toContain('Success');
+    });
   });
 
   test('Explicit logger should be honoured', async () => {

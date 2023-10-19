@@ -184,7 +184,7 @@ describe('Cargo collection', () => {
   });
 });
 
-test.only('Sending pings and receiving pongs', async () => {
+test('Sending pings and receiving pongs', async () => {
   const { pdaChain, internetGatewaySessionKey } = await createAndRegisterPrivateGateway();
 
   const pingId = uuid();

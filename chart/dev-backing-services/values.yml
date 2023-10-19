@@ -31,15 +31,13 @@ mongodb:
     enabled: false
 
 nats:
-  nameOverride: nats
   natsbox:
     enabled: false
-
 stan:
   nameOverride: stan
   stan:
     nats:
-      url: nats://nats:4222
+      url: nats://dev-backing-services-nats:4222
   store:
     type: memory
 

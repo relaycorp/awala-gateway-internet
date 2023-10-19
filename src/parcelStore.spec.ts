@@ -4,15 +4,9 @@ import { EnvVarError } from 'env-var';
 import { Connection } from 'mongoose';
 import { collect, consume, pipeline, take } from 'streaming-iterables';
 
-import * as natsStreaming from './backingServices/natsStreaming';
 import * as objectStorage from './backingServices/objectStorage';
 import * as parcelCollection from './parcelCollection';
-import {
-  ParcelObject,
-  ParcelStore,
-  ParcelStreamMessage,
-  QueuedInternetBoundParcelMessage,
-} from './parcelStore';
+import { ParcelObject, ParcelStore, ParcelStreamMessage } from './parcelStore';
 import * as pki from './pki';
 import { GATEWAY_INTERNET_ADDRESS, PEER_INTERNET_ADDRESS } from './testUtils/awala';
 import { sha256Hex } from './testUtils/crypto';
@@ -24,6 +18,8 @@ import { generatePdaChain, PdaChain } from './testUtils/pki';
 import { mockRedisPubSubClient } from './testUtils/redis';
 import { MockObjectStoreClient } from './testUtils/MockObjectStoreClient';
 import { RedisPublishFunction } from './backingServices/RedisPubSubClient';
+import { MockEmitter } from './testUtils/eventing/mockEmitters';
+import { EVENT_TYPES } from './services/queue/sinks/types';
 
 const BUCKET = 'the-bucket-name';
 
@@ -48,11 +44,6 @@ beforeAll(async () => {
   parcelSerialized = Buffer.from(await parcel.serialize(pdaChain.pdaGranteePrivateKey));
 });
 
-const MOCK_NATS_CLIENT: natsStreaming.NatsStreamingClient = {
-  makeQueueConsumer: mockSpy(jest.fn()),
-  publishMessage: mockSpy(jest.fn()),
-} as any;
-
 const MOCK_MONGOOSE_CONNECTION: Connection = mockSpy(jest.fn()) as any;
 
 const MOCK_OBJECT_STORE_CLIENT: ObjectStoreClient = {
@@ -68,6 +59,9 @@ beforeEach(() => {
 });
 
 const mockRedisPublish = mockSpy(jest.fn()) as unknown as RedisPublishFunction;
+
+const mockEmitter = new MockEmitter();
+afterEach(() => mockEmitter.reset());
 
 describe('liveStreamParcelsForPrivatePeer', () => {
   const objectStore = new MockObjectStoreClient();
@@ -401,7 +395,7 @@ describe('storeParcelFromPrivatePeer', () => {
     const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
     const spiedStoreParcelForPrivatePeer = jest
       .spyOn(store, 'storeParcelForPrivatePeer')
-      .mockImplementationOnce(async () => dummyObjectKey);
+      .mockResolvedValue(dummyObjectKey);
     const parcelForPrivateGateway = new Parcel(parcelRecipient, pdaChain.pdaCert, Buffer.from([]), {
       senderCaCertificateChain: [pdaChain.peerEndpointCert, pdaChain.privateGatewayCert],
     });
@@ -415,11 +409,11 @@ describe('storeParcelFromPrivatePeer', () => {
         parcelForPrivateGatewaySerialized,
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
+        mockEmitter,
         mockRedisPublish,
         mockLogging.logger,
       ),
-    ).resolves.toEqual(dummyObjectKey);
+    ).resolves.toBeTrue();
 
     expect(spiedStoreParcelForPrivatePeer).toBeCalledWith(
       parcelForPrivateGateway,
@@ -434,7 +428,7 @@ describe('storeParcelFromPrivatePeer', () => {
     const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
     const spiedStoreParcelForPrivatePeer = jest
       .spyOn(store, 'storeParcelForPrivatePeer')
-      .mockImplementationOnce(async () => dummyObjectKey);
+      .mockResolvedValue(dummyObjectKey);
     const parcelForPrivateGateway = new Parcel(
       { ...parcelRecipient, internetAddress: GATEWAY_INTERNET_ADDRESS },
       pdaChain.pdaCert,
@@ -451,11 +445,11 @@ describe('storeParcelFromPrivatePeer', () => {
         parcelForPrivateGatewaySerialized,
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
+        mockEmitter,
         mockRedisPublish,
         mockLogging.logger,
       ),
-    ).resolves.toEqual(dummyObjectKey);
+    ).resolves.toBeTrue();
 
     expect(spiedStoreParcelForPrivatePeer).toBeCalledWith(
       parcelForPrivateGateway,
@@ -470,7 +464,7 @@ describe('storeParcelFromPrivatePeer', () => {
     const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
     const spiedStoreParcelForInternetPeer = jest
       .spyOn(store, 'storeParcelForInternetPeer')
-      .mockImplementationOnce(async () => dummyObjectKey);
+      .mockResolvedValue(true);
 
     const parcelForPublicEndpoint = new Parcel(
       { ...parcelRecipient, internetAddress: PEER_INTERNET_ADDRESS },
@@ -488,19 +482,18 @@ describe('storeParcelFromPrivatePeer', () => {
         parcelForPublicEndpointSerialized,
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
+        mockEmitter,
         mockRedisPublish,
         mockLogging.logger,
       ),
-    ).resolves.toEqual(dummyObjectKey);
+    ).resolves.toBeTrue();
 
     expect(spiedStoreParcelForInternetPeer).toBeCalledWith(
       parcelForPublicEndpoint,
       parcelForPublicEndpointSerialized,
       privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
+      mockEmitter,
     );
   });
 });
@@ -527,18 +520,6 @@ describe('storeParcelForPrivatePeer', () => {
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
     expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
-  });
-
-  test('Debug log confirming validity of parcel should be recorded', async () => {
-    await store.storeParcelForPrivatePeer(
-      parcel,
-      parcelSerialized,
-      MOCK_MONGOOSE_CONNECTION,
-      mockRedisPublish,
-      mockLogging.logger,
-    );
-
-    expect(mockLogging.logs).toContainEqual(partialPinoLog('debug', 'Parcel is valid'));
   });
 
   test('Parcel object key should be output', async () => {
@@ -744,24 +725,10 @@ describe('storeParcelForInternetPeer', () => {
         Buffer.from(invalidParcelSerialized),
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
-        mockLogging.logger,
+        mockEmitter,
       ),
     ).rejects.toBeInstanceOf(InvalidMessageError);
-    expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
-  });
-
-  test('Debug log confirming validity of parcel should be recorded', async () => {
-    await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
-
-    expect(mockLogging.logs).toContainEqual(partialPinoLog('debug', 'Parcel is valid'));
+    expect(mockEmitter.events).toBeEmpty();
   });
 
   test('Parcel should be ignored if it was already processed', async () => {
@@ -773,19 +740,15 @@ describe('storeParcelForInternetPeer', () => {
         parcelSerialized,
         privateGatewayId,
         MOCK_MONGOOSE_CONNECTION,
-        MOCK_NATS_CLIENT,
-        mockLogging.logger,
+        mockEmitter,
       ),
-    ).resolves.toBeNull();
+    ).resolves.toBeFalse();
 
-    expect(MOCK_OBJECT_STORE_CLIENT.putObject).not.toBeCalled();
+    expect(mockEmitter.events).toBeEmpty();
     expect(mockWasParcelCollected).toBeCalledWith(
       parcel,
       privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
-    );
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Parcel was previously processed'),
     );
   });
 
@@ -795,8 +758,7 @@ describe('storeParcelForInternetPeer', () => {
       parcelSerialized,
       privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
+      mockEmitter,
     );
 
     expect(mockRecordParcelCollection).toBeCalledWith(
@@ -804,111 +766,111 @@ describe('storeParcelForInternetPeer', () => {
       privateGatewayId,
       MOCK_MONGOOSE_CONNECTION,
     );
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Parcel storage was successfully recorded'),
-    );
   });
 
-  test('Generated object key should be output', async () => {
-    const key = await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
-
-    const senderId = await parcel.senderCertificate.calculateSubjectId();
-    const expectedKey = [
-      privateGatewayId,
-      senderId,
-      parcel.recipient.id,
-      sha256Hex(parcel.id),
-    ].join('/');
-    expect(key).toMatch(expectedKey);
+  test('True should be output if parcel was stored', async () => {
+    await expect(
+      store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      ),
+    ).resolves.toBeTrue();
   });
 
-  test('Object should be put in the right bucket', async () => {
-    await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
+  describe('PDC outgoing parcel CloudEvent', () => {
+    test('Type attribute should be that of outgoing parcels', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
 
-    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
-      expect.anything(),
-      expect.anything(),
-      BUCKET,
-    );
-  });
+      const [event] = mockEmitter.events;
+      expect(event.type).toBe(EVENT_TYPES.PDC_OUTGOING_PARCEL);
+    });
 
-  test('Parcel should be stored with generated object key', async () => {
-    const key = await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
+    test('Source attribute should be private gateway id', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
 
-    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
-      expect.anything(),
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
-  });
+      const [event] = mockEmitter.events;
+      expect(event.source).toBe(privateGatewayId);
+    });
 
-  test('Parcel serialization should be stored', async () => {
-    const parcelObjectKey = await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
+    test('Subject attribute should be set to parcel id', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
 
-    expect(MOCK_OBJECT_STORE_CLIENT.putObject).toBeCalledWith(
-      expect.objectContaining({ body: parcelSerialized }),
-      expect.anything(),
-      expect.anything(),
-    );
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Parcel object was successfully stored', { parcelObjectKey }),
-    );
-  });
+      const [event] = mockEmitter.events;
+      expect(event.subject).toBe(parcel.id);
+    });
 
-  test('Parcel data should be published to right NATS Streaming channel', async () => {
-    const parcelObjectKey = await store.storeParcelForInternetPeer(
-      parcel,
-      parcelSerialized,
-      privateGatewayId,
-      MOCK_MONGOOSE_CONNECTION,
-      MOCK_NATS_CLIENT,
-      mockLogging.logger,
-    );
+    test('Expiry attribute should be set to that of parcel', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
 
-    const expectedMessageData: QueuedInternetBoundParcelMessage = {
-      deliveryAttempts: 0,
-      parcelExpiryDate: parcel.expiryDate,
-      parcelId: parcel.id,
-      parcelObjectKey: parcelObjectKey!!,
-      parcelRecipientAddress: PEER_INTERNET_ADDRESS,
-    };
-    expect(MOCK_NATS_CLIENT.publishMessage).toBeCalledWith(
-      JSON.stringify(expectedMessageData),
-      'internet-parcels',
-    );
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('debug', 'Parcel storage was successfully published on NATS', {
-        parcelObjectKey,
-      }),
-    );
+      const [event] = mockEmitter.events;
+      expect(event.expiry).toBe(parcel.expiryDate.toISOString());
+    });
+
+    test('Recipient Internet address attribute should be set to that of parcel', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
+
+      const [event] = mockEmitter.events;
+      expect(event.internetaddress).toBe(parcel.recipient.internetAddress);
+    });
+
+    test('Data content type attribute should be that of parcels', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
+
+      const [event] = mockEmitter.events;
+      expect(event.datacontenttype).toBe('application/vnd.awala.parcel');
+    });
+
+    test('Data attribute should be set to parcel serialisation', async () => {
+      await store.storeParcelForInternetPeer(
+        parcel,
+        parcelSerialized,
+        privateGatewayId,
+        MOCK_MONGOOSE_CONNECTION,
+        mockEmitter,
+      );
+
+      const [event] = mockEmitter.events;
+      expect(event.data).toMatchObject(parcelSerialized);
+    });
   });
 });
 

@@ -7,8 +7,7 @@ import { getMockInstance } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { makeMockQueueServer, makeQueueEventPoster, QUEUE_ENV_VARS } from '../_test_utils';
 import { HTTP_STATUS_CODES } from '../../../utilities/http';
-import { CE_SOURCE } from '../../../testUtils/eventing/stubs';
-import pdcOutgoing from './pdcOutgoing';
+import { EVENT_TYPES } from './types';
 
 jest.mock('../../../utilities/exitHandling');
 jest.mock('@relaycorp/relaynet-pohttp', () => {
@@ -30,13 +29,12 @@ describe('pdcOutgoing', () => {
   const recipientInternetAddress = 'endpoint.example.com';
   const parcelExpiry = addDays(new Date(), 1);
   const parcelSerialised = Buffer.from('Pretend this is a RAMF-serialized parcel');
-  const privatePeerId = 'the peer id';
+  const privatePeerId = 'the-private-gateway-id';
   const event = new CloudEvent({
-    type: pdcOutgoing.eventType,
+    type: EVENT_TYPES.PDC_OUTGOING_PARCEL,
+    source: privatePeerId,
     subject: parcelId,
-    source: CE_SOURCE,
     internetaddress: recipientInternetAddress,
-    privatepeerid: privatePeerId,
     expiry: parcelExpiry.toISOString(),
     datacontenttype: 'application/foo',
     data: parcelSerialised,
@@ -52,19 +50,6 @@ describe('pdcOutgoing', () => {
 
       expect(getContext().logs).toContainEqual(
         partialPinoLog('warn', 'Refused outgoing parcel with missing subject', { privatePeerId }),
-      );
-      expect(pohttp.deliverParcel).not.toBeCalled();
-    });
-
-    test('Private peer id should be present', async () => {
-      const invalidEvent = event.cloneWith({ privatepeerid: undefined }, false);
-
-      await expect(postQueueEvent(invalidEvent)).resolves.toBe(HTTP_STATUS_CODES.NO_CONTENT);
-
-      expect(getContext().logs).toContainEqual(
-        partialPinoLog('warn', 'Refused outgoing parcel with missing private peer id', {
-          parcelId,
-        }),
       );
       expect(pohttp.deliverParcel).not.toBeCalled();
     });

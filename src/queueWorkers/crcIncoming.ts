@@ -21,6 +21,8 @@ import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 import { RedisPublishFunction, RedisPubSubClient } from '../backingServices/RedisPubSubClient';
+import { Emitter } from '../utilities/eventing/Emitter';
+import { EmitterChannel } from '../utilities/eventing/EmitterChannel';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
@@ -28,7 +30,6 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
   logger.info('Starting queue worker');
 
   const natsStreamingClient = NatsStreamingClient.initFromEnv(workerName);
-
   const queueConsumer = natsStreamingClient.makeQueueConsumer(
     'crc-cargo',
     'worker',
@@ -36,19 +37,18 @@ export async function processIncomingCrcCargo(workerName: string): Promise<void>
     undefined,
     '-consumer',
   );
-  await pipeline(() => queueConsumer, makeCargoProcessor(natsStreamingClient, logger));
+  await pipeline(() => queueConsumer, makeCargoProcessor(logger));
 }
 
-function makeCargoProcessor(
-  natsStreamingClient: NatsStreamingClient,
-  logger: Logger,
-): (messages: AsyncIterable<Message>) => Promise<void> {
+function makeCargoProcessor(logger: Logger): (messages: AsyncIterable<Message>) => Promise<void> {
   return async (messages) => {
-    const mongooseConnection = await createMongooseConnectionFromEnv();
+    const mongooseConnection = createMongooseConnectionFromEnv();
     const gatewayManager = await InternetGatewayManager.init(mongooseConnection);
     const gateway = await gatewayManager.getCurrent();
 
     const parcelStore = ParcelStore.initFromEnv();
+
+    const emitter = await Emitter.init(EmitterChannel.PDC_OUTGOING);
 
     const redisClient = RedisPubSubClient.init();
     const redisPublisher = await redisClient.makePublisher();
@@ -61,7 +61,7 @@ function makeCargoProcessor(
           logger,
           parcelStore,
           mongooseConnection,
-          natsStreamingClient,
+          emitter,
           redisPublisher.publish,
         );
       }
@@ -78,7 +78,7 @@ async function processCargo(
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  natsStreamingClient: NatsStreamingClient,
+  emitter: Emitter<Buffer>,
   redisPublish: RedisPublishFunction,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
@@ -114,7 +114,7 @@ async function processCargo(
         privatePeerId,
         parcelStore,
         mongooseConnection,
-        natsStreamingClient,
+        emitter,
         redisPublish,
         cargoAwareLogger.child({ parcelId: item.id }),
       );
@@ -140,18 +140,18 @@ async function processParcel(
   privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  natsStreamingClient: NatsStreamingClient,
+  emitter: Emitter<Buffer>,
   redisPublish: RedisPublishFunction,
   parcelAwareLogger: Logger,
 ): Promise<void> {
-  let parcelObjectKey: string | null;
+  let wasParcelStored: boolean;
   try {
-    parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
+    wasParcelStored = await parcelStore.storeParcelFromPrivatePeer(
       parcel,
       parcelSerialized,
       privatePeerId,
       mongooseConnection,
-      natsStreamingClient,
+      emitter,
       redisPublish,
       parcelAwareLogger,
     );
@@ -165,10 +165,7 @@ async function processParcel(
   }
 
   parcelAwareLogger.debug(
-    {
-      parcelObjectKey,
-      parcelSenderAddress: await parcel.senderCertificate.calculateSubjectId(),
-    },
-    parcelObjectKey ? 'Parcel was stored' : 'Ignoring previously processed parcel',
+    { parcelSenderAddress: await parcel.senderCertificate.calculateSubjectId() },
+    wasParcelStored ? 'Parcel was stored' : 'Ignoring previously processed parcel',
   );
 }

@@ -35,6 +35,8 @@ import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';
 import { mockRedisPubSubClient } from '../testUtils/redis';
+import { mockEmitters } from '../testUtils/eventing/mockEmitters';
+import { EmitterChannel } from '../utilities/eventing/EmitterChannel';
 
 //region Stan-related fixtures
 
@@ -59,6 +61,10 @@ const mockNatsInitFromEnv = mockSpy(
   jest.spyOn(NatsStreamingClient, 'initFromEnv'),
   () => mockNatsClient,
 );
+
+// CloudEvents-related fixtures
+
+const retrieveEmitter = mockEmitters();
 
 // Redis-related fixtures
 
@@ -332,7 +338,7 @@ describe('Parcel processing', () => {
       Buffer.from(PARCEL_SERIALIZED),
       await certificateChain.privateGatewayCert.calculateSubjectId(),
       getMongoConnection(),
-      mockNatsClient,
+      retrieveEmitter(EmitterChannel.PDC_OUTGOING),
       mockRedisClient.publishers[0].publish,
       expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );
@@ -340,7 +346,6 @@ describe('Parcel processing', () => {
       partialPinoLog('debug', 'Parcel was stored', {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
-        parcelObjectKey: `parcels/${PARCEL.id}`,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectId(),
         privatePeerId: await certificateChain.privateGatewayCert.calculateSubjectId(),
         worker: STUB_WORKER_NAME,
@@ -349,7 +354,7 @@ describe('Parcel processing', () => {
   });
 
   test('Parcels previously received should be ignored', async () => {
-    mockStoreParcelFromPrivatePeer.mockResolvedValue(null);
+    mockStoreParcelFromPrivatePeer.mockResolvedValue(false);
 
     const cargo = await generateCargo(PARCEL_SERIALIZED);
     mockQueueMessages = [
@@ -362,7 +367,6 @@ describe('Parcel processing', () => {
       partialPinoLog('debug', 'Ignoring previously processed parcel', {
         cargoId: cargo.id,
         parcelId: PARCEL.id,
-        parcelObjectKey: null,
         parcelSenderAddress: await PARCEL.senderCertificate.calculateSubjectId(),
         privatePeerId: await certificateChain.privateGatewayCert.calculateSubjectId(),
         worker: STUB_WORKER_NAME,

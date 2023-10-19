@@ -9,6 +9,7 @@ import { parseISO } from 'date-fns';
 import { FastifyBaseLogger } from 'fastify';
 
 import { MessageSink } from '../types';
+import { EVENT_TYPES } from './types';
 
 async function attemptParcelDelivery(
   parcelSerialised: Buffer,
@@ -40,19 +41,14 @@ async function attemptParcelDelivery(
 }
 
 const pdcOutgoing: MessageSink = {
-  eventType: 'tech.relaycorp.awala.internet-gateway.pdc-outgoing-parcel',
+  eventType: EVENT_TYPES.PDC_OUTGOING_PARCEL,
   handler: async (event, { logger }) => {
     const parcelId = event.subject;
-    const privatePeerId = event.privatepeerid;
+    const privatePeerId = event.source;
     const parcelAwareLogger = logger.child({ parcelId, privatePeerId });
 
     if (!parcelId) {
       parcelAwareLogger.warn('Refused outgoing parcel with missing subject');
-      return true;
-    }
-
-    if (!privatePeerId) {
-      parcelAwareLogger.warn('Refused outgoing parcel with missing private peer id');
       return true;
     }
 

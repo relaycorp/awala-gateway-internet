@@ -4,7 +4,6 @@ import { FastifyInstance } from 'fastify';
 import { Response as LightMyRequestResponse } from 'light-my-request';
 import { Connection } from 'mongoose';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import * as certs from '../../pki';
 import { testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
@@ -12,18 +11,13 @@ import { partialPinoLog } from '../../testUtils/logging';
 import { makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
+import { EmitterChannel } from '../../utilities/eventing/EmitterChannel';
 
 jest.mock('../../utilities/exitHandling');
 
 const ENDPOINT_URL = '/v1/parcels';
 
 const getFixtures = makePoWebTestServer();
-
-const mockNatsStreamingConnection: NatsStreamingClient = {} as any;
-const mockNatsStreamingInit = mockSpy(
-  jest.spyOn(NatsStreamingClient, 'initFromEnv'),
-  () => mockNatsStreamingConnection,
-);
 
 mockSpy(jest.spyOn(certs, 'retrieveOwnCertificates'), async () => {
   return [getFixtures().internetGatewayCert];
@@ -190,20 +184,29 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     Buffer.from(PARCEL_SERIALIZED),
     await privateGatewayCert.calculateSubjectId(),
     expect.any(Connection),
-    mockNatsStreamingConnection,
+    getFixtures().retrieveEventEmitter(EmitterChannel.PDC_OUTGOING),
     redisPubSubClient.publishers[0].publish,
     expect.anything(),
   );
   expect(logs).toContainEqual(
-    partialPinoLog('debug', 'Parcel is well-formed', {
+    partialPinoLog('info', 'Parcel was successfully stored', {
       parcelId: PARCEL.id,
       privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
+});
+
+test('Previously-processed parcels should be logged as such', async () => {
+  const { server, privateGatewayCert, privateGatewayPrivateKey, parcelStore, logs } = getFixtures();
+  getMockInstance(parcelStore.storeParcelFromPrivatePeer).mockResolvedValue(false);
+  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
+  const countersignature = await signer.sign(PARCEL_SERIALIZED);
+
+  await postParcel(PARCEL_SERIALIZED, server, makeAuthorizationHeaderValue(countersignature));
+
   expect(logs).toContainEqual(
-    partialPinoLog('info', 'Parcel was successfully stored', {
+    partialPinoLog('info', 'Parcel was previously stored', {
       parcelId: PARCEL.id,
-      parcelObjectKey: expect.stringContaining(PARCEL.id),
       privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
   );
@@ -232,18 +235,6 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
       err: expect.objectContaining({ message: error.message }),
       privatePeerId: await privateGatewayCert.calculateSubjectId(),
     }),
-  );
-});
-
-test('NATS Streaming connection should use the right arguments', async () => {
-  const { server, privateGatewayPrivateKey, privateGatewayCert } = getFixtures();
-  const signer = new ParcelDeliverySigner(privateGatewayCert, privateGatewayPrivateKey);
-  const countersignature = await signer.sign(PARCEL_SERIALIZED);
-
-  await postParcel(PARCEL_SERIALIZED, server, makeAuthorizationHeaderValue(countersignature));
-
-  expect(mockNatsStreamingInit).toBeCalledWith(
-    expect.stringMatching(/^poweb-parcel-delivery-req-\d+$/),
   );
 });
 

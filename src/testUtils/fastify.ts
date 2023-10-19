@@ -21,8 +21,13 @@ export function makeTestServer(
   envVars: EnvVarSet,
 ): TestServerFixtureRetriever {
   const envVarMocker = configureMockEnvVars(envVars);
-  const mockLogging = makeMockLogging();
   const getConnection = setUpTestDBConnection();
+
+  const mockLogging = makeMockLogging();
+  beforeEach(() => {
+    // Clear the logs
+    mockLogging.logs.splice(0, mockLogging.logs.length);
+  });
 
   let server: FastifyInstance;
   beforeEach(async () => {

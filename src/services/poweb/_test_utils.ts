@@ -1,4 +1,4 @@
-import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { CertificationPath, MockPrivateKeyStore } from '@relaycorp/relaynet-core';
 import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 
 import * as keyStore from '../../backingServices/keystore';
@@ -12,14 +12,17 @@ import { mockRedisPubSubClient, MockRedisPubSubClient } from '../../testUtils/re
 import { makeTestServer, TestServerFixture } from '../../testUtils/fastify';
 import { makeServer } from './server';
 import { REQUIRED_ENV_VARS } from '../../testUtils/envVars';
+import { type EmitterRetriever, mockEmitters } from '../../testUtils/eventing/mockEmitters';
 
 export interface PoWebFixtureSet extends PdaChain, TestServerFixture {
   readonly parcelStore: ParcelStore;
   readonly privateKeyStore: MockPrivateKeyStore;
   readonly redisPubSubClient: MockRedisPubSubClient;
+  readonly retrieveEventEmitter: EmitterRetriever;
 }
 
 export function makePoWebTestServer(): () => PoWebFixtureSet {
+  const cloudEventsRetriever = mockEmitters();
   const redisPubSubClient = mockRedisPubSubClient();
 
   const mockParcelStore: ParcelStore = {
@@ -32,9 +35,7 @@ export function makePoWebTestServer(): () => PoWebFixtureSet {
     ),
     storeParcelFromPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
-      async (parcel: Parcel) => {
-        return `parcels/${parcel.id}`;
-      },
+      async () => true,
     ),
     streamParcelsForPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'streamParcelsForPrivatePeer'),
@@ -83,6 +84,7 @@ export function makePoWebTestServer(): () => PoWebFixtureSet {
     parcelStore: mockParcelStore,
     privateKeyStore: mockPrivateKeyStore,
     redisPubSubClient,
+    retrieveEventEmitter: cloudEventsRetriever,
     ...certificatePath,
   });
 }

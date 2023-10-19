@@ -8,13 +8,14 @@ import bufferToArray from 'buffer-to-arraybuffer';
 import { FastifyInstance, FastifyLoggerInstance, FastifyReply } from 'fastify';
 import { Connection } from 'mongoose';
 
-import { NatsStreamingClient } from '../../backingServices/natsStreaming';
 import { ParcelStore } from '../../parcelStore';
 import { retrieveOwnCertificates } from '../../pki';
 import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
+import { Emitter } from '../../utilities/eventing/Emitter';
+import { EmitterChannel } from '../../utilities/eventing/EmitterChannel';
 
 const ENDPOINT_URL = '/v1/parcels';
 
@@ -34,6 +35,8 @@ export default async function registerRoutes(
 
   const redisPublisher = await RedisPubSubClient.init().makePublisher();
   fastify.addHook('onClose', async () => redisPublisher.close());
+
+  const emitter = await Emitter.init(EmitterChannel.PDC_OUTGOING);
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -68,19 +71,14 @@ export default async function registerRoutes(
       const privatePeerId = await countersignerCertificate.calculateSubjectId();
       const parcelAwareLogger = request.log.child({ parcelId: parcel.id, privatePeerId });
 
-      parcelAwareLogger.debug('Parcel is well-formed');
-
-      const natsStreamingClient = NatsStreamingClient.initFromEnv(
-        `poweb-parcel-delivery-${request.id}`,
-      );
-      let parcelObjectKey: string | null;
+      let wasParcelSuccessfullyStored: boolean;
       try {
-        parcelObjectKey = await parcelStore.storeParcelFromPrivatePeer(
+        wasParcelSuccessfullyStored = await parcelStore.storeParcelFromPrivatePeer(
           parcel,
           request.body,
           privatePeerId,
           mongooseConnection,
-          natsStreamingClient,
+          emitter,
           redisPublisher.publish,
           parcelAwareLogger,
         );
@@ -94,7 +92,10 @@ export default async function registerRoutes(
         return reply.code(500).send({ message: 'Could not save parcel. Please try again later.' });
       }
 
-      parcelAwareLogger.info({ parcelObjectKey }, 'Parcel was successfully stored');
+      const logMessage = wasParcelSuccessfullyStored
+        ? 'Parcel was successfully stored'
+        : 'Parcel was previously stored';
+      parcelAwareLogger.info(logMessage);
       return reply.code(202).send();
     },
   });

@@ -4,7 +4,7 @@ import { FastifyInstance } from 'fastify';
 
 import { configureFastify, registerDisallowedMethods } from '../../utilities/fastify/server';
 import { HTTP_STATUS_CODES } from '../../utilities/http';
-import { Receiver } from '../../utilities/eventing/Receiver';
+import { QueueReceiver } from '../../utilities/backgroundQueue/QueueReceiver';
 import pdcOutgoing from './sinks/pdcOutgoing';
 import type { MessageSink, MessageSinkHandler } from './types';
 
@@ -33,7 +33,7 @@ async function makeQueueRoute(fastify: FastifyInstance): Promise<void> {
     },
   });
 
-  const eventReceiver = await Receiver.init();
+  const eventReceiver = await QueueReceiver.init();
   fastify.post('/', async (request, reply) => {
     let event: CloudEventV1<Buffer>;
     try {

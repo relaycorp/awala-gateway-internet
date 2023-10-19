@@ -14,8 +14,7 @@ import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
 import RouteOptions from './RouteOptions';
 import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
-import { Emitter } from '../../utilities/eventing/Emitter';
-import { EmitterChannel } from '../../utilities/eventing/EmitterChannel';
+import { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 
 const ENDPOINT_URL = '/v1/parcels';
 
@@ -36,7 +35,7 @@ export default async function registerRoutes(
   const redisPublisher = await RedisPubSubClient.init().makePublisher();
   fastify.addHook('onClose', async () => redisPublisher.close());
 
-  const emitter = await Emitter.init(EmitterChannel.PDC_OUTGOING);
+  const emitter = await QueueEmitter.init();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],

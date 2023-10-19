@@ -32,4 +32,4 @@ data:
   {{- end }}
   OBJECT_STORE_TLS_ENABLED: '{{ .Values.objectStore.tlsEnabled }}'
 
-  CE_CHANNEL_PDC_OUTGOING: {{ .Values.queueChannel }}
+  CE_CHANNEL: {{ .Values.queueChannel }}

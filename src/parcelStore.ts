@@ -14,7 +14,7 @@ import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';
 import { RedisPubSubClient, type RedisPublishFunction } from './backingServices/RedisPubSubClient';
-import { Emitter } from './utilities/eventing/Emitter';
+import { QueueEmitter } from './utilities/backgroundQueue/QueueEmitter';
 import { EVENT_TYPES } from './services/queue/sinks/types';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
@@ -156,7 +156,7 @@ export class ParcelStore {
     parcelSerialized: Buffer,
     privatePeerId: string,
     mongooseConnection: Connection,
-    eventEmitter: Emitter<Buffer>,
+    eventEmitter: QueueEmitter,
     redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
   ): Promise<boolean> {
@@ -275,7 +275,7 @@ export class ParcelStore {
     parcelSerialized: Buffer,
     privatePeerId: string,
     mongooseConnection: Connection,
-    eventEmitter: Emitter<Buffer>,
+    eventEmitter: QueueEmitter,
   ): Promise<boolean> {
     // Don't require the sender to be on a valid path from the current Internet gateway: Doing so
     // would only work if the recipient is also served by this gateway.

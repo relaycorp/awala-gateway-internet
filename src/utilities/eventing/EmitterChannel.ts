@@ -1,4 +1,0 @@
-export enum EmitterChannel {
-  PDC_OUTGOING = 'CE_CHANNEL_PDC_OUTGOING',
-  CRC_INCOMING = 'CE_CHANNEL_CRC_INCOMING',
-}

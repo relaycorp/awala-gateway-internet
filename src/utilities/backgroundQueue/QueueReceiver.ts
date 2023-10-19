@@ -4,26 +4,26 @@ import envVar from 'env-var';
 
 import { DEFAULT_TRANSPORT } from './transport';
 
-export class Receiver {
-  protected static cache: Receiver | undefined = undefined;
+export class QueueReceiver {
+  protected static cache: QueueReceiver | undefined = undefined;
 
   /**
    * For unit testing only.
    */
   public static clearCache(): void {
-    Receiver.cache = undefined;
+    QueueReceiver.cache = undefined;
   }
 
-  public static async init(): Promise<Receiver> {
-    if (Receiver.cache) {
-      return Receiver.cache;
+  public static async init(): Promise<QueueReceiver> {
+    if (QueueReceiver.cache) {
+      return QueueReceiver.cache;
     }
     const { makeReceiver } = await import('@relaycorp/cloudevents-transport');
 
     const transport = envVar.get('CE_TRANSPORT').default(DEFAULT_TRANSPORT).asString();
     const ceReceiver = await makeReceiver(transport);
-    Receiver.cache = new Receiver(ceReceiver);
-    return Receiver.cache;
+    QueueReceiver.cache = new QueueReceiver(ceReceiver);
+    return QueueReceiver.cache;
   }
 
   protected constructor(protected readonly ceReceiver: CeReceiver) {}

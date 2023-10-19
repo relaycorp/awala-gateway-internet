@@ -21,8 +21,7 @@ import { ParcelStore } from '../parcelStore';
 import { configureExitHandling } from '../utilities/exitHandling';
 import { makeLogger } from '../utilities/logging';
 import { RedisPublishFunction, RedisPubSubClient } from '../backingServices/RedisPubSubClient';
-import { Emitter } from '../utilities/eventing/Emitter';
-import { EmitterChannel } from '../utilities/eventing/EmitterChannel';
+import { QueueEmitter } from '../utilities/backgroundQueue/QueueEmitter';
 
 export async function processIncomingCrcCargo(workerName: string): Promise<void> {
   const logger = makeLogger().child({ worker: workerName });
@@ -48,7 +47,7 @@ function makeCargoProcessor(logger: Logger): (messages: AsyncIterable<Message>) 
 
     const parcelStore = ParcelStore.initFromEnv();
 
-    const emitter = await Emitter.init(EmitterChannel.PDC_OUTGOING);
+    const emitter = await QueueEmitter.init();
 
     const redisClient = RedisPubSubClient.init();
     const redisPublisher = await redisClient.makePublisher();
@@ -78,7 +77,7 @@ async function processCargo(
   logger: Logger,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  emitter: Emitter<Buffer>,
+  emitter: QueueEmitter,
   redisPublish: RedisPublishFunction,
 ): Promise<void> {
   const cargo = await Cargo.deserialize(bufferToArray(message.getRawData()));
@@ -140,7 +139,7 @@ async function processParcel(
   privatePeerId: string,
   parcelStore: ParcelStore,
   mongooseConnection: Connection,
-  emitter: Emitter<Buffer>,
+  emitter: QueueEmitter,
   redisPublish: RedisPublishFunction,
   parcelAwareLogger: Logger,
 ): Promise<void> {

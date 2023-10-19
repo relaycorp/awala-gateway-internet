@@ -12,17 +12,17 @@ import { mockRedisPubSubClient, MockRedisPubSubClient } from '../../testUtils/re
 import { makeTestServer, TestServerFixture } from '../../testUtils/fastify';
 import { makeServer } from './server';
 import { REQUIRED_ENV_VARS } from '../../testUtils/envVars';
-import { type EmitterRetriever, mockEmitters } from '../../testUtils/eventing/mockEmitters';
+import { type MockEmitter, mockEmitter } from '../../testUtils/eventing/mockEmitter';
 
 export interface PoWebFixtureSet extends PdaChain, TestServerFixture {
   readonly parcelStore: ParcelStore;
   readonly privateKeyStore: MockPrivateKeyStore;
   readonly redisPubSubClient: MockRedisPubSubClient;
-  readonly retrieveEventEmitter: EmitterRetriever;
+  readonly emitter: MockEmitter;
 }
 
 export function makePoWebTestServer(): () => PoWebFixtureSet {
-  const cloudEventsRetriever = mockEmitters();
+  const cloudEventsRetriever = mockEmitter();
   const redisPubSubClient = mockRedisPubSubClient();
 
   const mockParcelStore: ParcelStore = {
@@ -84,7 +84,7 @@ export function makePoWebTestServer(): () => PoWebFixtureSet {
     parcelStore: mockParcelStore,
     privateKeyStore: mockPrivateKeyStore,
     redisPubSubClient,
-    retrieveEventEmitter: cloudEventsRetriever,
+    emitter: cloudEventsRetriever,
     ...certificatePath,
   });
 }

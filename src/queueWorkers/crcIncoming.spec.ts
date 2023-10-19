@@ -35,8 +35,7 @@ import * as exitHandling from '../utilities/exitHandling';
 import * as logging from '../utilities/logging';
 import { processIncomingCrcCargo } from './crcIncoming';
 import { mockRedisPubSubClient } from '../testUtils/redis';
-import { mockEmitters } from '../testUtils/eventing/mockEmitters';
-import { EmitterChannel } from '../utilities/eventing/EmitterChannel';
+import { mockEmitter } from '../testUtils/eventing/mockEmitter';
 
 //region Stan-related fixtures
 
@@ -64,7 +63,7 @@ const mockNatsInitFromEnv = mockSpy(
 
 // CloudEvents-related fixtures
 
-const retrieveEmitter = mockEmitters();
+const emitter = mockEmitter();
 
 // Redis-related fixtures
 
@@ -338,7 +337,7 @@ describe('Parcel processing', () => {
       Buffer.from(PARCEL_SERIALIZED),
       await certificateChain.privateGatewayCert.calculateSubjectId(),
       getMongoConnection(),
-      retrieveEmitter(EmitterChannel.PDC_OUTGOING),
+      emitter,
       mockRedisClient.publishers[0].publish,
       expect.toSatisfy((x) => x.bindings().worker === STUB_WORKER_NAME),
     );

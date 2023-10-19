@@ -11,7 +11,6 @@ import { partialPinoLog } from '../../testUtils/logging';
 import { makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
-import { EmitterChannel } from '../../utilities/eventing/EmitterChannel';
 
 jest.mock('../../utilities/exitHandling');
 
@@ -184,7 +183,7 @@ test('Valid parcels should result in an HTTP 202 response', async () => {
     Buffer.from(PARCEL_SERIALIZED),
     await privateGatewayCert.calculateSubjectId(),
     expect.any(Connection),
-    getFixtures().retrieveEventEmitter(EmitterChannel.PDC_OUTGOING),
+    getFixtures().emitter,
     redisPubSubClient.publishers[0].publish,
     expect.anything(),
   );

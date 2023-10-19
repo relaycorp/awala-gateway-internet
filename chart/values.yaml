@@ -63,18 +63,13 @@ pohttp:
   resources: {}
   affinity: {}
 
-pdcQueue:
-  replicas: 1
-  resources: {}
-  affinity: {}
-
 cogrpc:
   serviceAnnotations: {}
   replicas: 1
   resources: {}
   affinity: {}
 
-crcQueue:
+queue:
   replicas: 1
   resources: {}
   affinity: {}

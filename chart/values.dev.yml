@@ -16,8 +16,8 @@ ingress:
 
 internetAddress: gateway.tld
 
-pdcQueue:
-  replicas: 2
+# Skip the broker; post directly to the CloudEvents endpoint in development
+queueChannel: http://public-gateway-queue
 
 mongo:
   uri: mongodb://mongodb

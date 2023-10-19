@@ -48,5 +48,3 @@ spec:
                     name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
                 - secretRef:
                     name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
-              resources:
-                {{- toYaml .Values.crcQueue.resources | nindent 16 }}

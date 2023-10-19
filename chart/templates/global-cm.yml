@@ -31,3 +31,5 @@ data:
   OBJECT_STORE_ACCESS_KEY_ID: {{ .Values.objectStore.accessKeyId }}
   {{- end }}
   OBJECT_STORE_TLS_ENABLED: '{{ .Values.objectStore.tlsEnabled }}'
+
+  CE_CHANNEL_PDC_OUTGOING: {{ .Values.queueChannel }}

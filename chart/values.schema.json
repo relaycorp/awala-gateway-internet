@@ -4,11 +4,11 @@
   "required": [
     "logging",
     "internetAddress",
-    "pdcQueue",
     "mongo",
     "nats",
     "redis",
-    "keystore"
+    "keystore",
+    "queueChannel"
   ],
   "properties": {
     "logging": {
@@ -88,15 +88,6 @@
     },
     "internetAddress": {
       "type": "string"
-    },
-    "pdcQueue": {
-      "type": "object",
-      "required": ["replicas"],
-      "properties": {
-        "replicas": {
-          "type": "number"
-        }
-      }
     },
     "mongo": {
       "type": "object",
@@ -223,6 +214,9 @@
           }
         }
       ]
+    },
+    "queueChannel": {
+      "type": "string"
     }
   }
 }

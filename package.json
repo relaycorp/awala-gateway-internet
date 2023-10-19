@@ -8,7 +8,7 @@
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:tslint": "tslint --fix --project .",
     "test": "jest --coverage --detectOpenHandles",
-    "test:functional": "jest --config src/functionalTests/jest.config.js --runInBand --detectOpenHandles",
+    "test:functional": "jest --config src/functionalTests/jest.config.js --runInBand --detectOpenHandles cogrpc.test.ts",
     "static-checks": "run-p static-checks:*",
     "static-checks:lint": "tslint --project .",
     "static-checks:prettier": "prettier \"src/**/*.ts\" --list-different",

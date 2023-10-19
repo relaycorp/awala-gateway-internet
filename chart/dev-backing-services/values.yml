@@ -31,6 +31,7 @@ mongodb:
     enabled: false
 
 nats:
+  nameOverride: nats
   natsbox:
     enabled: false
 stan:

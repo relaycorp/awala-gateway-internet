@@ -874,26 +874,6 @@ describe('storeParcelForInternetPeer', () => {
   });
 });
 
-describe('deleteParcelForInternetPeer', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
-
-  test('Object should be deleted from the right bucket', async () => {
-    await store.deleteParcelForInternetPeer('');
-
-    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(expect.anything(), BUCKET);
-  });
-
-  test('Full object key should be prefixed', async () => {
-    const key = 'thingy.parcel';
-    await store.deleteParcelForInternetPeer(key);
-
-    expect(MOCK_OBJECT_STORE_CLIENT.deleteObject).toBeCalledWith(
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
-  });
-});
-
 describe('initFromEnv', () => {
   const requiredEnvVars = {
     OBJECT_STORE_BUCKET: 'the-bucket',

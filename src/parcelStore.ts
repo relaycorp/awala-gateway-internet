@@ -301,13 +301,6 @@ export class ParcelStore {
     return true;
   }
 
-  public async deleteParcelForInternetPeer(parcelObjectKey: string): Promise<void> {
-    await this.objectStoreClient.deleteObject(
-      makeFullObjectKeyForInternetPeer(parcelObjectKey),
-      this.bucket,
-    );
-  }
-
   public makeActiveParcelRetriever(
     logger: FastifyBaseLogger,
   ): (parcelObjectKeys: AsyncIterable<string>) => AsyncIterable<ParcelObject> {

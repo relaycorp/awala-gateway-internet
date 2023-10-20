@@ -4,13 +4,14 @@ import { REQUIRED_ENV_VARS } from '../../testUtils/envVars';
 import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 import { makeTestServer, type TestServerFixtureRetriever } from '../../testUtils/fastify';
 import makeQueueServer from './server';
-
 import { postEvent } from '../../testUtils/eventing/cloudEvents';
+import { CE_CHANNEL } from '../../testUtils/eventing/stubs';
 
 export const QUEUE_ENV_VARS = {
   ...REQUIRED_ENV_VARS,
   OBJECT_STORE_BUCKET: 'the-bucket',
   PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+  CE_CHANNEL,
 };
 
 export function makeMockQueueServer(): TestServerFixtureRetriever {

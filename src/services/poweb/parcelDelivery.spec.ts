@@ -238,8 +238,7 @@ test('Failing to save a valid parcel should result in an HTTP 500 response', asy
 });
 
 test('Redis connection should be closed when server ends', async () => {
-  const { server } = getFixtures();
-  const { redisPubSubClient } = getFixtures();
+  const { server, redisPubSubClient } = getFixtures();
   const publisher = redisPubSubClient.publishers[0];
   expect(publisher.close).not.toBeCalled();
 

@@ -6,6 +6,7 @@ import { mockSpy } from '../../testUtils/jest';
 import { HTTP_STATUS_CODES } from '../../utilities/http';
 import { CE_SOURCE } from '../../testUtils/eventing/stubs';
 import { testDisallowedMethods } from '../../testUtils/fastify';
+import { mockRedisPubSubClient } from '../../testUtils/redis';
 
 const CE_TYPE = 'com.example.test.event.type';
 
@@ -15,11 +16,14 @@ jest.mock('./sinks/pdcOutgoing', () => ({
   default: { eventType: CE_TYPE, handler: mockHandler },
 }));
 jest.mock('../../utilities/exitHandling');
+jest.mock('../../node/InternetGatewayManager');
+jest.mock('../../parcelStore');
 import { makeMockQueueServer, makeQueueEventPoster, QUEUE_ENV_VARS } from './_test_utils';
 import makeQueueServer from './server';
 
 describe('makeQueueServer', () => {
   configureMockEnvVars(QUEUE_ENV_VARS);
+  const redisPubSubClient = mockRedisPubSubClient();
 
   describe('Disallowed methods', () => {
     testDisallowedMethods(['GET', 'HEAD', 'POST'], '/', makeQueueServer);
@@ -57,6 +61,16 @@ describe('makeQueueServer', () => {
     const logMessage = 'foo';
     server.log.info(logMessage);
     expect(logs).toContainEqual(partialPinoLog('info', logMessage));
+  });
+
+  test('Redis connection should be closed when server ends', async () => {
+    const server = await makeQueueServer();
+    const publisher = redisPubSubClient.publishers[0];
+    expect(publisher.close).not.toBeCalled();
+
+    await server.close();
+
+    expect(publisher.close).toBeCalled();
   });
 
   describe('Route', () => {

@@ -31,7 +31,7 @@ mongodb:
     enabled: false
 
 nats:
-  nameOverride: dev-backing-services-nats
+  nameOverride: nats
   natsbox:
     enabled: false
 stan:

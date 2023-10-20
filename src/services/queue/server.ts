@@ -5,10 +5,15 @@ import { FastifyInstance } from 'fastify';
 import { configureFastify, registerDisallowedMethods } from '../../utilities/fastify/server';
 import { HTTP_STATUS_CODES } from '../../utilities/http';
 import { QueueReceiver } from '../../utilities/backgroundQueue/QueueReceiver';
-import pdcOutgoing from './sinks/pdcOutgoing';
 import type { MessageSink, MessageSinkHandler } from './types';
+import pdcOutgoing from './sinks/pdcOutgoing';
+import crcIncoming from './sinks/crcIncoming';
+import { InternetGatewayManager } from '../../node/InternetGatewayManager';
+import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
+import { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
+import { ParcelStore } from '../../parcelStore';
 
-const SINKS: MessageSink[] = [pdcOutgoing];
+const SINKS: MessageSink[] = [pdcOutgoing, crcIncoming];
 const HANDLER_BY_TYPE: { [contentType: string]: MessageSinkHandler } = SINKS.reduce(
   (acc, sink) => ({ ...acc, [sink.eventType]: sink.handler }),
   {},
@@ -33,11 +38,18 @@ async function makeQueueRoute(fastify: FastifyInstance): Promise<void> {
     },
   });
 
-  const eventReceiver = await QueueReceiver.init();
+  const gatewayManager = await InternetGatewayManager.init(fastify.mongoose);
+  const parcelStore = ParcelStore.initFromEnv();
+  const queueReceiver = await QueueReceiver.init();
+  const queueEmitter = await QueueEmitter.init();
+
+  const redisPublisher = await RedisPubSubClient.init().makePublisher();
+  fastify.addHook('onClose', async () => redisPublisher.close());
+
   fastify.post('/', async (request, reply) => {
     let event: CloudEventV1<Buffer>;
     try {
-      event = eventReceiver.convertMessageToEvent(request.headers, request.body as Buffer);
+      event = queueReceiver.convertMessageToEvent(request.headers, request.body as Buffer);
     } catch (err) {
       request.log.info('Refused malformed CloudEvent');
       return reply.status(HTTP_STATUS_CODES.ACCEPTED).send();
@@ -49,7 +61,14 @@ async function makeQueueRoute(fastify: FastifyInstance): Promise<void> {
       return reply.status(HTTP_STATUS_CODES.ACCEPTED).send();
     }
 
-    const wasFulfilled = await handler(event, { logger: request.log });
+    const wasFulfilled = await handler(event, {
+      logger: request.log,
+      gatewayManager,
+      redisPublish: redisPublisher.publish,
+      dbConnection: fastify.mongoose,
+      parcelStore,
+      queueEmitter,
+    });
     const responseCode = wasFulfilled
       ? HTTP_STATUS_CODES.NO_CONTENT
       : HTTP_STATUS_CODES.SERVICE_UNAVAILABLE;

@@ -8,8 +8,11 @@ import { partialPinoLog } from '../../../testUtils/logging';
 import { makeMockQueueServer, makeQueueEventPoster, QUEUE_ENV_VARS } from '../_test_utils';
 import { HTTP_STATUS_CODES } from '../../../utilities/http';
 import { EVENT_TYPES } from './types';
+import { mockRedisPubSubClient } from '../../../testUtils/redis';
 
 jest.mock('../../../utilities/exitHandling');
+jest.mock('../../../node/InternetGatewayManager');
+jest.mock('../../../parcelStore');
 jest.mock('@relaycorp/relaynet-pohttp', () => {
   const actualPohttp = jest.requireActual('@relaycorp/relaynet-pohttp');
   return {
@@ -21,6 +24,7 @@ beforeEach(() => {
   getMockInstance(pohttp.deliverParcel).mockRestore();
 });
 
+mockRedisPubSubClient();
 const getContext = makeMockQueueServer();
 const postQueueEvent = makeQueueEventPoster(getContext);
 

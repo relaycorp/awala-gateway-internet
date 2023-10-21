@@ -1,27 +1,26 @@
 import { testDisallowedMethods } from '../../testUtils/fastify';
-import { setUpCommonFixtures } from './_test_utils';
-import { makeServer } from './server';
+import { makePoWebTestServer } from './_test_utils';
 
 jest.mock('../../utilities/exitHandling');
 
 describe('healthcheck', () => {
-  setUpCommonFixtures();
+  const getFixtures = makePoWebTestServer();
 
-  testDisallowedMethods(['HEAD', 'GET'], '/', makeServer);
+  testDisallowedMethods(['HEAD', 'GET'], '/', async () => getFixtures().server);
 
   test('A plain simple HEAD request should provide some diagnostic information', async () => {
-    const serverInstance = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await serverInstance.inject({ method: 'HEAD', url: '/' });
+    const response = await server.inject({ method: 'HEAD', url: '/' });
 
     expect(response).toHaveProperty('statusCode', 200);
     expect(response).toHaveProperty('headers.content-type', 'text/plain');
   });
 
   test('A plain simple GET request should provide some diagnostic information', async () => {
-    const serverInstance = await makeServer();
+    const { server } = getFixtures();
 
-    const response = await serverInstance.inject({ method: 'GET', url: '/' });
+    const response = await server.inject({ method: 'GET', url: '/' });
 
     expect(response).toHaveProperty('statusCode', 200);
     expect(response).toHaveProperty('headers.content-type', 'text/plain');

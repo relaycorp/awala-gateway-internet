@@ -2,11 +2,11 @@ import { ObjectStoreClient, StoreObject } from '@relaycorp/object-storage';
 import { Parcel } from '@relaycorp/relaynet-core';
 import { source as makeSourceAbortable } from 'abortable-iterator';
 import { get as getEnvVar } from 'env-var';
+import { CloudEvent } from 'cloudevents';
+import { FastifyBaseLogger } from 'fastify';
 import { Connection } from 'mongoose';
-import { Logger } from 'pino';
 import { concat, pipeline } from 'streaming-iterables';
 
-import { NatsStreamingClient } from './backingServices/natsStreaming';
 import { initObjectStoreFromEnv } from './backingServices/objectStorage';
 import { recordParcelCollection, wasParcelCollected } from './parcelCollection';
 import { retrieveOwnCertificates } from './pki';
@@ -14,18 +14,11 @@ import { sha256Hex } from './utilities/crypto';
 import { convertDateToTimestamp } from './utilities/time';
 import { BasicLogger } from './utilities/types';
 import { RedisPubSubClient, type RedisPublishFunction } from './backingServices/RedisPubSubClient';
+import { QueueEmitter } from './utilities/backgroundQueue/QueueEmitter';
+import { EVENT_TYPES } from './services/queue/sinks/types';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 const EXPIRY_METADATA_KEY = 'parcel-expiry';
-
-export interface QueuedInternetBoundParcelMessage {
-  readonly parcelId?: string; // Optional because it was introduced in July 2023
-  readonly parcelObjectKey: string;
-  readonly parcelRecipientAddress: string;
-  readonly parcelExpiryDate: Date;
-  readonly deliveryAttempts: number;
-}
 
 export interface ParcelObject {
   readonly key: string;
@@ -37,14 +30,6 @@ export interface ParcelStreamMessage {
   readonly ack: () => Promise<void>;
   readonly parcelObjectKey: string;
   readonly parcelSerialized: Buffer;
-}
-
-function makeParcelObjectKeyForInternetPeer(
-  privatePeerId: string,
-  senderId: string,
-  parcel: Parcel,
-): string {
-  return [privatePeerId, senderId, parcel.recipient.id, sha256Hex(parcel.id)].join('/');
 }
 
 export class ParcelStore {
@@ -74,7 +59,7 @@ export class ParcelStore {
     privatePeerId: string,
     redisPubSubClient: RedisPubSubClient,
     abortSignal: AbortSignal,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelStreamMessage> {
     const peerAwareLogger = logger.child({ privatePeerId });
 
@@ -125,7 +110,7 @@ export class ParcelStore {
    */
   public async *streamParcelsForPrivatePeer(
     privatePeerId: string,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelStreamMessage> {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
@@ -157,7 +142,7 @@ export class ParcelStore {
    */
   public async *retrieveParcelsForPrivatePeer(
     privatePeerId: string,
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): AsyncIterable<ParcelObject> {
     yield* pipeline(
       () => listParcelObjectKeysFromPrivateKey(this.objectStoreClient, this.bucket, privatePeerId),
@@ -170,29 +155,29 @@ export class ParcelStore {
     parcelSerialized: Buffer,
     privatePeerId: string,
     mongooseConnection: Connection,
-    natsStreamingConnection: NatsStreamingClient,
+    eventEmitter: QueueEmitter,
     redisPublisher: RedisPublishFunction,
     logger: BasicLogger,
-  ): Promise<string | null> {
+  ): Promise<boolean> {
     const isForAnotherPrivatePeer =
       !parcel.recipient.internetAddress ||
       parcel.recipient.internetAddress === this.internetAddress;
     if (isForAnotherPrivatePeer) {
-      return this.storeParcelForPrivatePeer(
+      await this.storeParcelForPrivatePeer(
         parcel,
         parcelSerialized,
         mongooseConnection,
         redisPublisher,
         logger,
       );
+      return true;
     }
     return this.storeParcelForInternetPeer(
       parcel,
       parcelSerialized,
       privatePeerId,
       mongooseConnection,
-      natsStreamingConnection,
-      logger,
+      eventEmitter,
     );
   }
 
@@ -266,14 +251,6 @@ export class ParcelStore {
     await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
   }
 
-  public async retrieveParcelForInternetPeer(parcelObjectKey: string): Promise<Buffer | null> {
-    const storeObject = await this.objectStoreClient.getObject(
-      makeFullObjectKeyForInternetPeer(parcelObjectKey),
-      this.bucket,
-    );
-    return storeObject?.body ?? null;
-  }
-
   /**
    * Store a parcel bound for a public endpoint.
    *
@@ -281,8 +258,7 @@ export class ParcelStore {
    * @param parcelSerialized
    * @param privatePeerId
    * @param mongooseConnection
-   * @param natsStreamingClient
-   * @param logger
+   * @param eventEmitter
    * @throws InvalidMessageException
    */
   public async storeParcelForInternetPeer(
@@ -290,55 +266,34 @@ export class ParcelStore {
     parcelSerialized: Buffer,
     privatePeerId: string,
     mongooseConnection: Connection,
-    natsStreamingClient: NatsStreamingClient,
-    logger: BasicLogger,
-  ): Promise<string | null> {
+    eventEmitter: QueueEmitter,
+  ): Promise<boolean> {
     // Don't require the sender to be on a valid path from the current Internet gateway: Doing so
     // would only work if the recipient is also served by this gateway.
     await parcel.validate();
-    logger.debug('Parcel is valid');
 
     if (await wasParcelCollected(parcel, privatePeerId, mongooseConnection)) {
-      logger.debug('Parcel was previously processed');
-      return null;
+      return false;
     }
 
-    const senderId = await parcel.senderCertificate.calculateSubjectId();
-    const parcelObjectKey = makeParcelObjectKeyForInternetPeer(privatePeerId, senderId, parcel);
-    const keyAwareLogger = logger.child({ parcelObjectKey });
-
-    await this.objectStoreClient.putObject(
-      { body: parcelSerialized, metadata: {} },
-      makeFullObjectKeyForInternetPeer(parcelObjectKey),
-      this.bucket,
-    );
-    keyAwareLogger.debug('Parcel object was successfully stored');
-
-    const messageData: QueuedInternetBoundParcelMessage = {
-      deliveryAttempts: 0,
-      parcelExpiryDate: parcel.expiryDate,
-      parcelId: parcel.id,
-      parcelObjectKey,
-      parcelRecipientAddress: parcel.recipient.internetAddress!,
-    };
-    await natsStreamingClient.publishMessage(JSON.stringify(messageData), 'internet-parcels');
-    keyAwareLogger.debug('Parcel storage was successfully published on NATS');
+    const event = new CloudEvent({
+      type: EVENT_TYPES.PDC_OUTGOING_PARCEL,
+      source: privatePeerId,
+      subject: parcel.id,
+      internetaddress: parcel.recipient.internetAddress,
+      expiry: parcel.expiryDate.toISOString(),
+      datacontenttype: 'application/vnd.awala.parcel',
+      data: parcelSerialized,
+    });
+    await eventEmitter.emit(event);
 
     await recordParcelCollection(parcel, privatePeerId, mongooseConnection);
-    keyAwareLogger.debug('Parcel storage was successfully recorded');
 
-    return parcelObjectKey;
-  }
-
-  public async deleteParcelForInternetPeer(parcelObjectKey: string): Promise<void> {
-    await this.objectStoreClient.deleteObject(
-      makeFullObjectKeyForInternetPeer(parcelObjectKey),
-      this.bucket,
-    );
+    return true;
   }
 
   public makeActiveParcelRetriever(
-    logger: Logger,
+    logger: FastifyBaseLogger,
   ): (parcelObjectKeys: AsyncIterable<string>) => AsyncIterable<ParcelObject> {
     const objectStoreClient = this.objectStoreClient;
     const bucket = this.bucket;
@@ -401,10 +356,6 @@ function getDateFromTimestamp(timestampString: string): Date | null {
   const parcelExpiryTimestamp = parseInt(timestampString, 10);
   const parcelExpiryDate = new Date(parcelExpiryTimestamp * 1_000);
   return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
-}
-
-function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
-  return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
 function getInternetPeerChannelName(privatePeerId: string): string {

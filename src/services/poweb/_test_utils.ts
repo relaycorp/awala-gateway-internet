@@ -1,27 +1,28 @@
-import { CertificationPath, MockPrivateKeyStore, Parcel } from '@relaycorp/relaynet-core';
+import { CertificationPath, MockPrivateKeyStore } from '@relaycorp/relaynet-core';
 import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
-import { Connection } from 'mongoose';
 
-import * as vault from '../../backingServices/keystore';
+import * as keyStore from '../../backingServices/keystore';
 import { ParcelStore } from '../../parcelStore';
 import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
-import { setUpTestDBConnection } from '../../testUtils/db';
-import { configureMockEnvVars } from '../../testUtils/envVars';
 import { arrayToAsyncIterable } from '../../testUtils/iter';
 import { mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { mockRedisPubSubClient, MockRedisPubSubClient } from '../../testUtils/redis';
+import { makeTestServer, TestServerFixture } from '../../testUtils/fastify';
+import { makeServer } from './server';
+import { REQUIRED_ENV_VARS } from '../../testUtils/envVars';
+import { type MockQueueEmitter, mockQueueEmitter } from '../../testUtils/eventing/mockQueueEmitter';
 
-export interface FixtureSet extends PdaChain {
-  readonly getMongooseConnection: () => Connection;
+export interface PoWebFixtureSet extends PdaChain, TestServerFixture {
   readonly parcelStore: ParcelStore;
   readonly privateKeyStore: MockPrivateKeyStore;
   readonly redisPubSubClient: MockRedisPubSubClient;
+  readonly emitter: MockQueueEmitter;
 }
 
-export function setUpCommonFixtures(): () => FixtureSet {
-  const getMongooseConnection = setUpTestDBConnection();
+export function makePoWebTestServer(): () => PoWebFixtureSet {
+  const cloudEventsRetriever = mockQueueEmitter();
   const redisPubSubClient = mockRedisPubSubClient();
 
   const mockParcelStore: ParcelStore = {
@@ -34,9 +35,7 @@ export function setUpCommonFixtures(): () => FixtureSet {
     ),
     storeParcelFromPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'storeParcelFromPrivatePeer'),
-      async (parcel: Parcel) => {
-        return `parcels/${parcel.id}`;
-      },
+      async () => true,
     ),
     streamParcelsForPrivatePeer: mockSpy(
       jest.spyOn(ParcelStore.prototype, 'streamParcelsForPrivatePeer'),
@@ -60,34 +59,32 @@ export function setUpCommonFixtures(): () => FixtureSet {
       certificatePath.internetGatewayPrivateKey,
     );
   });
-  mockSpy(jest.spyOn(vault, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
+  mockSpy(jest.spyOn(keyStore, 'initPrivateKeyStore'), () => mockPrivateKeyStore);
+
+  const getFixtures = makeTestServer(makeServer, {
+    ...REQUIRED_ENV_VARS,
+    PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+  });
 
   beforeEach(async () => {
-    const connection = getMongooseConnection();
+    const { dbConnection } = getFixtures();
 
-    const certificateStore = new MongoCertificateStore(connection);
+    const certificateStore = new MongoCertificateStore(dbConnection);
     await certificateStore.save(
       new CertificationPath(certificatePath.internetGatewayCert, []),
       internetGatewayId,
     );
 
-    const config = new Config(connection);
+    const config = new Config(dbConnection);
     await config.set(ConfigKey.CURRENT_ID, internetGatewayId);
   });
 
-  const mockEnvVars = configureMockEnvVars();
-  beforeEach(() => {
-    mockEnvVars({
-      GATEWAY_VERSION: '1.0.2',
-      PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
-    });
-  });
-
   return () => ({
-    getMongooseConnection,
+    ...getFixtures(),
     parcelStore: mockParcelStore,
     privateKeyStore: mockPrivateKeyStore,
     redisPubSubClient,
+    emitter: cloudEventsRetriever,
     ...certificatePath,
   });
 }

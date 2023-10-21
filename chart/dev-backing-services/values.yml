@@ -30,19 +30,6 @@ mongodb:
   persistence:
     enabled: false
 
-nats:
-  nameOverride: nats
-  natsbox:
-    enabled: false
-
-stan:
-  nameOverride: stan
-  stan:
-    nats:
-      url: nats://nats:4222
-  store:
-    type: memory
-
 redis:
   fullnameOverride: redis
   auth:

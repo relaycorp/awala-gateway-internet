@@ -21,13 +21,8 @@ import { arrayBufferFrom, expectBuffersToEqual } from '../../testUtils/buffers';
 import { UUID4_REGEX } from '../../testUtils/crypto';
 import { appendErrorToAsyncIterable, arrayToAsyncIterable } from '../../testUtils/iter';
 import { getMockInstance, mockSpy, useFakeTimers } from '../../testUtils/jest';
-import {
-  makeMockLogging,
-  MockLogging,
-  partialPinoLog,
-  partialPinoLogger,
-} from '../../testUtils/logging';
-import { setUpCommonFixtures } from './_test_utils';
+import { MockLogSet, partialPinoLog, partialPinoLogger } from '../../testUtils/logging';
+import { makePoWebTestServer } from './_test_utils';
 import { makeWebSocketServer, PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS } from './parcelCollection';
 import { WebSocketCode } from './websockets';
 
@@ -35,17 +30,12 @@ jest.mock('../../utilities/exitHandling');
 
 const REQUEST_ID_HEADER = 'X-Request';
 
-const getFixtures = setUpCommonFixtures();
+const getFixtures = makePoWebTestServer();
 
 let mockWSServer: WSServer;
-let mockLogging: MockLogging;
 beforeEach(() => {
-  mockLogging = makeMockLogging();
-  mockWSServer = makeWebSocketServer(
-    getFixtures().getMongooseConnection(),
-    REQUEST_ID_HEADER,
-    mockLogging.logger,
-  );
+  const { dbConnection, server } = getFixtures();
+  mockWSServer = makeWebSocketServer(dbConnection, REQUEST_ID_HEADER, server.log);
 });
 
 let privatePeerId: string;
@@ -57,7 +47,7 @@ beforeAll(async () => {
 const MOCK_RETRIEVE_OWN_CERTIFICATES = mockSpy(
   jest.spyOn(certs, 'retrieveOwnCertificates'),
   async (connection) => {
-    expect(connection).toBe(getFixtures().getMongooseConnection());
+    expect(connection).toBe(getFixtures().dbConnection);
     const fixtures = getFixtures();
     return [fixtures.internetGatewayCert];
   },
@@ -69,6 +59,11 @@ beforeEach(() => {
   MOCK_PARCEL_STORE = fixtures.parcelStore;
 });
 
+let logs: MockLogSet;
+beforeEach(() => {
+  ({ logs } = getFixtures());
+});
+
 const parcelSerialization = Buffer.from('This is supposed to be a RAMF serialization');
 
 mockSpy(jest.spyOn(WS, 'createWebSocketStream'), createMockWebSocketStream);
@@ -76,9 +71,9 @@ mockSpy(jest.spyOn(WS, 'createWebSocketStream'), createMockWebSocketStream);
 describe('WebSocket server configuration', () => {
   test('Path should be /v1/parcel-collection', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().getMongooseConnection(),
+      getFixtures().dbConnection,
       REQUEST_ID_HEADER,
-      mockLogging.logger,
+      getFixtures().server.log,
     );
 
     expect(wsServer.options.path).toEqual('/v1/parcel-collection');
@@ -86,9 +81,9 @@ describe('WebSocket server configuration', () => {
 
   test('Maximum incoming payload size should honour PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().getMongooseConnection(),
+      getFixtures().dbConnection,
       REQUEST_ID_HEADER,
-      mockLogging.logger,
+      getFixtures().server.log,
     );
 
     expect(wsServer.options.maxPayload).toEqual(PARCEL_COLLECTION_MAX_PAYLOAD_OCTETS);
@@ -96,9 +91,9 @@ describe('WebSocket server configuration', () => {
 
   test('Clients should not be tracked', () => {
     const wsServer = makeWebSocketServer(
-      getFixtures().getMongooseConnection(),
+      getFixtures().dbConnection,
       REQUEST_ID_HEADER,
-      mockLogging.logger,
+      getFixtures().server.log,
     );
 
     expect(wsServer.options.clientTracking).toBeFalse();
@@ -118,7 +113,7 @@ describe('Request id', () => {
     await client.connect();
     await client.waitForPeerClosure();
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Starting parcel collection request', { reqId }),
     );
   });
@@ -129,7 +124,7 @@ describe('Request id', () => {
     await client.connect();
     await client.waitForPeerClosure();
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Starting parcel collection request', {
         reqId: UUID4_REGEX,
       }),
@@ -150,7 +145,7 @@ test('Requests with Origin header should be refused', async () => {
     code: WebSocketCode.VIOLATED_POLICY,
     reason: 'Web browser requests are disabled for security reasons',
   });
-  expect(mockLogging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('debug', 'Denying web browser request', { reqId: expect.anything() }),
   );
 });
@@ -168,7 +163,7 @@ describe('Handshake', () => {
       expectBuffersToEqual(bufferToArray(uuidBinSpy.mock.results[0].value), challenge.nonce);
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Sending handshake challenge', { reqId: UUID4_REGEX }),
     );
   });
@@ -185,7 +180,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Refusing malformed handshake response', {
         err: expect.objectContaining({ type: InvalidMessageError.name }),
         reqId: UUID4_REGEX,
@@ -205,9 +200,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
-      partialPinoLog('info', 'Refusing malformed handshake response'),
-    );
+    expect(logs).toContainEqual(partialPinoLog('info', 'Refusing malformed handshake response'));
   });
 
   test('Handshake should fail if response contains zero signatures', async () => {
@@ -226,7 +219,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid number of signatures', {
         nonceSignaturesCount: 0,
         reqId: UUID4_REGEX,
@@ -253,7 +246,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid number of signatures', {
         nonceSignaturesCount: 2,
         reqId: UUID4_REGEX,
@@ -278,7 +271,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid signature', {
         err: expect.objectContaining({ type: CMSError.name }),
         reqId: UUID4_REGEX,
@@ -298,7 +291,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Refusing handshake response with invalid signature', {
         err: expect.objectContaining({ type: CertificateError.name }),
         reqId: UUID4_REGEX,
@@ -315,7 +308,7 @@ describe('Handshake', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Handshake completed successfully', {
         privatePeerId,
         reqId: UUID4_REGEX,
@@ -338,7 +331,7 @@ describe('Keep alive', () => {
       privatePeerId,
       expect.anything(),
     );
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'All parcels were acknowledged shortly after the last one was sent', {
         privatePeerId,
         reqId: UUID4_REGEX,
@@ -394,7 +387,7 @@ describe('Keep alive', () => {
   });
 
   test('Streaming failure should close connection and be logged as error', async () => {
-    const error = new Error('this has nothing to do with NATS');
+    const error = new Error('Oh noes');
     getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
       appendErrorToAsyncIterable(error, []),
     );
@@ -406,7 +399,7 @@ describe('Keep alive', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('error', 'Failed to live stream parcels', {
         err: expect.objectContaining({ message: error.message }),
         privatePeerId,
@@ -432,7 +425,7 @@ test('Server should send parcel to client', async () => {
     expectBuffersToEqual(parcelSerialization, Buffer.from(parcelDelivery.parcelSerialized));
   });
 
-  expect(mockLogging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Sending parcel', {
       reqId: UUID4_REGEX,
       privatePeerId,
@@ -478,7 +471,7 @@ describe('Acknowledgements', () => {
     });
 
     expect(parcelStreamMessage.ack).toBeCalled();
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Acknowledgement received', {
         parcelObjectKey: parcelStreamMessage.parcelObjectKey,
         privatePeerId,
@@ -521,7 +514,7 @@ describe('Acknowledgements', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
         privatePeerId,
         reqId: UUID4_REGEX,
@@ -546,7 +539,7 @@ describe('Acknowledgements', () => {
       });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Closing connection due to unknown acknowledgement', {
         privatePeerId,
         reqId: UUID4_REGEX,
@@ -587,7 +580,7 @@ describe('Acknowledgements', () => {
       await expect(client.waitForPeerClosure()).resolves.toEqual({ code: WebSocketCode.NORMAL });
     });
 
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('info', 'Closing connection after all parcels have been acknowledged', {
         privatePeerId,
         reqId: UUID4_REGEX,
@@ -606,7 +599,7 @@ test('Client-initiated WebSocket connection closure should be handled gracefully
   client.close(WebSocketCode.NORMAL, closeReason);
 
   expect(abortSpy).toBeCalled();
-  expect(mockLogging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Closing connection', {
       closeCode: WebSocketCode.NORMAL,
       closeReason,
@@ -626,7 +619,7 @@ test('Abrupt TCP connection closure should be handled gracefully', async () => {
     expect(abortSpy).toBeCalled();
   });
 
-  expect(mockLogging.logs).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Closing connection due to error', {
       err: expect.objectContaining({ message: error.message }),
       reqId: UUID4_REGEX,
@@ -663,7 +656,7 @@ describe('Pings', () => {
     await client.connect();
 
     jest.advanceTimersByTime(PING_INTERVAL_MS + 100);
-    expect(mockLogging.logs).toContainEqual(
+    expect(logs).toContainEqual(
       partialPinoLog('debug', 'Sending ping to client', {
         reqId: UUID4_REGEX,
       }),

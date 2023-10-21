@@ -2,20 +2,27 @@ import { ServerDuplexStream } from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck } from '@relaycorp/cogrpc';
 import { Cargo } from '@relaycorp/relaynet-core';
 import bufferToArray from 'buffer-to-arraybuffer';
+import { CloudEvent } from 'cloudevents';
 import { Connection } from 'mongoose';
 import { Logger } from 'pino';
 import { pipeline } from 'streaming-iterables';
-import uuid from 'uuid-random';
 
-import { NatsStreamingClient, PublisherMessage } from '../../../backingServices/natsStreaming';
 import { retrieveOwnCertificates } from '../../../pki';
 import { INTERNAL_SERVER_ERROR } from '../grpcUtils';
+import type { QueueEmitter } from '../../../utilities/backgroundQueue/QueueEmitter';
+import { EVENT_TYPES } from '../../queue/sinks/types';
+
+interface ValidatedCargoDelivery {
+  readonly privatePeerId: string;
+  readonly cargoId: string;
+  readonly cargoSerialised: Buffer;
+  readonly deliveryId: string;
+}
 
 export default async function deliverCargo(
   call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>,
   mongooseConnection: Connection,
-  natsServerUrl: string,
-  natsClusterId: string,
+  queueEmitter: QueueEmitter,
   baseLogger: Logger,
 ): Promise<void> {
   const logger = baseLogger.child({
@@ -24,14 +31,11 @@ export default async function deliverCargo(
   });
   const trustedCerts = await retrieveOwnCertificates(mongooseConnection);
 
-  const natsClient = new NatsStreamingClient(natsServerUrl, natsClusterId, `cogrpc-${uuid()}`);
-  const natsPublisher = natsClient.makePublisher('crc-cargo');
-
   let cargoesDelivered = 0;
 
   async function* validateDelivery(
     source: AsyncIterable<CargoDelivery>,
-  ): AsyncIterable<PublisherMessage> {
+  ): AsyncIterable<ValidatedCargoDelivery> {
     for await (const delivery of source) {
       let privatePeerId: string | null = null;
       let cargoId: string | null = null;
@@ -50,18 +54,27 @@ export default async function deliverCargo(
 
       logger.info({ cargoId, privatePeerId }, 'Processing valid cargo');
       cargoesDelivered += 1;
-      yield { id: delivery.id, data: delivery.cargo };
+      yield { privatePeerId, cargoId, cargoSerialised: delivery.cargo, deliveryId: delivery.id };
     }
   }
 
-  async function ackDelivery(source: AsyncIterable<string>): Promise<void> {
-    for await (const deliveryId of source) {
-      call.write({ id: deliveryId });
+  async function processDelivery(deliveries: AsyncIterable<ValidatedCargoDelivery>): Promise<void> {
+    for await (const delivery of deliveries) {
+      const cargoDeliveryEvent = new CloudEvent({
+        type: EVENT_TYPES.CRC_INCOMING_CARGO,
+        source: delivery.privatePeerId,
+        subject: delivery.cargoId,
+        datacontenttype: 'application/vnd.awala.cargo',
+        data: delivery.cargoSerialised,
+      });
+      await queueEmitter.emit(cargoDeliveryEvent);
+
+      call.write({ id: delivery.deliveryId });
     }
   }
 
   try {
-    await pipeline(() => call, validateDelivery, natsPublisher, ackDelivery);
+    await pipeline(() => call, validateDelivery, processDelivery);
   } catch (err) {
     logger.error({ err }, 'Failed to store cargo');
     call.emit('error', INTERNAL_SERVER_ERROR); // Also ends the call

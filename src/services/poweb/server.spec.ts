@@ -1,15 +1,15 @@
 import pino from 'pino';
 
 import { mockSpy } from '../../testUtils/jest';
-import * as fastifyUtils from '../fastify';
-import { setUpCommonFixtures } from './_test_utils';
+import * as fastifyUtils from '../../utilities/fastify/server';
+import { makePoWebTestServer } from './_test_utils';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');
 
-setUpCommonFixtures();
+makePoWebTestServer();
 
-const mockFastifyInstance = {};
+const mockFastifyInstance = { close: jest.fn() };
 const mockConfigureFastify = mockSpy(
   jest.spyOn(fastifyUtils, 'configureFastify'),
   () => mockFastifyInstance,

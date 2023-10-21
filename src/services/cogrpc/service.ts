@@ -7,33 +7,24 @@ import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { ParcelStore } from '../../parcelStore';
 import collectCargo from './methods/collectCargo';
 import deliverCargo from './methods/deliverCargo';
+import type { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 
 export interface ServiceOptions {
   readonly baseLogger: Logger;
-  readonly getMongooseConnection: () => Promise<Connection>;
-  readonly natsServerUrl: string;
-  readonly natsClusterId: string;
+  readonly getMongooseConnection: () => Connection;
+  readonly queueEmitter: QueueEmitter;
 }
 
 export async function makeService(options: ServiceOptions): Promise<CargoRelayServerMethodSet> {
   const parcelStore = ParcelStore.initFromEnv();
 
-  const mongooseConnection = await options.getMongooseConnection();
-  mongooseConnection.on('error', (err) =>
-    options.baseLogger.error({ err }, 'Mongoose connection error'),
-  );
+  const mongooseConnection = options.getMongooseConnection();
 
   const privateKeyStore = initPrivateKeyStore(mongooseConnection);
 
   return {
     async deliverCargo(call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>): Promise<void> {
-      await deliverCargo(
-        call,
-        mongooseConnection,
-        options.natsServerUrl,
-        options.natsClusterId,
-        options.baseLogger,
-      );
+      await deliverCargo(call, mongooseConnection, options.queueEmitter, options.baseLogger);
     },
     async collectCargo(call: ServerDuplexStream<CargoDeliveryAck, CargoDelivery>): Promise<void> {
       await collectCargo(

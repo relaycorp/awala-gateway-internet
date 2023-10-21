@@ -15,8 +15,8 @@ import { GATEWAY_INTERNET_ADDRESS } from '../../testUtils/awala';
 import { arrayBufferFrom } from '../../testUtils/buffers';
 import { sha256 } from '../../testUtils/crypto';
 import { testDisallowedMethods } from '../../testUtils/fastify';
-import { makeMockLogging, MockLogSet, partialPinoLog } from '../../testUtils/logging';
-import { FixtureSet, setUpCommonFixtures } from './_test_utils';
+import { MockLogSet, partialPinoLog } from '../../testUtils/logging';
+import { PoWebFixtureSet, makePoWebTestServer } from './_test_utils';
 import { CONTENT_TYPES } from './contentTypes';
 import { makeServer } from './server';
 
@@ -24,20 +24,18 @@ jest.mock('../../utilities/exitHandling');
 
 const ENDPOINT_URL = '/v1/nodes';
 
-const getFixtures = setUpCommonFixtures();
+const getFixtures = makePoWebTestServer();
 
-let fastify: FastifyInstance;
-let LOGS: MockLogSet;
-beforeEach(async () => {
-  const logging = makeMockLogging();
-  fastify = await makeServer(logging.logger);
-  LOGS = logging.logs;
+let server: FastifyInstance;
+let logs: MockLogSet;
+beforeEach(() => {
+  ({ server, logs } = getFixtures());
 });
 
 testDisallowedMethods(['POST'], ENDPOINT_URL, makeServer);
 
 test('HTTP 415 should be returned if the request Content-Type is not a PNRR', async () => {
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': 'application/json' },
     method: 'POST',
     payload: '{}',
@@ -48,7 +46,7 @@ test('HTTP 415 should be returned if the request Content-Type is not a PNRR', as
 });
 
 test('HTTP 400 should be returned if the PNRR is not valid', async () => {
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: 'Not really a PNRA',
@@ -60,7 +58,7 @@ test('HTTP 400 should be returned if the PNRR is not valid', async () => {
     'message',
     'Payload is not a valid Private Node Registration Request',
   );
-  expect(LOGS).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'Invalid PNRR received', {
       err: expect.objectContaining({ type: InvalidMessageError.name }),
     }),
@@ -75,7 +73,7 @@ test('HTTP 400 should be returned if the authorization in the PNRR is invalid', 
   );
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: Buffer.from(payload),
@@ -87,7 +85,7 @@ test('HTTP 400 should be returned if the authorization in the PNRR is invalid', 
     'message',
     'Registration request contains an invalid authorization',
   );
-  expect(LOGS).toContainEqual(
+  expect(logs).toContainEqual(
     partialPinoLog('info', 'PNRR contains invalid authorization', {
       err: expect.objectContaining({ type: InvalidMessageError.name }),
     }),
@@ -103,7 +101,7 @@ test('HTTP 403 should be returned if PNRA is used with unauthorized key', async 
   );
   const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
-  const response = await fastify.inject({
+  const response = await server.inject({
     headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
     method: 'POST',
     payload: Buffer.from(payload),
@@ -233,13 +231,13 @@ describe('Successful registration', () => {
     });
   });
 
-  async function completeRegistration(fixtures: FixtureSet): Promise<Response> {
+  async function completeRegistration(fixtures: PoWebFixtureSet): Promise<Response> {
     const privateGatewayPublicKey = await fixtures.privateGatewayCert.getPublicKey();
     const pnraSerialized = await generatePNRA(await derSerializePublicKey(privateGatewayPublicKey));
     const pnrr = new PrivateNodeRegistrationRequest(privateGatewayPublicKey, pnraSerialized);
     const payload = await pnrr.serialize(fixtures.privateGatewayPrivateKey);
 
-    return fastify.inject({
+    return server.inject({
       headers: { 'content-type': CONTENT_TYPES.GATEWAY_REGISTRATION.REQUEST },
       method: 'POST',
       payload: Buffer.from(payload),

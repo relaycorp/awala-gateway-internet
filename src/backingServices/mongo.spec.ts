@@ -1,72 +1,88 @@
-import { EnvVarError } from 'env-var';
-import mongoose, { Connection } from 'mongoose';
+import envVar from 'env-var';
+import type { ConnectOptions } from 'mongoose';
 
-import { configureMockEnvVars } from '../testUtils/envVars';
 import { mockSpy } from '../testUtils/jest';
+
+const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any;
+const MOCK_MONGOOSE_CREATE_CONNECTION = jest.fn().mockReturnValue(MOCK_MONGOOSE_CONNECTION);
+jest.mock('mongoose', () => ({
+  createConnection: MOCK_MONGOOSE_CREATE_CONNECTION,
+}));
 import { createMongooseConnectionFromEnv } from './mongo';
+import { configureMockEnvVars } from '../testUtils/envVars';
 
-const MOCK_MONGOOSE_CONNECTION = { model: { bind: mockSpy(jest.fn()) } } as any as Connection;
-const MOCK_MONGOOSE_CREATE_CONNECTION = mockSpy(
-  jest.spyOn(mongoose, 'createConnection'),
-  jest.fn().mockReturnValue({ asPromise: () => MOCK_MONGOOSE_CONNECTION }),
-);
+const MONGODB_DB = 'the-db';
+const MONGODB_USER = 'alicia';
+const MONGODB_PASSWORD = 'letmein';
 
-const MONGO_ENV_VARS = {
-  MONGO_DB: 'the_db',
-  MONGO_PASSWORD: 'letmein',
-  MONGO_URI: 'mongodb://example.com',
-  MONGO_USER: 'alicia',
-};
+const MONGODB_URI = 'mongodb://example.com';
+const MONGO_ENV_VARS = { MONGODB_URI };
 const mockEnvVars = configureMockEnvVars(MONGO_ENV_VARS);
 
 describe('createMongooseConnectionFromEnv', () => {
   test.each(Object.getOwnPropertyNames(MONGO_ENV_VARS))(
     'Environment variable %s should be present',
-    async (envVarName) => {
+    (envVarName) => {
       mockEnvVars({ ...MONGO_ENV_VARS, [envVarName]: undefined });
 
-      await expect(createMongooseConnectionFromEnv()).rejects.toBeInstanceOf(EnvVarError);
+      expect(createMongooseConnectionFromEnv).toThrow(envVar.EnvVarError);
     },
   );
 
-  test('Connection should use MONGO_URI', async () => {
-    await createMongooseConnectionFromEnv();
+  test('Connection should use MONGODB_URI', () => {
+    createMongooseConnectionFromEnv();
 
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
-      MONGO_ENV_VARS.MONGO_URI,
+    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toHaveBeenCalledWith(
+      MONGO_ENV_VARS.MONGODB_URI,
       expect.anything(),
     );
   });
 
-  test('Connection should use MONGO_DB', async () => {
-    await createMongooseConnectionFromEnv();
+  test.each([
+    ['dbName', 'MONGODB_DB', MONGODB_DB],
+    ['user', 'MONGODB_USER', MONGODB_USER],
+    ['pass', 'MONGODB_PASSWORD', MONGODB_PASSWORD],
+  ])('%s should be taken from %s if specified', (optionName, envVarName, envVarValue) => {
+    mockEnvVars({ [envVarName]: envVarValue, ...MONGO_ENV_VARS });
 
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
+    createMongooseConnectionFromEnv();
+
+    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ dbName: MONGO_ENV_VARS.MONGO_DB }),
+      expect.objectContaining<ConnectOptions>({ [optionName]: envVarValue }),
     );
   });
 
-  test('Connection should use MONGO_USER', async () => {
-    await createMongooseConnectionFromEnv();
+  test.each([
+    ['dbName', 'MONGODB_DB'],
+    ['user', 'MONGODB_USER'],
+    ['pass', 'MONGODB_PASSWORD'],
+  ])('%s should be absent if %s is unspecified', (optionName, envVarName) => {
+    mockEnvVars({ ...MONGO_ENV_VARS, [envVarName]: undefined });
 
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
+    createMongooseConnectionFromEnv();
+
+    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ user: MONGO_ENV_VARS.MONGO_USER }),
+      expect.not.toContainKeys([optionName]),
     );
   });
 
-  test('Connection should use MONGO_PASSWORD', async () => {
-    await createMongooseConnectionFromEnv();
+  test.each([
+    ['serverSelectionTimeoutMS', 3000],
+    ['connectTimeoutMS', 3000],
+    ['maxIdleTimeMS', 60_000],
+  ])('Timeout setting %s should be set to %d', (optionName, expectedValue) => {
+    createMongooseConnectionFromEnv();
 
-    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toBeCalledWith(
+    expect(MOCK_MONGOOSE_CREATE_CONNECTION).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ pass: MONGO_ENV_VARS.MONGO_PASSWORD }),
+      expect.objectContaining({ [optionName]: expectedValue }),
     );
   });
 
-  test('Mongoose connection should be returned', async () => {
-    const connection = await createMongooseConnectionFromEnv();
+  test('Mongoose connection should be returned', () => {
+    const connection = createMongooseConnectionFromEnv();
 
     expect(connection).toBe(MOCK_MONGOOSE_CONNECTION);
   });

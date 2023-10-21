@@ -1,19 +1,17 @@
 import { Certificate, InvalidMessageError, Parcel } from '@relaycorp/relaynet-core';
 import { FastifyInstance } from 'fastify';
 import { InjectOptions } from 'light-my-request';
+import { Connection } from 'mongoose';
 
 import { ParcelStore } from '../../parcelStore';
-import { setUpTestDBConnection } from '../../testUtils/db';
-import { configureMockEnvVars } from '../../testUtils/envVars';
 import { testDisallowedMethods } from '../../testUtils/fastify';
 import { getMockInstance, mockSpy } from '../../testUtils/jest';
 import { generatePdaChain, PdaChain } from '../../testUtils/pki';
 import { makeServer } from './server';
 import { mockRedisPubSubClient } from '../../testUtils/redis';
+import { makePoHttpTestServer } from './_test_utils';
 
 jest.mock('../../utilities/exitHandling');
-
-const getMongooseConnection = setUpTestDBConnection();
 
 const validRequestOptions: InjectOptions = {
   headers: {
@@ -32,6 +30,8 @@ interface StubParcelOptions {
   readonly senderCertificate: Certificate;
   readonly senderCertificateChain?: readonly Certificate[];
 }
+
+const getFixtures = makePoHttpTestServer();
 
 beforeAll(async () => {
   stubPdaChain = await generatePdaChain();
@@ -55,26 +55,24 @@ const mockParcelStore: ParcelStore = {
 jest.spyOn(ParcelStore, 'initFromEnv').mockReturnValue(mockParcelStore);
 
 describe('receiveParcel', () => {
-  configureMockEnvVars({ GATEWAY_VERSION: '1.0.2' });
-
   const redisPubSubClient = mockRedisPubSubClient();
 
-  let serverInstance: FastifyInstance;
+  let server: FastifyInstance;
   beforeEach(async () => {
-    serverInstance = await makeServer();
+    ({ server } = getFixtures());
   });
 
   testDisallowedMethods(['HEAD', 'GET', 'POST'], '/', makeServer);
 
   test('A plain simple HEAD request should provide some diagnostic information', async () => {
-    const response = await serverInstance.inject({ method: 'HEAD', url: '/' });
+    const response = await server.inject({ method: 'HEAD', url: '/' });
 
     expect(response).toHaveProperty('statusCode', 200);
     expect(response).toHaveProperty('headers.content-type', 'text/plain');
   });
 
   test('A plain simple GET request should provide some diagnostic information', async () => {
-    const response = await serverInstance.inject({ method: 'GET', url: '/' });
+    const response = await server.inject({ method: 'GET', url: '/' });
 
     expect(response).toHaveProperty('statusCode', 200);
     expect(response).toHaveProperty('headers.content-type', 'text/plain');
@@ -83,7 +81,7 @@ describe('receiveParcel', () => {
   });
 
   test('Content-Type other than application/vnd.awala.parcel should be refused', async () => {
-    const response = await serverInstance.inject({
+    const response = await server.inject({
       ...validRequestOptions,
       headers: {
         ...validRequestOptions.headers,
@@ -98,7 +96,7 @@ describe('receiveParcel', () => {
 
   test('Request body should be refused if it is not a valid RAMF-serialized parcel', async () => {
     const payload = Buffer.from('');
-    const response = await serverInstance.inject({
+    const response = await server.inject({
       ...validRequestOptions,
       headers: { ...validRequestOptions.headers, 'Content-Length': payload.byteLength.toString() },
       payload,
@@ -116,7 +114,7 @@ describe('receiveParcel', () => {
     getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockReset();
     getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockRejectedValueOnce(error);
 
-    const response = await serverInstance.inject(validRequestOptions);
+    const response = await server.inject(validRequestOptions);
 
     expect(response).toHaveProperty('statusCode', 403);
     expect(JSON.parse(response.payload)).toEqual({
@@ -129,7 +127,7 @@ describe('receiveParcel', () => {
   test('Failing to save parcel in object store should result in a 500 response', async () => {
     getMockInstance(mockParcelStore.storeParcelForPrivatePeer).mockRejectedValue(new Error('Oops'));
 
-    const response = await serverInstance.inject(validRequestOptions);
+    const response = await server.inject(validRequestOptions);
 
     expect(response).toHaveProperty('statusCode', 500);
     expect(JSON.parse(response.payload)).toEqual({
@@ -141,20 +139,20 @@ describe('receiveParcel', () => {
   });
 
   test('Parcel should be bound for private gateway if valid', async () => {
-    await serverInstance.inject(validRequestOptions);
+    await server.inject(validRequestOptions);
 
     expect(mockParcelStore.storeParcelForPrivatePeer).toBeCalledTimes(1);
     expect(mockParcelStore.storeParcelForPrivatePeer).toBeCalledWith(
       expect.objectContaining({ id: PARCEL.id }),
       validRequestOptions.payload,
-      getMongooseConnection(),
+      expect.any(Connection),
       redisPubSubClient.publishers[0].publish,
       expect.objectContaining({ debug: expect.toBeFunction(), info: expect.toBeFunction() }),
     );
   });
 
   test('HTTP 202 should be returned if the parcel was successfully stored', async () => {
-    const response = await serverInstance.inject(validRequestOptions);
+    const response = await server.inject(validRequestOptions);
 
     expect(response).toHaveProperty('statusCode', 202);
     expect(JSON.parse(response.payload)).toEqual({});
@@ -165,7 +163,7 @@ describe('receiveParcel', () => {
     const publisher = redisPubSubClient.publishers[0];
     expect(publisher.close).not.toBeCalled();
 
-    await serverInstance.close();
+    await server.close();
 
     expect(publisher.close).toBeCalled();
   });

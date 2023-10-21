@@ -11,7 +11,7 @@ export class InternetGatewayManager extends GatewayManager<undefined> {
   public static async init(mongoConnection: Connection): Promise<InternetGatewayManager> {
     const certificateStore = new MongoCertificateStore(mongoConnection);
     const publicKeyStore = new MongoPublicKeyStore(mongoConnection);
-    const privateKeyStore = await initPrivateKeyStore(mongoConnection);
+    const privateKeyStore = initPrivateKeyStore(mongoConnection);
     return new InternetGatewayManager(mongoConnection, {
       certificateStore,
       privateKeyStore,

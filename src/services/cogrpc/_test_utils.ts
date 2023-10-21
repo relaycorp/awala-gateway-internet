@@ -8,17 +8,18 @@ import { configureMockEnvVars } from '../../testUtils/envVars';
 import { mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, MockLogging } from '../../testUtils/logging';
 import { ServiceOptions } from './service';
+import { MockQueueEmitter, mockQueueEmitter } from '../../testUtils/eventing/mockQueueEmitter';
+
 import SpyInstance = jest.SpyInstance;
 
 export const STUB_OBJECT_STORE_BUCKET = 'parcels-bucket';
-const NATS_SERVER_URL = 'nats://example.com';
-const NATS_CLUSTER_ID = 'nats-cluster-id';
 
 interface Fixture {
   readonly getMongooseConnection: () => Connection;
   readonly getSvcImplOptions: () => ServiceOptions;
   readonly getMockLogs: () => readonly object[];
   readonly getPrivateKeystore: () => MockPrivateKeyStore;
+  readonly queueEmitter: MockQueueEmitter;
 }
 
 export function setUpTestEnvironment(): Fixture {
@@ -46,16 +47,18 @@ export function setUpTestEnvironment(): Fixture {
     privateKeyStore.clear();
   });
 
+  const queueEmitter = mockQueueEmitter();
+
   return {
     getMockLogs: () => mockLogging.logs,
     getMongooseConnection,
     getSvcImplOptions: () => ({
       baseLogger: mockLogging.logger,
       getMongooseConnection: mockGetMongooseConnection as any,
-      natsClusterId: NATS_CLUSTER_ID,
-      natsServerUrl: NATS_SERVER_URL,
       parcelStoreBucket: STUB_OBJECT_STORE_BUCKET,
+      queueEmitter,
     }),
     getPrivateKeystore: () => privateKeyStore,
+    queueEmitter,
   };
 }

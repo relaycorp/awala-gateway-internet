@@ -16,18 +16,14 @@ ingress:
 
 internetAddress: gateway.tld
 
-pdcQueue:
-  replicas: 2
+# Skip the broker; post directly to the CloudEvents endpoint in development
+queueChannel: http://public-gateway-queue
 
 mongo:
   uri: mongodb://mongodb
   db: gw
   user: root
   password: letmein
-
-nats:
-  serverUrl: nats://nats:4222
-  clusterId: stan
 
 redis:
   url: redis://redis-headless:6379

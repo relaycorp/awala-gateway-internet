@@ -125,7 +125,7 @@ export default async function collectCargo(
     }
   }
 
-  const cargoMessageStream = await generateCargoMessageStream(
+  const cargoMessageStream = generateCargoMessageStream(
     cca,
     privatePeerId,
     parcelStore,

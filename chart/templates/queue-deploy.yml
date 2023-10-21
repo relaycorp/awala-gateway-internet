@@ -1,14 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-pdcout
+  name: {{ include "relaynet-internet-gateway.fullname" . }}-queue
   labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pdcout") .) | nindent 4 }}
+    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "queue") .) | nindent 4 }}
 spec:
-  replicas: {{ .Values.pdcQueue.replicas }}
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.queue.replicas }}
+{{- end }}
   selector:
     matchLabels:
-      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 6 }}
+      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "queue") .) | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -18,28 +20,30 @@ spec:
         global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
         mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
         global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
+        keystore-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
+        keystore-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
       labels:
-        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pdcout") .) | nindent 8 }}
+        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "queue") .) | nindent 8 }}
     spec:
       serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true
       containers:
-        - name: pdcout
+        - name: queue
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "relaynet-internet-gateway.image" . }}
           imagePullPolicy: IfNotPresent
           args:
-            - build/main/bin/pdc-outgoing-queue-worker.js
+            - build/main/bin/queue-server.js
           env:
-            - name: WORKER_ID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
             - name: POHTTP_USE_TLS
               value: {{ ternary "false" "true" .Values.tags.gwDev | quote }}
+            {{- if .Values.proxyRequestIdHeader }}
+            - name: REQUEST_ID_HEADER
+              value: {{ .Values.proxyRequestIdHeader | quote }}
+            {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
@@ -47,13 +51,29 @@ spec:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
             - secretRef:
                 name: {{ include "relaynet-internet-gateway.fullname" . }}
+            - configMapRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+            - secretRef:
+                name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+          ports:
+            - name: queue
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: queue
+          readinessProbe:
+            httpGet:
+              path: /
+              port: queue
           resources:
-            {{- toYaml .Values.pdcQueue.resources | nindent 12 }}
+            {{- toYaml .Values.queue.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.pdcQueue.affinity }}
+      {{- with .Values.queue.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}

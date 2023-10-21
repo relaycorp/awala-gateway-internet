@@ -14,7 +14,7 @@ import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { issuePrivateGatewayCertificate } from '../../pki';
 import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';
-import { registerDisallowedMethods } from '../fastify';
+import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
 
 const ENDPOINT_URL = '/v1/nodes';

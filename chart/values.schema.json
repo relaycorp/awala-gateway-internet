@@ -4,11 +4,10 @@
   "required": [
     "logging",
     "internetAddress",
-    "pdcQueue",
     "mongo",
-    "nats",
     "redis",
-    "keystore"
+    "keystore",
+    "queueChannel"
   ],
   "properties": {
     "logging": {
@@ -89,15 +88,6 @@
     "internetAddress": {
       "type": "string"
     },
-    "pdcQueue": {
-      "type": "object",
-      "required": ["replicas"],
-      "properties": {
-        "replicas": {
-          "type": "number"
-        }
-      }
-    },
     "mongo": {
       "type": "object",
       "required": ["uri", "db", "user", "password"],
@@ -113,22 +103,6 @@
           "type": "string"
         },
         "password": {
-          "type": "string"
-        }
-      }
-    },
-    "nats": {
-      "type": "object",
-      "required": [
-        "serverUrl",
-        "clusterId"
-      ],
-      "properties": {
-        "serverUrl": {
-          "type": "string",
-          "format": "uri"
-        },
-        "clusterId": {
           "type": "string"
         }
       }
@@ -223,6 +197,9 @@
           }
         }
       ]
+    },
+    "queueChannel": {
+      "type": "string"
     }
   }
 }

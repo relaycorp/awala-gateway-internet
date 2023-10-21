@@ -1,5 +1,5 @@
 import { mockSpy } from '../../testUtils/jest';
-import * as fastifyUtils from '../fastify';
+import * as fastifyUtils from '../../utilities/fastify/server';
 import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');

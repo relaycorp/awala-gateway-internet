@@ -18,9 +18,6 @@ mongo:
   db: db
   user: the_user
   password: passw0rd
-nats:
-  serverUrl: nats://nats.example.com:4222
-  clusterId: example-stan
 redis:
   url: redis://redis.example.com:6379
 objectStore:
@@ -101,8 +98,6 @@ Each gateway component has the following options:
 | `mongo.db` | string | | MongoDB database name |
 | `mongo.user` | string | | MongoDB user name |
 | `mongo.password` | string | | MongoDB user password |
-| `nats.serverUrl` | string | | Connection URI for NATS Streaming |
-| `nats.clusterId` | string | | NATS Streaming cluster id |
 | `redis.url` | string | | Connection URI for Redis |
 | `objectStore.endpoint` | string | | Host name and port number for the object store server |
 | `objectStore.bucket` | string | | Bucket name |

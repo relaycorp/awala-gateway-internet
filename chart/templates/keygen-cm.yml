@@ -19,8 +19,8 @@ data:
   LOG_ENV_NAME: {{ .Values.logging.envName }}
   {{- end }}
 
-  MONGO_URI: {{ .Values.mongo.uri }}
-  MONGO_DB: {{ .Values.mongo.db }}
-  MONGO_USER: {{ .Values.mongo.user }}
+  MONGODB_URI: {{ .Values.mongo.uri }}
+  MONGODB_DB: {{ .Values.mongo.db }}
+  MONGODB_USER: {{ .Values.mongo.user }}
 
   {{- include "relaynet-internet-gateway.keystoreNonSecretEnvVars" . | nindent 2 }}

@@ -5,7 +5,7 @@ markdown: kramdown
 baseurl: /relaynet-internet-gateway
 remote_theme: pmarsceill/just-the-docs@v0.2.7-r
 
-footer_content: "Copyright &copy; 2020 Relaycorp, Inc."
+footer_content: "Copyright &copy; 2020-2023 Relaycorp, Inc."
 
 aux_links:
   "Relaynet-Internet Gateway on GitHub":

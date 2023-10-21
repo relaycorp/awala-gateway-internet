@@ -5,7 +5,6 @@
     "logging",
     "internetAddress",
     "mongo",
-    "nats",
     "redis",
     "keystore",
     "queueChannel"
@@ -104,22 +103,6 @@
           "type": "string"
         },
         "password": {
-          "type": "string"
-        }
-      }
-    },
-    "nats": {
-      "type": "object",
-      "required": [
-        "serverUrl",
-        "clusterId"
-      ],
-      "properties": {
-        "serverUrl": {
-          "type": "string",
-          "format": "uri"
-        },
-        "clusterId": {
           "type": "string"
         }
       }

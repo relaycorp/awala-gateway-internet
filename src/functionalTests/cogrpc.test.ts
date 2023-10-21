@@ -15,9 +15,8 @@ import { deliverParcel } from '@relaycorp/relaynet-pohttp';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addDays } from 'date-fns';
-import { Message, Stan, Subscription } from 'node-nats-streaming';
 import uuid from 'uuid-random';
-import { GeneratedParcel } from '../testUtils/awala';
+import { collect } from 'streaming-iterables';
 
 import { arrayToAsyncIterable } from '../testUtils/iter';
 import { getPromiseRejection } from '../testUtils/jest';
@@ -30,10 +29,9 @@ import {
   GW_POHTTP_HOST_URL,
   GW_POWEB_HOST_PORT,
 } from './utils/constants';
-import { connectToNatsStreaming } from './utils/nats';
 import { extractPong, makePingParcel } from './utils/ping';
 import { waitForNextParcel } from './utils/poweb';
-import { collect } from 'streaming-iterables';
+import { GeneratedParcel } from '../testUtils/awala';
 
 const TOMORROW = addDays(new Date(), 1);
 
@@ -63,10 +61,9 @@ describe('Cargo delivery', () => {
     );
 
     await expect(collect(ackDeliveryIds)).resolves.toEqual([deliveryId]);
-    await expect(getLastQueueMessage()).resolves.toEqual(cargoSerialized);
   });
 
-  test('Unauthorized cargo should be acknowledged but not processed', async () => {
+  test('Unauthorized cargo should be acknowledged', async () => {
     const unauthorizedSenderKeyPair = await generateRSAKeyPair();
     const unauthorizedCertificate = await issueGatewayCertificate({
       issuerPrivateKey: unauthorizedSenderKeyPair.privateKey,
@@ -88,8 +85,6 @@ describe('Cargo delivery', () => {
         arrayToAsyncIterable([{ localId: 'random-delivery-id', cargo: cargoSerialized }]),
       ),
     );
-
-    await expect(getLastQueueMessage()).resolves.not.toEqual(cargoSerialized);
   });
 });
 
@@ -110,7 +105,7 @@ describe('Cargo collection', () => {
     );
     const collectedCargoes = await collect(cogRPCClient.collectCargo(ccaSerialized));
 
-    await expect(collectedCargoes).toHaveLength(1);
+    expect(collectedCargoes).toHaveLength(1);
     const cargoMessages = await extractMessagesFromCargo(
       collectedCargoes[0],
       cdaChain.privateGatewayCert,
@@ -248,36 +243,4 @@ async function generateDummyParcel(pdaChain: ExternalPdaChain): Promise<Generate
   );
   const parcelSerialized = await parcel.serialize(pdaChain.pdaGranteePrivateKey);
   return { parcel, parcelSerialized };
-}
-
-async function getLastQueueMessage(): Promise<Buffer | undefined> {
-  const stanConnection = await connectToNatsStreaming();
-  const subscription = subscribeToCRCChannel(stanConnection);
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      subscription.close();
-      stanConnection.close();
-      reject(new Error('Could not get NATS Streaming message on time'));
-    }, 3_000);
-    subscription.on('error', (error) => {
-      clearTimeout(timeout);
-      // Close the connection directly. Not the subscription because it probably wasn't created.
-      stanConnection.close();
-      reject(error);
-    });
-    subscription.on('message', (message: Message) => {
-      clearTimeout(timeout);
-      subscription.close();
-      stanConnection.close();
-      resolve(message.getRawData());
-    });
-  });
-}
-
-function subscribeToCRCChannel(stanConnection: Stan): Subscription {
-  return stanConnection.subscribe(
-    'crc-cargo',
-    'functional-tests',
-    stanConnection.subscriptionOptions().setDeliverAllAvailable().setStartWithLastReceived(),
-  );
 }

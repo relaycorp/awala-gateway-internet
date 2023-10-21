@@ -17,9 +17,6 @@ data:
   LOG_ENV_NAME: {{ .Values.logging.envName }}
   {{- end }}
 
-  NATS_SERVER_URL: {{ .Values.nats.serverUrl }}
-  NATS_CLUSTER_ID: {{ .Values.nats.clusterId }}
-
   REDIS_URL: {{ .Values.redis.url }}
 
   OBJECT_STORE_BACKEND: {{ .Values.objectStore.backend }}

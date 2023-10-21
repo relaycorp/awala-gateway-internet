@@ -25,10 +25,6 @@ mongo:
   user: root
   password: letmein
 
-nats:
-  serverUrl: nats://dev-backing-services-nats:4222
-  clusterId: stan
-
 redis:
   url: redis://redis-headless:6379
 

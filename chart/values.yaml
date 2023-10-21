@@ -78,7 +78,6 @@ queue:
 
 mongo: {}
 
-nats: {}
 redis: {}
 
 objectStore:

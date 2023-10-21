@@ -8,22 +8,13 @@ import {
 import { deliverParcel, PoHTTPInvalidParcelError } from '@relaycorp/relaynet-pohttp';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { addDays } from 'date-fns';
-import { Stan } from 'node-nats-streaming';
 import { collect, pipeline } from 'streaming-iterables';
 
 import { expectBuffersToEqual } from '../testUtils/buffers';
 import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
 import { GW_POHTTP_HOST_URL, GW_POWEB_HOST_PORT } from './utils/constants';
-import { connectToNatsStreaming } from './utils/nats';
 
 describe('PoHTTP server', () => {
-  let stanConnection: Stan;
-  beforeEach(async () => (stanConnection = await connectToNatsStreaming()));
-  afterEach(async () => {
-    stanConnection.close();
-    await new Promise((resolve) => stanConnection.once('close', resolve));
-  });
-
   test('Valid parcel should be accepted', async () => {
     const { pdaChain } = await createAndRegisterPrivateGateway();
     const parcel = new Parcel(

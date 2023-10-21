@@ -387,7 +387,7 @@ describe('Keep alive', () => {
   });
 
   test('Streaming failure should close connection and be logged as error', async () => {
-    const error = new Error('this has nothing to do with NATS');
+    const error = new Error('Oh noes');
     getMockInstance(MOCK_PARCEL_STORE.liveStreamParcelsForPrivatePeer).mockReturnValue(
       appendErrorToAsyncIterable(error, []),
     );

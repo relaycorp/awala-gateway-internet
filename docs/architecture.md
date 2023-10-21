@@ -52,13 +52,11 @@ The components provided by this Internet gateway employ the following third-part
 
 ### S3-compatible, object store server
 
-This server is used to store parcels and cargoes under the following object key prefixes:
+This server is used to store parcels bound for private gateways. [Minio](https://min.io/) is used in development.
 
-- `parcels/endpoint-bound/` for public endpoint-bound parcels. Those parcels won't stay long there because they'll either be delivered quickly or we may give up after trying for up to 24 hours. Consequently, objects in here can be automatically deleted after 24 hours.
-- `parcels/gateway-bound/` for private gateway-bound parcels. It may take up to 6 months for a parcel to be collected according to the Relaynet specs, so objects here can be automatically deleted after that time.
-- `cargoes/pending-unwrapping/` for cargoes received via the CogRPC server.
+### CloudEvents broker
 
-[Minio](https://min.io/) is used in development.
+Any [CloudEvents](https://cloudevents.io) supported by [`@relaycorp/cloudevents-transport`](https://www.npmjs.com/package/@relaycorp/cloudevents-transport).
 
 ### Redis
 
@@ -66,9 +64,9 @@ This server is used to store parcels and cargoes under the following object key 
 
 - `pdc-parcel.${privateGatewayId}` where `${privateGatewayId}` is the id of the private gateway. Parcels received via Internet-based PDCs (e.g., PoHTTP) are published on these channels.
 
-### HashiCorp Vault
+### Key Management Service (KMS)
 
-[HashiCorp Vault](https://www.vaultproject.io/) is used to store the key pairs for identity and session keys.
+Any KMS supported by [`@relaycorp/webcrypto-kms` documentation](https://www.npmjs.com/package/@relaycorp/webcrypto-kms).
 
 ### MongoDB
 

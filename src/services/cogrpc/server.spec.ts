@@ -13,6 +13,8 @@ import * as exitHandling from '../../utilities/exitHandling';
 import * as logging from '../../utilities/logging';
 import { runServer } from './server';
 import * as cogrpcService from './service';
+import { mockQueueEmitter } from '../../testUtils/eventing/mockQueueEmitter';
+import envVar from 'env-var';
 
 const makeServiceImplementationSpy = mockSpy(jest.spyOn(cogrpcService, 'makeService'));
 const mockServer = {
@@ -37,14 +39,14 @@ const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSel
 const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
 
 const BASE_ENV_VARS = {
-  NATS_CLUSTER_ID: 'nats-cluster-id',
-  NATS_SERVER_URL: 'nats://example.com',
   SERVER_IP_ADDRESS: '127.0.0.1',
 };
 const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 const mockLogger = makeMockLogging().logger;
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogger);
+
+const queueEmitter = mockQueueEmitter();
 
 describe('runServer', () => {
   test('Exit handler should be configured as the very first step', async () => {
@@ -54,14 +56,11 @@ describe('runServer', () => {
     expect(mockExitHandler).toBeCalledWith(mockLogger);
   });
 
-  test.each(['NATS_SERVER_URL', 'NATS_CLUSTER_ID', 'SERVER_IP_ADDRESS'])(
-    'Environment variable %s should be present',
-    async (envVar) => {
-      mockEnvVars({ ...BASE_ENV_VARS, [envVar]: undefined });
+  test('Environment variable SERVER_IP_ADDRESS should be present', async () => {
+    mockEnvVars({ ...BASE_ENV_VARS, SERVER_IP_ADDRESS: undefined });
 
-      await expect(runServer).rejects.toMatchObject(new RegExp(envVar));
-    },
-  );
+    await expect(runServer).rejects.toThrowWithMessage(envVar.EnvVarError, /SERVER_IP_ADDRESS/);
+  });
 
   test('Server should accept the largest possible RAMF messages', async () => {
     const expectMaxLength = MAX_RAMF_MESSAGE_SIZE + 256;
@@ -123,8 +122,7 @@ describe('runServer', () => {
         error: expect.anything(),
       }),
       getMongooseConnection: createMongooseConnectionFromEnv,
-      natsClusterId: BASE_ENV_VARS.NATS_CLUSTER_ID,
-      natsServerUrl: BASE_ENV_VARS.NATS_SERVER_URL,
+      queueEmitter,
     });
     const serviceImplementation = makeServiceImplementationSpy.mock.results[0].value;
 

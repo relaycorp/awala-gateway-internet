@@ -18,7 +18,7 @@ import { generatePdaChain, PdaChain } from './testUtils/pki';
 import { mockRedisPubSubClient } from './testUtils/redis';
 import { MockObjectStoreClient } from './testUtils/MockObjectStoreClient';
 import { RedisPublishFunction } from './backingServices/RedisPubSubClient';
-import { MockEmitter } from './testUtils/eventing/mockEmitter';
+import { MockQueueEmitter } from './testUtils/eventing/mockQueueEmitter';
 import { EVENT_TYPES } from './services/queue/sinks/types';
 
 const BUCKET = 'the-bucket-name';
@@ -60,7 +60,7 @@ beforeEach(() => {
 
 const mockRedisPublish = mockSpy(jest.fn()) as unknown as RedisPublishFunction;
 
-const mockEmitter = new MockEmitter();
+const mockEmitter = new MockQueueEmitter();
 afterEach(() => mockEmitter.reset());
 
 describe('liveStreamParcelsForPrivatePeer', () => {

@@ -7,12 +7,12 @@ import { initPrivateKeyStore } from '../../backingServices/keystore';
 import { ParcelStore } from '../../parcelStore';
 import collectCargo from './methods/collectCargo';
 import deliverCargo from './methods/deliverCargo';
+import type { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 
 export interface ServiceOptions {
   readonly baseLogger: Logger;
   readonly getMongooseConnection: () => Connection;
-  readonly natsServerUrl: string;
-  readonly natsClusterId: string;
+  readonly queueEmitter: QueueEmitter;
 }
 
 export async function makeService(options: ServiceOptions): Promise<CargoRelayServerMethodSet> {
@@ -24,13 +24,7 @@ export async function makeService(options: ServiceOptions): Promise<CargoRelaySe
 
   return {
     async deliverCargo(call: ServerDuplexStream<CargoDelivery, CargoDeliveryAck>): Promise<void> {
-      await deliverCargo(
-        call,
-        mongooseConnection,
-        options.natsServerUrl,
-        options.natsClusterId,
-        options.baseLogger,
-      );
+      await deliverCargo(call, mongooseConnection, options.queueEmitter, options.baseLogger);
     },
     async collectCargo(call: ServerDuplexStream<CargoDeliveryAck, CargoDelivery>): Promise<void> {
       await collectCargo(

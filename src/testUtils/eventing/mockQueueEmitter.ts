@@ -5,7 +5,7 @@ import { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 // eslint-disable-next-line @typescript-eslint/require-await
 const NO_OP_FUNCTION = async (): Promise<void> => undefined;
 
-export class MockEmitter extends QueueEmitter {
+export class MockQueueEmitter extends QueueEmitter {
   public readonly events: CloudEvent<Buffer>[] = [];
 
   public constructor() {
@@ -22,10 +22,10 @@ export class MockEmitter extends QueueEmitter {
   }
 }
 
-export function mockEmitter(): MockEmitter {
+export function mockQueueEmitter(): MockQueueEmitter {
   const initMock = jest.spyOn(QueueEmitter, 'init');
 
-  const emitter = new MockEmitter();
+  const emitter = new MockQueueEmitter();
 
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/require-await

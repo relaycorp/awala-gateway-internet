@@ -4,12 +4,13 @@ import { get as getEnvVar } from 'env-var';
 import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
 import * as selfsigned from 'selfsigned';
+
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { configureExitHandling } from '../../utilities/exitHandling';
-
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
 import { makeLogger } from '../../utilities/logging';
 import { makeService } from './service';
+import { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 
 const NETLOC = '0.0.0.0:8080';
 
@@ -24,9 +25,6 @@ export async function runServer(logger?: Logger): Promise<void> {
   const baseLogger = logger ?? makeLogger();
   configureExitHandling(baseLogger);
 
-  const natsServerUrl = getEnvVar('NATS_SERVER_URL').required().asString();
-  const natsClusterId = getEnvVar('NATS_CLUSTER_ID').required().asString();
-
   const server = new Server({
     'grpc.max_concurrent_streams': MAX_CONCURRENT_CALLS,
     'grpc.max_connection_age_grace_ms': MAX_CONNECTION_AGE_GRACE_SECONDS * 1_000,
@@ -36,11 +34,11 @@ export async function runServer(logger?: Logger): Promise<void> {
     'grpc.max_receive_message_length': MAX_RECEIVED_MESSAGE_LENGTH,
   });
 
+  const queueEmitter = await QueueEmitter.init();
   const serviceImplementation = await makeService({
     baseLogger,
     getMongooseConnection: createMongooseConnectionFromEnv,
-    natsClusterId,
-    natsServerUrl,
+    queueEmitter,
   });
   server.addService(CargoRelayService, serviceImplementation as any);
 

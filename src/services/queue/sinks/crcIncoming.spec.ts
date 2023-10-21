@@ -28,7 +28,7 @@ import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
 import { Config, ConfigKey } from '../../../utilities/config';
 import { mockRedisPubSubClient } from '../../../testUtils/redis';
 import { makeMockQueueServer, makeQueueEventPoster } from '../_test_utils';
-import { mockEmitter } from '../../../testUtils/eventing/mockEmitter';
+import { mockQueueEmitter } from '../../../testUtils/eventing/mockQueueEmitter';
 import { HTTP_STATUS_CODES } from '../../../utilities/http';
 import { EVENT_TYPES } from './types';
 import { InternetGateway } from '../../../node/InternetGateway';
@@ -53,7 +53,7 @@ const mockStoreParcelFromPrivatePeer = mockSpy(
   },
 );
 
-const emitter = mockEmitter();
+const emitter = mockQueueEmitter();
 const mockRedisClient = mockRedisPubSubClient();
 
 const getContext = makeMockQueueServer();

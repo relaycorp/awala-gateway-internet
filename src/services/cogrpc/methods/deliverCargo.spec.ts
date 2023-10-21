@@ -2,16 +2,16 @@ import * as grpc from '@grpc/grpc-js';
 import { CargoDelivery, CargoDeliveryAck, CargoRelayServerMethodSet } from '@relaycorp/cogrpc';
 import { Cargo, InvalidMessageError, RAMFSyntaxError } from '@relaycorp/relaynet-core';
 
-import * as natsStreaming from '../../../backingServices/natsStreaming';
 import * as certs from '../../../pki';
 import { GATEWAY_INTERNET_ADDRESS } from '../../../testUtils/awala';
 import { catchErrorEvent } from '../../../testUtils/errors';
 import { MockGrpcBidiCall } from '../../../testUtils/grpc';
-import { getMockInstance, mockSpy } from '../../../testUtils/jest';
+import { mockSpy } from '../../../testUtils/jest';
 import { partialPinoLog } from '../../../testUtils/logging';
 import { generatePdaChain, PdaChain } from '../../../testUtils/pki';
 import { setUpTestEnvironment } from '../_test_utils';
 import { makeService } from '../service';
+import { EVENT_TYPES } from '../../queue/sinks/types';
 
 let pdaChain: PdaChain;
 let privateGatewayId: string;
@@ -20,7 +20,7 @@ beforeAll(async () => {
   privateGatewayId = await pdaChain.privateGatewayCert.calculateSubjectId();
 });
 
-const { getSvcImplOptions, getMockLogs } = setUpTestEnvironment();
+const { getSvcImplOptions, getMockLogs, queueEmitter } = setUpTestEnvironment();
 
 const DELIVERY_ID = 'the-id';
 
@@ -38,30 +38,6 @@ beforeAll(async () => {
   cargoSerialization = Buffer.from(await cargo.serialize(pdaChain.privateGatewayPrivateKey));
 });
 
-let NATS_CLIENT: natsStreaming.NatsStreamingClient;
-// tslint:disable-next-line:readonly-array
-let PUBLISHED_MESSAGES: Buffer[];
-beforeEach(() => {
-  PUBLISHED_MESSAGES = [];
-
-  async function* mockNatsPublisher(
-    messages: IterableIterator<natsStreaming.PublisherMessage>,
-  ): AsyncIterable<string> {
-    for await (const message of messages) {
-      PUBLISHED_MESSAGES.push(message.data as Buffer);
-      yield message.id;
-    }
-  }
-
-  NATS_CLIENT = {
-    makePublisher: jest.fn().mockReturnValue(mockNatsPublisher),
-  } as unknown as natsStreaming.NatsStreamingClient;
-});
-const mockNatsClientClass = mockSpy(
-  jest.spyOn(natsStreaming, 'NatsStreamingClient'),
-  () => NATS_CLIENT,
-);
-
 let SERVICE: CargoRelayServerMethodSet;
 beforeEach(async () => {
   SERVICE = await makeService(getSvcImplOptions());
@@ -76,39 +52,16 @@ const RETRIEVE_OWN_CERTIFICATES_SPY = mockSpy(jest.spyOn(certs, 'retrieveOwnCert
   pdaChain.internetGatewayCert,
 ]);
 
-test('NATS Streaming publisher should be initialized upfront', async () => {
-  expect(mockNatsClientClass).not.toBeCalled();
-
-  await SERVICE.deliverCargo(CALL.convertToGrpcStream());
-
-  expect(mockNatsClientClass).toBeCalledTimes(1);
-  expect(mockNatsClientClass).toBeCalledWith(
-    getSvcImplOptions().natsServerUrl,
-    getSvcImplOptions().natsClusterId,
-    expect.stringMatching(/^cogrpc-([a-f0-9]+-){4}[a-f0-9]+$/),
-  );
-  expect(NATS_CLIENT.makePublisher).toBeCalledTimes(1);
-  expect(NATS_CLIENT.makePublisher).toBeCalledWith('crc-cargo');
-});
-
 describe('Cargo processing', () => {
   test('Malformed message should be ACKd but discarded', async () => {
-    // The invalid message is followed by a valid one to check that processing continues
-    const invalidDeliveryId = 'invalid';
-    CALL.output.push(
-      { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
-      {
-        cargo: cargoSerialization,
-        id: DELIVERY_ID,
-      },
-    );
+    CALL.output.push({ cargo: Buffer.from('invalid cargo'), id: DELIVERY_ID });
+
     await SERVICE.deliverCargo(CALL.convertToGrpcStream());
 
-    expect(CALL.write).toBeCalledTimes(2);
-    expect(CALL.write).toBeCalledWith({ id: invalidDeliveryId });
+    expect(CALL.write).toBeCalledTimes(1);
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
-    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
+    expect(queueEmitter.events).toHaveLength(0);
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
@@ -121,29 +74,20 @@ describe('Cargo processing', () => {
   });
 
   test('Well-formed yet invalid message should be ACKd but discarded', async () => {
-    // The invalid message is followed by a valid one to check that processing continues
     const invalidCargo = new Cargo(
       cargo.recipient,
       pdaChain.peerEndpointCert,
       Buffer.from('payload'),
     );
     const invalidCargoSerialized = await invalidCargo.serialize(pdaChain.peerEndpointPrivateKey);
-    const invalidDeliveryId = 'invalid';
-    CALL.output.push(
-      { cargo: Buffer.from(invalidCargoSerialized), id: invalidDeliveryId },
-      {
-        cargo: cargoSerialization,
-        id: DELIVERY_ID,
-      },
-    );
+    CALL.output.push({ cargo: Buffer.from(invalidCargoSerialized), id: DELIVERY_ID });
 
     await SERVICE.deliverCargo(CALL.convertToGrpcStream());
 
-    expect(CALL.write).toBeCalledTimes(2);
-    expect(CALL.write).toBeCalledWith({ id: invalidDeliveryId });
+    expect(CALL.write).toBeCalledTimes(1);
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
 
-    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
+    expect(queueEmitter.events).toHaveLength(0);
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Ignoring malformed/invalid cargo', {
@@ -163,10 +107,16 @@ describe('Cargo processing', () => {
 
     await SERVICE.deliverCargo(CALL.convertToGrpcStream());
 
-    expect(PUBLISHED_MESSAGES).toEqual([cargoSerialization]);
-
     expect(CALL.write).toBeCalledTimes(1);
     expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
+
+    expect(queueEmitter.events).toHaveLength(1);
+    const [event] = queueEmitter.events;
+    expect(event.type).toEqual(EVENT_TYPES.CRC_INCOMING_CARGO);
+    expect(event.source).toEqual(privateGatewayId);
+    expect(event.subject).toEqual(cargo.id);
+    expect(event.datacontenttype).toBe('application/vnd.awala.cargo');
+    expect(event.data).toMatchObject(cargoSerialization);
 
     expect(getMockLogs()).toContainEqual(
       partialPinoLog('info', 'Processing valid cargo', {
@@ -176,6 +126,27 @@ describe('Cargo processing', () => {
         privatePeerId: privateGatewayId,
       }),
     );
+  });
+
+  test('Processing should continue after ignoring invalid/malformed cargo', async () => {
+    // The invalid message is followed by a valid one to check that processing continues
+    const invalidDeliveryId = 'invalid';
+    CALL.output.push(
+      { cargo: Buffer.from('invalid cargo'), id: invalidDeliveryId },
+      {
+        cargo: cargoSerialization,
+        id: DELIVERY_ID,
+      },
+    );
+    await SERVICE.deliverCargo(CALL.convertToGrpcStream());
+
+    expect(CALL.write).toBeCalledTimes(2);
+    expect(CALL.write).toBeCalledWith({ id: invalidDeliveryId });
+    expect(CALL.write).toBeCalledWith({ id: DELIVERY_ID });
+
+    expect(queueEmitter.events).toHaveLength(1);
+    const [event] = queueEmitter.events;
+    expect(event.subject).toEqual(cargo.id);
   });
 
   test('Successful completion should be logged and end the call', async () => {
@@ -198,14 +169,7 @@ describe('Cargo processing', () => {
 
   test('Errors while processing cargo should be logged and end the call', async () => {
     const error = new Error('Denied');
-
-    async function* failToPublishMessage(
-      _: IterableIterator<natsStreaming.PublisherMessage>,
-    ): AsyncIterable<string> {
-      throw error;
-    }
-
-    getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(failToPublishMessage);
+    jest.spyOn(queueEmitter, 'emit').mockRejectedValueOnce(error);
     CALL.output.push({
       cargo: cargoSerialization,
       id: DELIVERY_ID,
@@ -222,33 +186,17 @@ describe('Cargo processing', () => {
         grpcMethod: 'deliverCargo',
       }),
     );
-
     expect(callError).toEqual({
       code: grpc.status.UNAVAILABLE,
       message: 'Internal server error; please try again later',
     });
-
     expect(CALL.end).toBeCalledWith();
   });
 
   test('No ACK should be sent if a valid cargo cannot be queued', async () => {
     // Receive two deliveries. The first succeeds but the second fails.
-
-    async function* publishFirstMessageThenFail(
-      messages: IterableIterator<natsStreaming.PublisherMessage>,
-    ): AsyncIterable<string> {
-      let firstMessageYielded = false;
-      for await (const message of messages) {
-        if (!firstMessageYielded) {
-          yield message.id;
-          firstMessageYielded = true;
-          continue;
-        }
-        throw new Error('Denied');
-      }
-    }
-
-    getMockInstance(NATS_CLIENT.makePublisher).mockReturnValue(publishFirstMessageThenFail);
+    jest.spyOn(queueEmitter, 'emit').mockResolvedValueOnce(undefined);
+    jest.spyOn(queueEmitter, 'emit').mockRejectedValueOnce(new Error('Whoops'));
     const undeliveredMessageId = 'undelivered';
     CALL.output.push(
       { cargo: cargoSerialization, id: DELIVERY_ID },

@@ -18,7 +18,6 @@ import { QueueEmitter } from './utilities/backgroundQueue/QueueEmitter';
 import { EVENT_TYPES } from './services/queue/sinks/types';
 
 const GATEWAY_BOUND_OBJECT_KEY_PREFIX = 'parcels/gateway-bound';
-const ENDPOINT_BOUND_OBJECT_KEY_PREFIX = 'parcels/endpoint-bound';
 const EXPIRY_METADATA_KEY = 'parcel-expiry';
 
 export interface ParcelObject {
@@ -252,14 +251,6 @@ export class ParcelStore {
     await this.objectStoreClient.deleteObject(parcelKey, this.bucket);
   }
 
-  public async retrieveParcelForInternetPeer(parcelObjectKey: string): Promise<Buffer | null> {
-    const storeObject = await this.objectStoreClient.getObject(
-      makeFullObjectKeyForInternetPeer(parcelObjectKey),
-      this.bucket,
-    );
-    return storeObject?.body ?? null;
-  }
-
   /**
    * Store a parcel bound for a public endpoint.
    *
@@ -365,10 +356,6 @@ function getDateFromTimestamp(timestampString: string): Date | null {
   const parcelExpiryTimestamp = parseInt(timestampString, 10);
   const parcelExpiryDate = new Date(parcelExpiryTimestamp * 1_000);
   return Number.isNaN(parcelExpiryDate.getTime()) ? null : parcelExpiryDate;
-}
-
-function makeFullObjectKeyForInternetPeer(parcelObjectKey: string): string {
-  return `${ENDPOINT_BOUND_OBJECT_KEY_PREFIX}/${parcelObjectKey}`;
 }
 
 function getInternetPeerChannelName(privatePeerId: string): string {

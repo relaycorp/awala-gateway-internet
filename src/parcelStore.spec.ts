@@ -659,46 +659,6 @@ describe('deleteParcelForPrivatePeer', () => {
   });
 });
 
-describe('retrieveParcelForInternetPeer', () => {
-  const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
-
-  beforeEach(() => {
-    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue({
-      body: parcelSerialized,
-    });
-  });
-
-  test('Object should be retrieved from the right bucket', async () => {
-    await store.retrieveParcelForInternetPeer('');
-
-    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(expect.anything(), BUCKET);
-  });
-
-  test('Lookup object key should be prefixed', async () => {
-    const key = 'thingy.parcel';
-    await store.retrieveParcelForInternetPeer(key);
-
-    expect(MOCK_OBJECT_STORE_CLIENT.getObject).toBeCalledWith(
-      `parcels/endpoint-bound/${key}`,
-      expect.anything(),
-    );
-  });
-
-  test('Parcel should be returned', async () => {
-    const retrievedParcelSerialized = await store.retrieveParcelForInternetPeer('key');
-
-    expect(retrievedParcelSerialized).toEqual(parcelSerialized);
-  });
-
-  test('Nothing should be returned if the object does not exist', async () => {
-    getMockInstance(MOCK_OBJECT_STORE_CLIENT.getObject).mockResolvedValue(null);
-
-    const retrievedParcelSerialized = await store.retrieveParcelForInternetPeer('key');
-
-    expect(retrievedParcelSerialized).toBeNull();
-  });
-});
-
 describe('storeParcelForInternetPeer', () => {
   const store = new ParcelStore(MOCK_OBJECT_STORE_CLIENT, BUCKET, GATEWAY_INTERNET_ADDRESS);
 

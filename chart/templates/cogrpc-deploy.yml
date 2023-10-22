@@ -1,31 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+  name: {{ include "awala-gateway-internet.fullname" . }}-cogrpc
   labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
 spec:
 {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.cogrpc.replicas }}
 {{- end }}
   selector:
     matchLabels:
-      {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 6 }}
+      {{- include "awala-gateway-internet.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 6 }}
   template:
     metadata:
       annotations:
         {{- if .Values.podAnnotations }}
         {{- toYaml .Values.podAnnotations | nindent 8 }}
         {{- end }}
-        global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
-        mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
-        global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
-        keystore-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
-        keystore-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
+        global-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
+        mongo-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
+        global-secret-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
+        keystore-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
+        keystore-secret-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
       labels:
-        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 8 }}
+        {{- include "awala-gateway-internet.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
+      serviceAccountName: {{ include "awala-gateway-internet.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true
@@ -33,7 +33,7 @@ spec:
         - name: cogrpc
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: {{ include "relaynet-internet-gateway.image" . }}
+          image: {{ include "awala-gateway-internet.image" . }}
           imagePullPolicy: IfNotPresent
           args:
             - build/main/bin/cogrpc-server.js
@@ -48,15 +48,15 @@ spec:
               {{- end }}
           envFrom:
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}
+                name: {{ include "awala-gateway-internet.fullname" . }}
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
+                name: {{ include "awala-gateway-internet.fullname" . }}-mongo
             - secretRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}
+                name: {{ include "awala-gateway-internet.fullname" . }}
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+                name: {{ include "awala-gateway-internet.fullname" . }}-keystore
             - secretRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+                name: {{ include "awala-gateway-internet.fullname" . }}-keystore
           ports:
             - name: grpc
               containerPort: 8080

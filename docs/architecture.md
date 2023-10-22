@@ -12,17 +12,17 @@ All the services and background queues provided by this Internet gateway run on 
 
 ## Services
 
-This app implements the minimum set of services required for a Relaynet Internet gateway:
+This app implements the minimum set of services required for an Awala Internet gateway:
 
 ### PoWeb server
 
-A [PoWeb](https://specs.relaynet.network/RS-016) server, to exchange parcels with private gateways via the Internet.
+A [PoWeb](https://specs.awala.network/RS-016) server, to exchange parcels with private gateways via the Internet.
 
 This server is powered by [Fastify](https://www.fastify.io/) and [`ws`](https://www.npmjs.com/package/ws).
 
 ### CogRPC server
 
-A [CogRPC](https://specs.relaynet.network/RS-008) server, to exchange parcels with private gateways via an end-to-end encrypted sneakernet.
+A [CogRPC](https://specs.awala.network/RS-008) server, to exchange parcels with private gateways via an end-to-end encrypted sneakernet.
 
 An operator may choose not to deploy the CogRPC server if their users don't need the ability to use the sneakernet.
 
@@ -30,7 +30,7 @@ This server is powered by [`grpc`](https://www.npmjs.com/package/grpc).
 
 ### PoHTTP server
 
-A [PoHTTP](https://specs.relaynet.network/RS-007) server, to receive parcels from other gateways or public endpoints.
+A [PoHTTP](https://specs.awala.network/RS-007) server, to receive parcels from other gateways or public endpoints.
 
 This server is powered by [Fastify](https://www.fastify.io/).
 

@@ -1,18 +1,18 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName :=  include "relaynet-internet-gateway.fullname" . -}}
+{{- $fullName :=  include "awala-gateway-internet.fullname" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
-    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   rules:
-    - host: {{ include "relaynet-internet-gateway.pohttpHost" . }}
+    - host: {{ include "awala-gateway-internet.pohttpHost" . }}
       http:
         paths:
           - backend:
@@ -22,7 +22,7 @@ spec:
                   name: http
             pathType: Prefix
             path: /
-    - host: {{ include "relaynet-internet-gateway.powebHost" . }}
+    - host: {{ include "awala-gateway-internet.powebHost" . }}
       http:
         paths:
           - backend:
@@ -32,7 +32,7 @@ spec:
                   name: poweb
             pathType: Prefix
             path: /
-    - host: {{ include "relaynet-internet-gateway.cogrpcHost" . }}
+    - host: {{ include "awala-gateway-internet.cogrpcHost" . }}
       http:
         paths:
           - backend:

@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+  name: {{ include "awala-gateway-internet.fullname" . }}-keygen
   labels:
-    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "1"
@@ -13,21 +13,21 @@ spec:
     metadata:
       name: "{{ .Release.Name }}-keygen"
       labels:
-        {{- include "relaynet-internet-gateway.labels" . | nindent 8 }}
+        {{- include "awala-gateway-internet.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}-keygen
+      serviceAccountName: {{ include "awala-gateway-internet.serviceAccountName" . }}-keygen
       securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 8 }}
       shareProcessNamespace: true
       restartPolicy: OnFailure
       containers:
         - name: keygen
-          image: {{ include "relaynet-internet-gateway.image" . }}
+          image: {{ include "awala-gateway-internet.image" . }}
           imagePullPolicy: IfNotPresent
           args:
             - build/main/bin/generate-keypairs.js
           envFrom:
             - configMapRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+                name: {{ include "awala-gateway-internet.fullname" . }}-keygen
             - secretRef:
-                name: {{ include "relaynet-internet-gateway.fullname" . }}-keygen
+                name: {{ include "awala-gateway-internet.fullname" . }}-keygen

@@ -46,7 +46,7 @@ export default async function deliverCargo(
         await cargo.validate(trustedCerts);
       } catch (err) {
         // Acknowledge that we got it, not that it was accepted and stored. See:
-        // https://github.com/relaynet/specs/issues/38
+        // https://github.com/AwalaNetwork/specs/issues/38
         logger.info({ err, privatePeerId }, 'Ignoring malformed/invalid cargo');
         call.write({ id: delivery.id });
         continue;

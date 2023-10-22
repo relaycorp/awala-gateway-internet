@@ -6,7 +6,7 @@ COPY . ./
 RUN npm run build && npm prune --production && rm -r src
 
 FROM node:20.7.0-slim
-LABEL org.opencontainers.image.source="https://github.com/relaycorp/relaynet-internet-gateway"
+LABEL org.opencontainers.image.source="https://github.com/relaycorp/awala-gateway-internet"
 WORKDIR /opt/gw
 COPY --from=build /tmp/gw ./
 USER node

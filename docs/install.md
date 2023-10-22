@@ -4,7 +4,7 @@ permalink: /install
 ---
 # Install and upgrade
 
-The Relaynet-Internet Gateway is distributed as a Helm chart. Note that deploying the Docker images directly is discouraged: We're likely to change paths, as well as split and rename the Docker image.
+The Awala-Internet Gateway is distributed as a Helm chart. Note that deploying the Docker images directly is discouraged: We're likely to change paths, as well as split and rename the Docker image.
 
 ## Example
 
@@ -38,7 +38,7 @@ helm repo add relaycorp https://h.cfcr.io/relaycorp/public
 helm install \
   --values values.yaml \
   gateway-test \
-  relaycorp/relaynet-internet-gateway
+  relaycorp/awala-gateway-internet
 ```
 
 Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway) for a working example on Google Cloud Platform.
@@ -48,7 +48,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `nameOverride` | string | | A custom name for the release, to override the one passed to Helm |
-| `image.repository` | string | `ghcr.io/relaycorp/relaynet-internet-gateway` | Docker image for the gateway |
+| `image.repository` | string | `ghcr.io/relaycorp/awala-gateway-internet` | Docker image for the gateway |
 | `image.tag` | string | (Same as the chart version) | Docker image tag |
 | `podSecurityContext` | object | `{}` | A custom `securityContext` to be attached to the pods |
 | `podAnnotations` | object | `{}` | Annotations to be attached to the pods |
@@ -62,7 +62,7 @@ Check out [`relaycorp/cloud-gateway`](https://github.com/relaycorp/cloud-gateway
 | `objectStore.backend` | string | | The type of object store used. Any value supported by [`@relaycorp/object-storage`](https://github.com/relaycorp/object-storage-js) (e.g., `s3`). |
 | `logging.level` | string | `info` | The [log level](instrumentation.md). |
 | `logging.target` | string | | Any target supported by [@relaycorp/pino-cloud](https://www.npmjs.com/package/@relaycorp/pino-cloud); e.g., `gcp`. |
-| `logging.envName` | string | `relaynet-internet-gateway` | A unique name for this instance of the gateway. Used by the `gcp` target as the _service name_ when pushing errors to Google Error Reporting, for example. |
+| `logging.envName` | string | `awala-gateway-internet` | A unique name for this instance of the gateway. Used by the `gcp` target as the _service name_ when pushing errors to Google Error Reporting, for example. |
 
 ### Component-specific options
 

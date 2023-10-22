@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-pohttp
+  name: {{ include "awala-gateway-internet.fullname" . }}-pohttp
   labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "pohttp") .) | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" (merge (dict "Component" "pohttp") .) | nindent 4 }}
   {{- with .Values.service.annotations }}
   annotations:
   {{- toYaml . | nindent 4 }}
@@ -16,4 +16,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "pohttp") .) | nindent 4 }}
+    {{- include "awala-gateway-internet.selectorLabels" (merge (dict "Component" "pohttp") .) | nindent 4 }}

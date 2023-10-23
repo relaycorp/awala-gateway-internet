@@ -7,7 +7,7 @@ skinparam maxMessageSize 200
 Person(user, User)
 Person(courier, Courier)
 
-System_Boundary(c1, "Relaynet-Internet Gateway") {
+System_Boundary(c1, "Awala-Internet Gateway") {
   Container(poweb, "PoWeb service", "Fastify, ws", "Allows direct communication with private gateway over the Internet")
 
   Container(cogrpc, "CogRPC service", "gRPC server", "Allows courier to collect and deliver cargo on behalf of private gateway")

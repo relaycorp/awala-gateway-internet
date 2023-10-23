@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
+  name: {{ include "awala-gateway-internet.fullname" . }}-mongo
   labels:
-    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" . | nindent 4 }}
 data:
   MONGODB_URI: {{ .Values.mongo.uri }}
   MONGODB_DB: {{ .Values.mongo.db }}

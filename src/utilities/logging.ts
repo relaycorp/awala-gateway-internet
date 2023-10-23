@@ -2,7 +2,7 @@ import { getPinoOptions, LoggingTarget } from '@relaycorp/pino-cloud';
 import { get as getEnvVar } from 'env-var';
 import pino, { Level, Logger } from 'pino';
 
-const DEFAULT_APP_NAME = 'relaynet-internet-gateway';
+const DEFAULT_APP_NAME = 'awala-gateway';
 
 export function makeLogger(): Logger {
   const logTarget = getEnvVar('LOG_TARGET').asString();

@@ -4,4 +4,4 @@ permalink: /support
 ---
 # Help and support
 
-If you run into any issues or have any questions, please [create an issue on GitHub](https://github.com/relaycorp/relaynet-internet-gateway/issues/new/choose).
+If you run into any issues or have any questions, please [create an issue on GitHub](https://github.com/relaycorp/awala-gateway-internet/issues/new/choose).

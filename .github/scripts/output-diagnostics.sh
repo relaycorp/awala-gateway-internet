@@ -30,7 +30,7 @@ kubectl get pods
 
 PODS="$(
   kubectl get pod \
-    -l app.kubernetes.io/name=relaynet-internet-gateway \
+    -l app.kubernetes.io/name=awala-gateway-internet \
     "-o=jsonpath={.items[*]['metadata.name']}"
 )"
 

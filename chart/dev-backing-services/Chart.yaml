@@ -1,5 +1,5 @@
 apiVersion: v2
-name: relaynet-internet-gateway
+name: awala-gateway-internet
 type: application
 
 version: 1.0.0

@@ -2,14 +2,14 @@
 apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+  name: {{ include "awala-gateway-internet.fullname" . }}-cogrpc
   labels:
-    {{- include "relaynet-internet-gateway.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "relaynet-internet-gateway.fullname" . }}-cogrpc
+    name: {{ include "awala-gateway-internet.fullname" . }}-cogrpc
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

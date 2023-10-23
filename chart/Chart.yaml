@@ -1,6 +1,6 @@
 apiVersion: v2
-name: relaynet-internet-gateway
-description: Relaynet-Internet Gateway
+name: awala-gateway-internet
+description: Awala-Internet Gateway
 maintainers:
   - name: Relaycorp, Inc.
 type: application
@@ -9,7 +9,7 @@ type: application
 version: 0.1.0
 appVersion: 1.9.0
 
-home: https://docs.relaycorp.tech/relaynet-internet-gateway/
+home: https://docs.relaycorp.tech/awala-gateway-internet/
 
 sources:
-  - https://github.com/relaycorp/relaynet-internet-gateway
+  - https://github.com/relaycorp/awala-gateway-internet

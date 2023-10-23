@@ -1,15 +1,15 @@
-title: Relaynet-Internet Gateway
+title: Awala-Internet Gateway
 
 markdown: kramdown
 
-baseurl: /relaynet-internet-gateway
+baseurl: /awala-gateway-internet
 remote_theme: pmarsceill/just-the-docs@v0.2.7-r
 
 footer_content: "Copyright &copy; 2020-2023 Relaycorp, Inc."
 
 aux_links:
-  "Relaynet-Internet Gateway on GitHub":
-    - "https://github.com/relaycorp/relaynet-internet-gateway"
+  "Awala-Internet Gateway on GitHub":
+    - "https://github.com/relaycorp/awala-gateway-internet"
 
 search_enabled: false
 

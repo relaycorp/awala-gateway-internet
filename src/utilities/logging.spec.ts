@@ -64,12 +64,12 @@ describe('makeLogger', () => {
     expect(getPinoOptions).toBeCalledWith(undefined, expect.objectContaining({ name: envName }));
   });
 
-  test('App name should be "relaynet-internet-gateway" if LOG_ENV_NAME if absent', () => {
+  test('App name should be "awala-gateway" if LOG_ENV_NAME if absent', () => {
     makeLogger();
 
     expect(getPinoOptions).toBeCalledWith(
       undefined,
-      expect.objectContaining({ name: 'relaynet-internet-gateway' }),
+      expect.objectContaining({ name: 'awala-gateway' }),
     );
   });
 

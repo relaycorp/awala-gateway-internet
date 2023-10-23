@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "relaynet-internet-gateway.fullname" . }}-certrotator
+  name: {{ include "awala-gateway-internet.fullname" . }}-certrotator
   labels:
-    {{- include "relaynet-internet-gateway.labels" . | nindent 4 }}
+    {{- include "awala-gateway-internet.labels" . | nindent 4 }}
 spec:
   schedule: "0 8 * * *"
   startingDeadlineSeconds: 3600
@@ -14,17 +14,17 @@ spec:
         {{- if .Values.podAnnotations }}
         {{- toYaml .Values.podAnnotations | nindent 8 }}
         {{- end }}
-        global-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
-        mongo-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
-        global-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
-        keystore-cm-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
-        keystore-secret-digest: {{ include "relaynet-internet-gateway.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
+        global-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "global-cm.yml") .) }}
+        mongo-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "mongo-cm.yml") .) }}
+        global-secret-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "global-secret.yml") .) }}
+        keystore-cm-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "keystore-cm.yml") .) }}
+        keystore-secret-digest: {{ include "awala-gateway-internet.resourceDigest" (merge (dict "fileName" "keystore-secret.yml") .) }}
       labels:
-        {{- include "relaynet-internet-gateway.selectorLabels" (merge (dict "Component" "certrotator") .) | nindent 8 }}
+        {{- include "awala-gateway-internet.selectorLabels" (merge (dict "Component" "certrotator") .) | nindent 8 }}
     spec:
       template:
         spec:
-          serviceAccountName: {{ include "relaynet-internet-gateway.serviceAccountName" . }}
+          serviceAccountName: {{ include "awala-gateway-internet.serviceAccountName" . }}
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
           shareProcessNamespace: true
@@ -33,18 +33,18 @@ spec:
             - name: keygen
               securityContext:
                 {{- toYaml .Values.securityContext | nindent 16 }}
-              image: {{ include "relaynet-internet-gateway.image" . }}
+              image: {{ include "awala-gateway-internet.image" . }}
               imagePullPolicy: IfNotPresent
               args:
                 - build/main/bin/rotate-id-certificate.js
               envFrom:
                 - configMapRef:
-                    name: {{ include "relaynet-internet-gateway.fullname" . }}
+                    name: {{ include "awala-gateway-internet.fullname" . }}
                 - configMapRef:
-                    name: {{ include "relaynet-internet-gateway.fullname" . }}-mongo
+                    name: {{ include "awala-gateway-internet.fullname" . }}-mongo
                 - secretRef:
-                    name: {{ include "relaynet-internet-gateway.fullname" . }}
+                    name: {{ include "awala-gateway-internet.fullname" . }}
                 - configMapRef:
-                    name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+                    name: {{ include "awala-gateway-internet.fullname" . }}-keystore
                 - secretRef:
-                    name: {{ include "relaynet-internet-gateway.fullname" . }}-keystore
+                    name: {{ include "awala-gateway-internet.fullname" . }}-keystore

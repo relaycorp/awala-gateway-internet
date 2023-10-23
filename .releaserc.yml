@@ -1,15 +1,14 @@
-branches: [master]
+branches: [main]
 plugins:
   - "@semantic-release/commit-analyzer"
   - "@semantic-release/release-notes-generator"
   - - "@semantic-release/npm"
     - npmPublish: false
   - - "@semantic-release/exec"
-    - prepareCmd: docker tag public-gateway:latest ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
-      publishCmd: docker push ghcr.io/relaycorp/relaynet-internet-gateway:${nextRelease.version}
+    - prepareCmd: docker tag relaycorp/awala-gateway-internet:ci ghcr.io/relaycorp/awala-gateway-internet:${nextRelease.version}
+      publishCmd: docker push ghcr.io/relaycorp/awala-gateway-internet:${nextRelease.version}
   - - "@semantic-release/exec"
-    - prepareCmd: helm package chart/ --dependency-update --app-version=${nextRelease.version} --version=${nextRelease.version} --destination=build/
-      publishCmd: .github/scripts/push-helm-chart.sh
+    - prepareCmd: docker tag relaycorp/awala-gateway-internet:ci relaycorp/awala-gateway-internet:${nextRelease.version}
+      publishCmd: docker push relaycorp/awala-gateway-internet:${nextRelease.version}
+  - - "@semantic-release/exec"
   - - "@semantic-release/github"
-    - assets:
-        - path: build/relaynet-internet-gateway-*.tgz

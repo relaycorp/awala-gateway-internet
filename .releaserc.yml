@@ -8,7 +8,7 @@ plugins:
     - prepareCmd: docker tag relaycorp/awala-gateway-internet:ci ghcr.io/relaycorp/awala-gateway-internet:${nextRelease.version}
       publishCmd: docker push ghcr.io/relaycorp/awala-gateway-internet:${nextRelease.version}
   - - "@semantic-release/exec"
-    - prepareCmd: docker tag relaycorp/awala-gateway-internet:ci relaycorp/awala-gateway-internet:${nextRelease.version}
-      publishCmd: docker push relaycorp/awala-gateway-internet:${nextRelease.version}
+    - prepareCmd: docker tag relaycorp/awala-gateway-internet:ci relaycorp/awala-gateway:${nextRelease.version}
+      publishCmd: docker push relaycorp/awala-gateway:${nextRelease.version}
   - - "@semantic-release/exec"
   - - "@semantic-release/github"

@@ -19,7 +19,7 @@
     "@redis/client": "^1.5.11",
     "@relaycorp/awala-keystore-cloud": "^2.1.30",
     "@relaycorp/awala-keystore-mongodb": "^1.1.22",
-    "@relaycorp/cloudevents-transport": "^2.0.0",
+    "@relaycorp/cloudevents-transport": "^2.0.1",
     "@relaycorp/cogrpc": "^1.3.82",
     "@relaycorp/object-storage": "^1.4.93",
     "@relaycorp/pino-cloud": "^1.0.28",

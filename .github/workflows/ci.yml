@@ -11,6 +11,9 @@ jobs:
       nodejs_version: 20
       kubernetes_version: "1.26.3"
       skaffold_version: "2.3.1"
+      dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+    secrets:
+      dockerhub_password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   release:
     needs: ci

@@ -158,10 +158,7 @@ describe('RedisPubSubClient', () => {
       mockRedisClient.connect.mockRejectedValueOnce(error);
       mockCreateClient.mockReturnValueOnce(mockRedisClient);
 
-      const errorWrapped = await getPromiseRejection(
-        client.makePublisher(),
-        RedisPubSubError,
-      );
+      const errorWrapped = await getPromiseRejection(client.makePublisher(), RedisPubSubError);
 
       expect(errorWrapped.message).toStartWith('Failed to connect to Redis');
       expect(errorWrapped.cause()).toBe(error);

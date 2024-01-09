@@ -48,6 +48,22 @@ describe('RedisPubSubClient', () => {
       expect(redisClient.connect).toHaveBeenCalledBefore(redisClient.subscribe);
     });
 
+    test('Should wrap connection errors', async () => {
+      const client = RedisPubSubClient.init();
+      const mockRedisClient = new MockRedisClient();
+      const error = new Error('the error');
+      mockRedisClient.connect.mockRejectedValueOnce(error);
+      mockCreateClient.mockReturnValueOnce(mockRedisClient);
+
+      const errorWrapped = await getPromiseRejection(
+        collect(client.subscribe(channel)),
+        RedisPubSubError,
+      );
+
+      expect(errorWrapped.message).toStartWith('Failed to connect to Redis');
+      expect(errorWrapped.cause()).toBe(error);
+    });
+
     test('Should subscribe to specified channel', async () => {
       const client = RedisPubSubClient.init();
       emitMessagesAsync(['message']);
@@ -133,6 +149,19 @@ describe('RedisPubSubClient', () => {
 
       const redisClient = getMockedRedisClient();
       expect(redisClient.connect).toHaveBeenCalledOnce();
+    });
+
+    test('Should wrap connection errors', async () => {
+      const client = RedisPubSubClient.init();
+      const mockRedisClient = new MockRedisClient();
+      const error = new Error('the error');
+      mockRedisClient.connect.mockRejectedValueOnce(error);
+      mockCreateClient.mockReturnValueOnce(mockRedisClient);
+
+      const errorWrapped = await getPromiseRejection(client.makePublisher(), RedisPubSubError);
+
+      expect(errorWrapped.message).toStartWith('Failed to connect to Redis');
+      expect(errorWrapped.cause()).toBe(error);
     });
 
     describe('Publish', () => {

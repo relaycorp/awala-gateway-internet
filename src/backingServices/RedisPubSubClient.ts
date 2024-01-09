@@ -77,7 +77,11 @@ export class RedisPubSubClient {
 
   private async connect(): Promise<RedisClientType> {
     const redisClient = createClient({ url: this.redisUrl });
-    await redisClient.connect();
+    try {
+      await redisClient.connect();
+    } catch (err) {
+      throw new RedisPubSubError(err as Error, 'Failed to connect to Redis');
+    }
     return redisClient as RedisClientType;
   }
 }

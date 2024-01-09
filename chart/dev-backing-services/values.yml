@@ -9,17 +9,17 @@ vault:
 
 minio:
   fullnameOverride: minio
-  accessKey: test-key
-  secretKey: test-secret
-  buckets:
-    - name: public-gateway
-      policy: none
+  auth:
+    rootUser: test-key
+    rootPassword: test-secret
+  defaultBuckets: public-gateway
   persistence:
     enabled: false
-  resources:
-    requests:
-      # TODO: Try to get Minio to use less RAM
-      memory: 1Gi
+  provisioning:
+    resources:
+      requests:
+        # TODO: Try to get Minio to use less RAM
+        memory: 1Gi
 
 mongodb:
   fullnameOverride: mongodb

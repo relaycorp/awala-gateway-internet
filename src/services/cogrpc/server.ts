@@ -1,9 +1,7 @@
-import { KeyCertPair, Server, ServerCredentials } from '@grpc/grpc-js';
+import { Server, ServerCredentials } from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
-import { get as getEnvVar } from 'env-var';
 import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
-import * as selfsigned from 'selfsigned';
 
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { configureExitHandling } from '../../utilities/exitHandling';
@@ -49,9 +47,8 @@ export async function runServer(logger?: Logger): Promise<void> {
   });
   server.addService(grpcHealthCheck.service, healthCheckService as any);
 
-  const certificate = await selfIssueCertificate();
   await new Promise<void>((resolve, reject) => {
-    server.bindAsync(NETLOC, ServerCredentials.createSsl(null, [certificate]), (error) => {
+    server.bindAsync(NETLOC, ServerCredentials.createInsecure(), (error) => {
       if (error) {
         reject(error);
       } else {
@@ -62,28 +59,4 @@ export async function runServer(logger?: Logger): Promise<void> {
   server.start();
 
   baseLogger.info('Ready to receive requests');
-}
-
-/**
- * Self issue certificate.
- *
- * As a workaround for: https://github.com/kubernetes/ingress-gce/issues/18#issuecomment-694815076
- */
-async function selfIssueCertificate(): Promise<KeyCertPair> {
-  const ipAddress = getEnvVar('SERVER_IP_ADDRESS').required().asString();
-  const keys = selfsigned.generate([{ name: 'commonName', value: ipAddress }], {
-    days: 365,
-    extensions: [
-      {
-        altNames: [
-          {
-            ip: ipAddress,
-            type: 7, // IP Address
-          },
-        ],
-        name: 'subjectAltName',
-      },
-    ],
-  });
-  return { cert_chain: Buffer.from(keys.cert), private_key: Buffer.from(keys.private) };
 }

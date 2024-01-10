@@ -37,15 +37,6 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - build/main/bin/cogrpc-server.js
-          env:
-            - name: SERVER_IP_ADDRESS
-              {{- if .Values.tags.gwDev }}
-              value: 127.0.0.1
-              {{- else }}
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-              {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "awala-gateway-internet.fullname" . }}

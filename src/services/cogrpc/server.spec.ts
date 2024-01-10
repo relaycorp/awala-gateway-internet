@@ -2,11 +2,9 @@ import * as grpc from '@grpc/grpc-js';
 import { CargoRelayService } from '@relaycorp/cogrpc';
 import * as grpcHealthCheck from 'grpc-js-health-check';
 import { Logger } from 'pino';
-import selfsigned from 'selfsigned';
 
 import { createMongooseConnectionFromEnv } from '../../backingServices/mongo';
 import { MAX_RAMF_MESSAGE_SIZE } from '../../constants';
-import { configureMockEnvVars } from '../../testUtils/envVars';
 import { getMockContext, mockSpy } from '../../testUtils/jest';
 import { makeMockLogging, partialPinoLog } from '../../testUtils/logging';
 import * as exitHandling from '../../utilities/exitHandling';
@@ -14,7 +12,6 @@ import * as logging from '../../utilities/logging';
 import { runServer } from './server';
 import * as cogrpcService from './service';
 import { mockQueueEmitter } from '../../testUtils/eventing/mockQueueEmitter';
-import envVar from 'env-var';
 
 const makeServiceImplementationSpy = mockSpy(jest.spyOn(cogrpcService, 'makeService'));
 const mockServer = {
@@ -30,18 +27,7 @@ jest.mock('@grpc/grpc-js', () => {
   };
 });
 
-const mockSelfSignedOutput = {
-  cert: 'the certificate, PEM-encoded',
-  private: 'the private key, PEM-encoded',
-};
-const mockSelfSigned = mockSpy(jest.spyOn(selfsigned, 'generate'), () => mockSelfSignedOutput);
-
 const mockExitHandler = mockSpy(jest.spyOn(exitHandling, 'configureExitHandling'));
-
-const BASE_ENV_VARS = {
-  SERVER_IP_ADDRESS: '127.0.0.1',
-};
-const mockEnvVars = configureMockEnvVars(BASE_ENV_VARS);
 
 const mockLogger = makeMockLogging().logger;
 const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogger);
@@ -49,17 +35,10 @@ const mockMakeLogger = mockSpy(jest.spyOn(logging, 'makeLogger'), () => mockLogg
 const queueEmitter = mockQueueEmitter();
 
 describe('runServer', () => {
-  test('Exit handler should be configured as the very first step', async () => {
-    mockEnvVars({});
+  test('Exit handler should be configured', async () => {
+    await runServer();
 
-    await expect(runServer()).toReject();
     expect(mockExitHandler).toBeCalledWith(mockLogger);
-  });
-
-  test('Environment variable SERVER_IP_ADDRESS should be present', async () => {
-    mockEnvVars({ ...BASE_ENV_VARS, SERVER_IP_ADDRESS: undefined });
-
-    await expect(runServer).rejects.toThrowWithMessage(envVar.EnvVarError, /SERVER_IP_ADDRESS/);
   });
 
   test('Server should accept the largest possible RAMF messages', async () => {
@@ -173,32 +152,6 @@ describe('runServer', () => {
     mockServer.bindAsync.mockImplementation((_netloc, _credentials, cb) => cb(bindError));
 
     await expect(() => runServer()).rejects.toBe(bindError);
-  });
-
-  test('Server should use TLS with a self-issued certificate', async () => {
-    const spiedCreateSsl = jest.spyOn(grpc.ServerCredentials, 'createSsl');
-
-    await runServer();
-
-    expect(mockServer.bindAsync).toBeCalledTimes(1);
-    expect(spiedCreateSsl).toBeCalledWith(null, [
-      {
-        cert_chain: Buffer.from(mockSelfSignedOutput.cert),
-        private_key: Buffer.from(mockSelfSignedOutput.private),
-      },
-    ]);
-    expect(mockSelfSigned).toBeCalledWith(
-      [{ name: 'commonName', value: BASE_ENV_VARS.SERVER_IP_ADDRESS }],
-      {
-        days: 365,
-        extensions: [
-          {
-            altNames: [{ ip: BASE_ENV_VARS.SERVER_IP_ADDRESS, type: 7 }],
-            name: 'subjectAltName',
-          },
-        ],
-      },
-    );
   });
 
   test('gRPC server should be started as the last step', async () => {

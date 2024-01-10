@@ -837,7 +837,7 @@ describe('storeParcelForInternetPeer', () => {
 describe('initFromEnv', () => {
   const requiredEnvVars = {
     OBJECT_STORE_BUCKET: 'the-bucket',
-    PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+    INTERNET_ADDRESS: GATEWAY_INTERNET_ADDRESS,
   };
   const mockEnvVars = configureMockEnvVars(requiredEnvVars);
 

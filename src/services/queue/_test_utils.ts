@@ -10,7 +10,7 @@ import { CE_CHANNEL } from '../../testUtils/eventing/stubs';
 export const QUEUE_ENV_VARS = {
   ...REQUIRED_ENV_VARS,
   OBJECT_STORE_BUCKET: 'the-bucket',
-  PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+  INTERNET_ADDRESS: GATEWAY_INTERNET_ADDRESS,
   CE_CHANNEL,
 };
 

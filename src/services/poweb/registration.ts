@@ -30,7 +30,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
 
   const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
 
-  const internetAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
+  const internetAddress = getEnvVar('INTERNET_ADDRESS').required().asString();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],

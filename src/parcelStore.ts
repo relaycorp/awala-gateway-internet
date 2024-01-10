@@ -36,7 +36,7 @@ export class ParcelStore {
   public static initFromEnv(): ParcelStore {
     const objectStoreClient = initObjectStoreFromEnv();
     const objectStoreBucket = getEnvVar('OBJECT_STORE_BUCKET').required().asString();
-    const internetAddress = getEnvVar('PUBLIC_ADDRESS').required().asString();
+    const internetAddress = getEnvVar('INTERNET_ADDRESS').required().asString();
     return new ParcelStore(objectStoreClient, objectStoreBucket, internetAddress);
   }
 

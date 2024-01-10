@@ -31,7 +31,7 @@ export function setUpTestEnvironment(): Fixture {
     OBJECT_STORE_BUCKET: STUB_OBJECT_STORE_BUCKET,
     OBJECT_STORE_ENDPOINT: 'http://localhost.example',
     OBJECT_STORE_SECRET_KEY: 's3cr3t',
-    PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+    INTERNET_ADDRESS: GATEWAY_INTERNET_ADDRESS,
   });
 
   let mockLogging: MockLogging;

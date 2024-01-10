@@ -63,7 +63,7 @@ export function makePoWebTestServer(): () => PoWebFixtureSet {
 
   const getFixtures = makeTestServer(makeServer, {
     ...REQUIRED_ENV_VARS,
-    PUBLIC_ADDRESS: GATEWAY_INTERNET_ADDRESS,
+    INTERNET_ADDRESS: GATEWAY_INTERNET_ADDRESS,
   });
 
   beforeEach(async () => {

@@ -15,9 +15,5 @@ spec:
       targetPort: grpc
       protocol: TCP
       name: cogrpc
-    - port: 8083
-      targetPort: health-check
-      protocol: TCP
-      name: health-check
   selector:
     {{- include "awala-gateway-internet.selectorLabels" (merge (dict "Component" "cogrpc") .) | nindent 4 }}

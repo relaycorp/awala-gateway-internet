@@ -24,7 +24,7 @@ import { ExternalPdaChain, generateCCA, generateCDAChain } from '../testUtils/pk
 import { encapsulateMessagesInCargo, extractMessagesFromCargo } from './utils/cargo';
 import { createAndRegisterPrivateGateway } from './utils/gatewayRegistration';
 import {
-  GW_COGRPC_HOST,
+  GW_COGRPC_PORT,
   GW_INTERNET_ADDRESS,
   GW_POHTTP_HOST_URL,
   GW_POWEB_HOST_PORT,
@@ -39,7 +39,7 @@ const POWEB_CLIENT = PoWebClient.initLocal(GW_POWEB_HOST_PORT);
 
 let cogRPCClient: CogRPCClient;
 beforeEach(async () => {
-  cogRPCClient = await CogRPCClient.initLan(GW_COGRPC_HOST);
+  cogRPCClient = await CogRPCClient.initLocalhost(GW_COGRPC_PORT);
 });
 afterEach(() => {
   cogRPCClient.close();

@@ -37,15 +37,6 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - build/main/bin/cogrpc-server.js
-          env:
-            - name: SERVER_IP_ADDRESS
-              {{- if .Values.tags.gwDev }}
-              value: 127.0.0.1
-              {{- else }}
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-              {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "awala-gateway-internet.fullname" . }}
@@ -61,40 +52,14 @@ spec:
             - name: grpc
               containerPort: 8080
               protocol: TCP
+          livenessProbe:
+            grpc:
+              port: 8080
+          readinessProbe:
+            grpc:
+              port: 8080
           resources:
             {{- toYaml .Values.cogrpc.resources | nindent 12 }}
-        - name: cogrpc-health-check
-          image: salrashid123/grpc_health_proxy:1.0.0
-          imagePullPolicy: IfNotPresent
-          command:
-            - "/bin/grpc_health_proxy"
-            - "-http-listen-addr"
-            - "0.0.0.0:8082"
-            - "-grpcaddr"
-            - "127.0.0.1:8080"
-            - "-service-name"
-            - "relaynet.cogrpc.CargoRelay"
-            - "-grpctls"
-            - "-grpc-tls-no-verify"
-            - "-v"
-            - "10"
-          ports:
-            - name: health-check
-              containerPort: 8082
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              port: "health-check"
-          readinessProbe:
-            httpGet:
-              port: "health-check"
-          resources:
-            requests:
-              cpu: 2m
-              memory: 7Mi
-            limits:
-              cpu: 5m
-              memory: 10Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

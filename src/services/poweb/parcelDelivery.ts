@@ -108,11 +108,12 @@ async function verifyCountersignature(
 ): Promise<Certificate | null> {
   const [authorizationType, countersignatureBase64] = (authorizationHeader || '').split(' ', 2);
   if (authorizationType !== 'Relaynet-Countersignature') {
+    logger.info('Refused parcel due to missing countersignature');
     return null;
   }
   const countersignature = Buffer.from(countersignatureBase64, 'base64');
   if (countersignature.byteLength === 0) {
-    // The base64-encoded countersignature was empty or malformed
+    logger.info('Refused parcel due to malformed countersignature');
     return null;
   }
   const trustedCertificates = await retrieveOwnCertificates(mongooseConnection);
@@ -120,7 +121,7 @@ async function verifyCountersignature(
   try {
     return await verifier.verify(bufferToArray(countersignature), parcelSerialized);
   } catch (err) {
-    logger.debug({ err }, 'Invalid countersignature');
+    logger.info({ err }, 'Refused parcel due to invalid countersignature');
     return null;
   }
 }

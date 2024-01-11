@@ -58,29 +58,38 @@ describe('Authorization errors', () => {
   });
 
   test('Requests with the wrong Authorization type should result in HTTP 401', async () => {
-    const { server } = getFixtures();
+    const { server, logs } = getFixtures();
 
     const response = await postParcel(Buffer.from([]), server, 'Bearer 123');
 
     expectResponseToRequireAuthentication(response);
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Refused parcel due to missing countersignature'),
+    );
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Requests with missing Authorization value should result in HTTP 401', async () => {
-    const { server } = getFixtures();
+    const { server, logs } = getFixtures();
 
     const response = await postParcel(Buffer.from([]), server, 'Relaynet-Countersignature ');
 
     expectResponseToRequireAuthentication(response);
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Refused parcel due to malformed countersignature'),
+    );
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
   test('Malformed base64-encoded countersignatures should result in HTTP 401', async () => {
-    const { server } = getFixtures();
+    const { server, logs } = getFixtures();
 
     const response = await postParcel(Buffer.from([]), server, 'Relaynet-Countersignature .');
 
     expectResponseToRequireAuthentication(response);
+    expect(logs).toContainEqual(
+      partialPinoLog('info', 'Refused parcel due to malformed countersignature'),
+    );
     expect(getFixtures().parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });
 
@@ -100,7 +109,9 @@ describe('Authorization errors', () => {
 
     expectResponseToRequireAuthentication(response);
     expect(logs).toContainEqual(
-      partialPinoLog('debug', 'Invalid countersignature', { err: expect.anything() }),
+      partialPinoLog('info', 'Refused parcel due to invalid countersignature', {
+        err: expect.anything(),
+      }),
     );
     expect(parcelStore.storeParcelFromPrivatePeer).not.toBeCalled();
   });

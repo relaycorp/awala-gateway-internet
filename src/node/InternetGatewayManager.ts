@@ -28,21 +28,19 @@ export class InternetGatewayManager extends GatewayManager<undefined> {
 
   protected readonly defaultNodeConstructor = InternetGateway;
 
-  protected readonly config: Config;
-
   constructor(
     protected connection: Connection,
     keyStores: KeyStoreSet,
   ) {
     super(keyStores);
-    this.config = new Config(this.connection);
   }
 
   public async getOrCreateCurrent(): Promise<InternetGateway> {
     let id = await this.getCurrentId();
     if (!id) {
       id = await this.create();
-      await this.config.set(ConfigKey.CURRENT_ID, id);
+      const config = new Config(this.connection);
+      await config.set(ConfigKey.CURRENT_ID, id);
     }
     return this.getOrThrow(id);
   }
@@ -56,7 +54,8 @@ export class InternetGatewayManager extends GatewayManager<undefined> {
   }
 
   protected async getCurrentId(): Promise<string | null> {
-    return this.config.get(ConfigKey.CURRENT_ID);
+    const config = new Config(this.connection);
+    return config.get(ConfigKey.CURRENT_ID);
   }
 
   protected async getOrThrow(id: string): Promise<InternetGateway> {

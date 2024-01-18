@@ -1,3 +1,4 @@
+import envVar from 'env-var';
 import pino from 'pino';
 
 import { mockSpy } from '../../testUtils/jest';
@@ -7,7 +8,7 @@ import { makeServer } from './server';
 
 jest.mock('../../utilities/exitHandling');
 
-makePoWebTestServer();
+const getFixtures = makePoWebTestServer();
 
 const mockFastifyInstance = { close: jest.fn() };
 const mockConfigureFastify = mockSpy(
@@ -28,6 +29,13 @@ describe('makeServer', () => {
     await makeServer(logger);
 
     expect(mockConfigureFastify).toBeCalledWith(expect.anything(), expect.anything(), logger);
+  });
+
+  test('Env var INTERNET_ADDRESS should be defined', async () => {
+    const { envVarMocker } = getFixtures();
+    envVarMocker({});
+
+    await expect(makeServer()).rejects.toThrowWithMessage(envVar.EnvVarError, /INTERNET_ADDRESS/);
   });
 
   test('Fastify instance should be returned', async () => {

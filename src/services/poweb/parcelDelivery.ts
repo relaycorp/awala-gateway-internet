@@ -12,16 +12,12 @@ import { ParcelStore } from '../../parcelStore';
 import { retrieveOwnCertificates } from '../../pki';
 import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
-import RouteOptions from './RouteOptions';
 import { RedisPubSubClient } from '../../backingServices/RedisPubSubClient';
 import { QueueEmitter } from '../../utilities/backgroundQueue/QueueEmitter';
 
 const ENDPOINT_URL = '/v1/parcels';
 
-export default async function registerRoutes(
-  fastify: FastifyInstance,
-  _options: RouteOptions,
-): Promise<void> {
+export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   const parcelStore = ParcelStore.initFromEnv();
 
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);

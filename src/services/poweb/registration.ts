@@ -7,7 +7,6 @@ import {
 } from '@relaycorp/relaynet-core';
 import { MongoCertificateStore } from '@relaycorp/awala-keystore-mongodb';
 import bufferToArray from 'buffer-to-arraybuffer';
-import { get as getEnvVar } from 'env-var';
 import { FastifyInstance, FastifyReply } from 'fastify';
 
 import { initPrivateKeyStore } from '../../backingServices/keystore';
@@ -16,10 +15,14 @@ import { Config, ConfigKey } from '../../utilities/config';
 import { sha256 } from '../../utilities/crypto';
 import { registerDisallowedMethods } from '../../utilities/fastify/server';
 import { CONTENT_TYPES } from './contentTypes';
+import { PowebRouteOptions } from './PowebRouteOptions';
 
 const ENDPOINT_URL = '/v1/nodes';
 
-export default async function registerRoutes(fastify: FastifyInstance): Promise<void> {
+export default async function registerRoutes(
+  fastify: FastifyInstance,
+  options: PowebRouteOptions,
+): Promise<void> {
   registerDisallowedMethods(['POST'], ENDPOINT_URL, fastify);
 
   fastify.addContentTypeParser(
@@ -29,8 +32,6 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
   );
 
   const privateKeyStore = initPrivateKeyStore((fastify as any).mongoose);
-
-  const internetAddress = getEnvVar('INTERNET_ADDRESS').required().asString();
 
   fastify.route<{ readonly Body: Buffer }>({
     method: ['POST'],
@@ -102,7 +103,7 @@ export default async function registerRoutes(fastify: FastifyInstance): Promise<
       const registration = new PrivateNodeRegistration(
         privateGatewayCertificate,
         internetGatewayCertPath!.leafCertificate,
-        internetAddress,
+        options.internetAddress,
         sessionKeyPair.sessionKey,
       );
       return reply

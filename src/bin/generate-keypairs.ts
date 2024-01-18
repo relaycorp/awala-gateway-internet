@@ -21,7 +21,8 @@ async function main(): Promise<void> {
 
 async function bootstrap(connection: Connection): Promise<void> {
   const manager = await InternetGatewayManager.init(connection);
-  await manager.getOrCreateCurrent();
+  const gateway = await manager.getOrCreateCurrent();
+  await gateway.makeInitialSessionKeyIfMissing();
 }
 
 main();

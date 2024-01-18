@@ -22,4 +22,20 @@ export class InternetGateway extends Gateway<undefined> {
     };
     return new InternetGatewayChannel(this, peer, new CertificationPath(cda, []), this.keyStores);
   }
+
+  /**
+   * Generate the initial session key if it doesn't exist yet.
+   * @returns Whether the initial session key was created.
+   */
+  public async makeInitialSessionKeyIfMissing(): Promise<boolean> {
+    const existingKey = await this.keyStores.privateKeyStore.retrieveUnboundSessionPublicKey(
+      this.id,
+    );
+    if (existingKey !== null) {
+      return false;
+    }
+
+    await this.generateSessionKey();
+    return true;
+  }
 }

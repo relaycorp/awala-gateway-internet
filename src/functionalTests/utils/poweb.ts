@@ -1,6 +1,7 @@
 import { Parcel, ParcelCollectionHandshakeSigner, StreamingMode } from '@relaycorp/relaynet-core';
 import { PoWebClient } from '@relaycorp/relaynet-poweb';
 import { collect, pipeline, take } from 'streaming-iterables';
+
 import { ExternalPdaChain } from '../../testUtils/pki';
 
 /**

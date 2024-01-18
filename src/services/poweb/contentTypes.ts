@@ -5,4 +5,5 @@ export const CONTENT_TYPES = {
     REQUEST: 'application/vnd.awala.node-registration.request',
   },
   PARCEL: 'application/vnd.awala.parcel',
+  CONNECTION_PARAMS: 'application/vnd.etsi.tsl.der',
 };

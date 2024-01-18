@@ -68,8 +68,6 @@ beforeAll(async () => {
 
   internetGatewayId = await certificateChain.internetGatewayCert.calculateSubjectId();
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
   const sessionKeyPair = await SessionKeyPair.generate();
   internetGatewaySessionKey = sessionKeyPair.sessionKey;
   internetGatewaySessionPrivateKey = sessionKeyPair.privateKey;

@@ -1,4 +1,4 @@
-import { Cargo, MockKeyStoreSet, SessionKeyPair } from '@relaycorp/relaynet-core';
+import { Cargo, MockKeyStoreSet, type SessionKey, SessionKeyPair } from '@relaycorp/relaynet-core';
 import {
   CDACertPath,
   generateCDACertificationPath,
@@ -7,10 +7,10 @@ import {
 } from '@relaycorp/relaynet-testing';
 import bufferToArray from 'buffer-to-arraybuffer';
 import { addMinutes } from 'date-fns';
+import { collect } from 'streaming-iterables';
 
 import { arrayToAsyncIterable } from '../testUtils/iter';
 import { InternetGateway } from './InternetGateway';
-import { collect } from 'streaming-iterables';
 
 let keyPairSet: NodeKeyPairSet;
 let cdaChain: CDACertPath;
@@ -92,5 +92,29 @@ describe('getChannelFromCda', () => {
     );
 
     expect(channel.peer.internetAddress).toBeUndefined();
+  });
+});
+
+describe('makeInitialSessionKeyIfMissing', () => {
+  test('Key should be generated if there are no existing unbound keys', async () => {
+    await expect(
+      KEY_STORES.privateKeyStore.retrieveUnboundSessionPublicKey(internetGateway.id),
+    ).resolves.toBeNull();
+
+    await expect(internetGateway.makeInitialSessionKeyIfMissing()).resolves.toBeTrue();
+
+    await expect(
+      KEY_STORES.privateKeyStore.retrieveUnboundSessionPublicKey(internetGateway.id),
+    ).resolves.not.toBeNull();
+  });
+
+  test('Key should not be generated if there are existing unbound keys', async () => {
+    const preExistingKey = await internetGateway.generateSessionKey();
+
+    await expect(internetGateway.makeInitialSessionKeyIfMissing()).resolves.toBeFalse();
+
+    await expect(
+      KEY_STORES.privateKeyStore.retrieveUnboundSessionPublicKey(internetGateway.id),
+    ).resolves.toSatisfy<SessionKey>((key) => key.keyId.equals(preExistingKey.keyId));
   });
 });

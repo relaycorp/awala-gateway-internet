@@ -14,7 +14,7 @@ logging:
 ingress:
   enableTls: false
 
-internetAddress: gateway.tld
+internetAddress: public-gateway-pohttp.default
 
 # Skip the broker; post directly to the CloudEvents endpoint in development
 queueChannel: http://public-gateway-queue

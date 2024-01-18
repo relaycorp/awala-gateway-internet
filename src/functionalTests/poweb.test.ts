@@ -3,6 +3,7 @@ import {
   generateRSAKeyPair,
   issueDeliveryAuthorization,
   issueEndpointCertificate,
+  NodeConnectionParams,
   Parcel,
   ParcelDeliverySigner,
   PrivateNodeRegistrationRequest,
@@ -18,13 +19,20 @@ import uuid from 'uuid-random';
 
 import { GeneratedParcel } from '../testUtils/awala';
 import { ExternalPdaChain } from '../testUtils/pki';
-import { GW_POWEB_HOST_PORT } from './utils/constants';
+import { GW_INTERNET_ADDRESS, GW_POWEB_HOST_PORT } from './utils/constants';
 import {
   createAndRegisterPrivateGateway,
   registerPrivateGateway,
 } from './utils/gatewayRegistration';
 import { extractPong, makePingParcel } from './utils/ping';
 import { collectNextParcel, waitForNextParcel } from './utils/poweb';
+
+test('Connection params should be available', async () => {
+  const response = await fetch(`http://127.0.0.1:${GW_POWEB_HOST_PORT}/connection-params.der`);
+
+  const params = await NodeConnectionParams.deserialize(await response.arrayBuffer());
+  expect(params.internetAddress).toBe(GW_INTERNET_ADDRESS);
+});
 
 describe('Node registration', () => {
   test('Valid registration requests should be accepted', async () => {

@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.9.5",
-    "@redis/client": "^1.5.11",
+    "@redis/client": "^1.5.13",
     "@relaycorp/awala-keystore-cloud": "^2.2.3",
     "@relaycorp/awala-keystore-mongodb": "^1.1.26",
     "@relaycorp/cloudevents-transport": "^2.0.6",

@@ -29,7 +29,7 @@
     "abortable-iterator": "^3.0.0",
     "buffer-to-arraybuffer": "0.0.6",
     "cloudevents": "^8.0.0",
-    "date-fns": "^2.29.2",
+    "date-fns": "^3.3.1",
     "env-var": "^7.3.1",
     "fastify": "^4.24.3",
     "fastify-plugin": "^4.5.1",

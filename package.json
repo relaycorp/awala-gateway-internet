@@ -49,7 +49,7 @@
     "@relaycorp/relaynet-poweb": "^1.6.35",
     "@relaycorp/relaynet-testing": "^2.2.31",
     "@relaycorp/shared-config": "^1.14.1",
-    "@relaycorp/ws-mock": "^5.2.7",
+    "@relaycorp/ws-mock": "^5.2.10",
     "@shelf/jest-mongodb": "^4.2.0",
     "@types/jest": "^29.5.11",
     "@types/mongoose": "^5.10.5",

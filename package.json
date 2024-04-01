@@ -31,7 +31,7 @@
     "cloudevents": "^8.0.0",
     "date-fns": "^3.6.0",
     "env-var": "^7.3.1",
-    "fastify": "^4.26.1",
+    "fastify": "^4.26.2",
     "fastify-plugin": "^4.5.1",
     "grpc-js-health-check": "^1.1.0",
     "mongoose": "^8.1.0",

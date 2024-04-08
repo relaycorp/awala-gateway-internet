@@ -15,7 +15,7 @@
     "clean": "del-cli build test coverage"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/grpc-js": "^1.10.6",
     "@redis/client": "^1.5.14",
     "@relaycorp/awala-keystore-cloud": "^2.2.16",
     "@relaycorp/awala-keystore-mongodb": "^1.1.32",

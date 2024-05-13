@@ -18,7 +18,7 @@
     "@grpc/grpc-js": "^1.10.6",
     "@redis/client": "^1.5.14",
     "@relaycorp/awala-keystore-cloud": "^2.2.21",
-    "@relaycorp/awala-keystore-mongodb": "^1.1.34",
+    "@relaycorp/awala-keystore-mongodb": "^1.1.38",
     "@relaycorp/cloudevents-transport": "^2.0.15",
     "@relaycorp/cogrpc": "^1.4.3",
     "@relaycorp/object-storage": "^1.4.110",

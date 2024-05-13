@@ -21,7 +21,7 @@
     "@relaycorp/awala-keystore-mongodb": "^1.1.38",
     "@relaycorp/cloudevents-transport": "^2.0.15",
     "@relaycorp/cogrpc": "^1.4.3",
-    "@relaycorp/object-storage": "^1.4.109",
+    "@relaycorp/object-storage": "^1.4.110",
     "@relaycorp/pino-cloud": "^1.0.28",
     "@relaycorp/relaynet-core": "^1.88.2",
     "@relaycorp/relaynet-pohttp": "^1.7.81",
@@ -43,7 +43,7 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8",
-    "utf-8-validate": "^6.0.3"
+    "utf-8-validate": "^6.0.4"
   },
   "devDependencies": {
     "@relaycorp/relaynet-poweb": "^1.6.35",

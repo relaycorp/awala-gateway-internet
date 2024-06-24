@@ -21,7 +21,7 @@
     "@relaycorp/awala-keystore-mongodb": "^1.1.38",
     "@relaycorp/cloudevents-transport": "^2.0.17",
     "@relaycorp/cogrpc": "^1.4.3",
-    "@relaycorp/object-storage": "^1.4.111",
+    "@relaycorp/object-storage": "^1.4.112",
     "@relaycorp/pino-cloud": "^1.0.28",
     "@relaycorp/relaynet-core": "^1.88.2",
     "@relaycorp/relaynet-pohttp": "^1.7.83",
